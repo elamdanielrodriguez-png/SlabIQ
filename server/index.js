@@ -415,36 +415,33 @@ function sanitizeGradingResponse(rawText, measuredCenterings) {
     }
   }
 
-  // Strip the legacy centeringMeasured field (AI sometimes still includes it)
+  // Strip the legacy centeringMeasured field
   delete parsed.centeringMeasured;
 
-  // BGS overall = avg of 4 subgrades (centering + corners + edges + surface), capped at lowest + 0.5.
-  // Centering is AI's initial estimate — user may override client-side, which triggers a recompute.
+  // Compute BGS overall and PSA grade from whichever subgrades are present.
+  // Centering is AI's initial estimate; user may override client-side which triggers a recompute.
   if (parsed.bgs) {
     const c = typeof parsed.bgs.centering === 'number' ? parsed.bgs.centering : null;
     const { corners, edges, surface } = parsed.bgs;
-    if (c != null && typeof corners === 'number' && typeof edges === 'number' && typeof surface === 'number') {
-      const subs = [c, corners, edges, surface];
-      const avg = subs.reduce((a, b) => a + b, 0) / 4;
+    const fixed = [corners, edges, surface].filter(v => typeof v === 'number');
+    const subs = c != null ? [c, ...fixed] : fixed;
+
+    if (subs.length >= 3) {
+      const avg = subs.reduce((a, b) => a + b, 0) / subs.length;
+
+      // BGS overall: avg rounded to 0.5, capped at lowest + 0.5 (BGS rule)
       const rounded = Math.round(avg * 2) / 2;
       const lowest = Math.min(...subs);
       parsed.bgs.overall = Math.min(rounded, lowest + 0.5);
-      parsed.bgs.isBlackLabel = subs.every(v => v === 10.0);
-    }
-  }
+      parsed.bgs.isBlackLabel = subs.length === 4 && subs.every(v => v === 10.0);
 
-  // PSA grade = straight round(avg of 4 subgrades). User-requested simple averaging.
-  if (parsed.bgs) {
-    const c = typeof parsed.bgs.centering === 'number' ? parsed.bgs.centering : null;
-    const { corners, edges, surface } = parsed.bgs;
-    if (c != null && typeof corners === 'number' && typeof edges === 'number' && typeof surface === 'number') {
-      const avg = (c + corners + edges + surface) / 4;
+      // PSA: straight round of average (user-specified rule)
       const psaGrade = Math.max(1, Math.min(10, Math.round(avg)));
       const PSA_LABELS = { 10: 'GEM MT', 9: 'MINT', 8: 'NM-MT', 7: 'NM', 6: 'EX-MT', 5: 'EX', 4: 'VG-EX', 3: 'VG', 2: 'GOOD', 1: 'PR' };
       if (!parsed.psa) parsed.psa = {};
-      console.log(`PSA: AI said ${parsed.psa.grade}, deriving ${psaGrade} from avg(${c},${corners},${edges},${surface})=${avg.toFixed(2)}`);
+      console.log(`Subgrades [${subs.join(',')}] avg=${avg.toFixed(2)} → BGS ${parsed.bgs.overall}, PSA ${psaGrade}`);
       parsed.psa.grade = psaGrade;
-      parsed.psa.label = PSA_LABELS[psaGrade] || parsed.psa.label || '';
+      parsed.psa.label = PSA_LABELS[psaGrade] || '';
     }
   }
 
@@ -584,6 +581,53 @@ RULES:
   } catch (err) {
     console.error('Identify error:', err.message);
     res.status(502).json({ error: 'Could not identify card. Please try again.' });
+  }
+});
+
+app.post('/api/find-corners', async (req, res) => {
+  const { imageData, mediaType = 'image/jpeg' } = req.body;
+  if (!imageData) return res.status(400).json({ error: 'Image required' });
+
+  try {
+    const msg = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 300,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageData } },
+          { type: 'text', text: `Find the four corners of the trading card in this image. The card may be tilted at an angle.
+
+Return ONLY this JSON (no extra text), with corners as fractions of image width/height (0.0 to 1.0):
+{
+  "tl": { "x": <num>, "y": <num> },
+  "tr": { "x": <num>, "y": <num> },
+  "br": { "x": <num>, "y": <num> },
+  "bl": { "x": <num>, "y": <num> }
+}
+
+Where:
+- tl = the top-left physical corner of the card itself (NOT the image edge)
+- tr = top-right corner of the card
+- br = bottom-right corner of the card
+- bl = bottom-left corner of the card
+
+Be precise. The 4 points should hug the card's actual corners. If the card is held at an angle, the 4 points will not form a perfect rectangle — that's correct and expected.
+
+If you cannot reliably identify all 4 corners (e.g., a corner is out of frame or hidden), return: { "error": "no card" }` }
+        ],
+      }],
+    });
+    const text = msg.content.find(b => b.type === 'text')?.text ?? '';
+    const m = text.match(/\{[\s\S]*\}/);
+    if (!m) return res.json({ corners: null });
+    const parsed = JSON.parse(m[0]);
+    if (parsed.error || !parsed.tl) return res.json({ corners: null });
+    console.log(`Corners: tl=${parsed.tl.x?.toFixed(2)},${parsed.tl.y?.toFixed(2)} br=${parsed.br?.x?.toFixed(2)},${parsed.br?.y?.toFixed(2)}`);
+    res.json({ corners: parsed });
+  } catch (err) {
+    console.error('Find corners error:', err.message);
+    res.status(502).json({ corners: null });
   }
 });
 

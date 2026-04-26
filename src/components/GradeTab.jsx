@@ -576,18 +576,13 @@ export default function GradeTab({ images, result, candidates, loading, error, o
   const handleDrop = (e) => { e.preventDefault(); onAddImages(e.dataTransfer.files); };
 
   const frontImg = result ? (images.find(img => img.role === 'front') ?? images[0] ?? null) : null;
-  const imageCentering = frontImg?.centering ?? null;
-  const cm = imageCentering ?? result?.centeringMeasured;
-  const computedCm = computeCentering(cm);
-  const centeringIsOk = computedCm && computedCm.worst <= 55;
+  // Only treat centering as "user-confirmed" if they actually opened the editor and hit Confirm.
+  // Auto-detection at upload populates frontImg.centering but doesn't count as confirmation.
+  const userConfirmed = frontImg?.centeringConfirmedByUser === true;
+  const userCentering = userConfirmed ? frontImg?.centering : null;
+  const cm = userCentering;
   const activeNegs = (result?.negatives ?? [])
-    .map(n => cleanCenteringText(n, cm))
-    .filter((n, i) => {
-      if (dismissedNegs.includes(i)) return false;
-      // drop any centering negative when our measurement says it's within PSA 10 tolerance
-      if (centeringIsOk && /center/i.test(n)) return false;
-      return true;
-    });
+    .filter((_, i) => !dismissedNegs.includes(i));
   const activeDefects = (result?.defects ?? []).filter((_, i) => !dismissedDefects.includes(i));
 
   return (
@@ -750,10 +745,9 @@ export default function GradeTab({ images, result, candidates, loading, error, o
 
             {/* BGS subgrades */}
             {(() => {
-              const subCm = imageCentering ? computeCentering(imageCentering) : null;
-              // Prefer user-set centering; fall back to AI's initial estimate
-              const centeringDisplay = subCm ? subCm.bgsSubgrade : (result.bgs?.centering ?? null);
-              const isManual = !!subCm;
+              // Single source of truth: result.bgs.centering. AI sets it initially; recomputeBgsAndPsa updates it on user confirm.
+              const centeringDisplay = result.bgs?.centering ?? null;
+              const isManual = userConfirmed;
               return (
                 <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", marginTop: 22, paddingTop: 18, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
                   <button
@@ -765,7 +759,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
                       <>
                         <div style={{ color: "rgba(255,255,255,0.85)", fontSize: 20, fontWeight: 600, letterSpacing: "-0.5px" }}>{centeringDisplay}</div>
                         <div style={{ color: isManual ? "#30d158" : "rgba(255,255,255,0.25)", fontSize: 8, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginTop: 3 }}>
-                          {isManual ? "✓ manual" : "ai · tap"}
+                          {isManual ? "✓ manual" : "✓ ai"}
                         </div>
                       </>
                     ) : (
@@ -795,7 +789,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
 
             {/* Centering breakdown — only shown when user has manually set centering */}
             {(() => {
-              const raw = imageCentering;
+              const raw = userCentering;
               if (!raw) return null;
               const f = raw.front ?? raw;
               const b = raw.back ?? null;

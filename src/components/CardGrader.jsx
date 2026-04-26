@@ -186,18 +186,241 @@ function processImageFile(file) {
         const ctx = canvas.getContext("2d");
         ctx.drawImage(img, 0, 0, w, h);
         const detected = detectCardCentering(canvas, ctx);
-        resolve({
-          imageData: canvas.toDataURL("image/jpeg", 0.92).split(",")[1],
-          centering: detected ? { leftPct: detected.leftPct, rightPct: detected.rightPct, topPct: detected.topPct, bottomPct: detected.bottomPct } : null,
-          centeringLines: detected?.lines ?? null,
-          cardBounds: detected?.cardBounds ?? { cL: 0, cR: w, cT: 0, cB: h },
-          width: w,
-          height: h,
-        });
+
+        // Auto-crop to just the card (scanner-feel) when detection found a card
+        // smaller than the frame. Keeps a 4% margin so we never shave the card.
+        let finalCanvas = canvas;
+        let finalW = w, finalH = h;
+        let finalBounds = detected?.cardBounds ?? { cL: 0, cR: w, cT: 0, cB: h };
+        let finalLines = detected?.lines ?? null;
+
+        if (detected?.cardBounds) {
+          const { cL, cR, cT, cB } = detected.cardBounds;
+          const cardW = cR - cL, cardH = cB - cT;
+          const cardFillsFrame = (cardW / w) > 0.92 && (cardH / h) > 0.92;
+          if (!cardFillsFrame) {
+            const mX = Math.round(cardW * 0.04);
+            const mY = Math.round(cardH * 0.04);
+            const cropX = Math.max(0, cL - mX);
+            const cropY = Math.max(0, cT - mY);
+            const cropW = Math.min(w - cropX, cardW + mX * 2);
+            const cropH = Math.min(h - cropY, cardH + mY * 2);
+
+            const cropped = document.createElement("canvas");
+            cropped.width = cropW;
+            cropped.height = cropH;
+            cropped.getContext("2d").drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+
+            finalCanvas = cropped;
+            finalW = cropW;
+            finalH = cropH;
+            finalBounds = { cL: cL - cropX, cR: cR - cropX, cT: cT - cropY, cB: cB - cropY };
+
+            // Translate the auto-detected centering lines from the original frame's
+            // coordinate system to the cropped frame so the editor still places them
+            // correctly on the card edges.
+            if (detected.lines) {
+              const tx = (frac, total, off, newTot) => (frac * total - off) / newTot;
+              finalLines = {
+                leftOuter:   Math.max(tx(detected.lines.leftOuter,   w, cropX, cropW), 0.001),
+                leftInner:           tx(detected.lines.leftInner,    w, cropX, cropW),
+                rightInner:          tx(detected.lines.rightInner,   w, cropX, cropW),
+                rightOuter:  Math.min(tx(detected.lines.rightOuter,  w, cropX, cropW), 0.999),
+                topOuter:    Math.max(tx(detected.lines.topOuter,    h, cropY, cropH), 0.001),
+                topInner:            tx(detected.lines.topInner,     h, cropY, cropH),
+                bottomInner:         tx(detected.lines.bottomInner,  h, cropY, cropH),
+                bottomOuter: Math.min(tx(detected.lines.bottomOuter, h, cropY, cropH), 0.999),
+              };
+            }
+          }
+        }
+
+        finalCanvas.toBlob((blob) => {
+          resolve({
+            imageData: finalCanvas.toDataURL("image/jpeg", 0.92).split(",")[1],
+            objectURL: blob ? URL.createObjectURL(blob) : null,
+            centering: detected ? { leftPct: detected.leftPct, rightPct: detected.rightPct, topPct: detected.topPct, bottomPct: detected.bottomPct } : null,
+            centeringLines: finalLines,
+            cardBounds: finalBounds,
+            width: finalW,
+            height: finalH,
+          });
+        }, "image/jpeg", 0.92);
       };
       img.src = e.target.result;
     };
     reader.readAsDataURL(file);
+  });
+}
+
+// ─── Perspective correction (Path C: scanner mode) ────────────────────────────
+// Solve 8x8 linear system via Gaussian elimination with partial pivoting
+function solveLinear8x8(A, b) {
+  const n = 8;
+  const M = A.map((row, i) => [...row, b[i]]);
+  for (let i = 0; i < n; i++) {
+    let max = i;
+    for (let k = i + 1; k < n; k++) if (Math.abs(M[k][i]) > Math.abs(M[max][i])) max = k;
+    [M[i], M[max]] = [M[max], M[i]];
+    for (let k = i + 1; k < n; k++) {
+      const f = M[k][i] / M[i][i];
+      for (let j = i; j <= n; j++) M[k][j] -= f * M[i][j];
+    }
+  }
+  const x = new Array(n);
+  for (let i = n - 1; i >= 0; i--) {
+    x[i] = M[i][n];
+    for (let j = i + 1; j < n; j++) x[i] -= M[i][j] * x[j];
+    x[i] /= M[i][i];
+  }
+  return x;
+}
+
+// Homography mapping 4 source points to 4 destination points (returns 9 floats)
+function homography(src, dst) {
+  const A = [], b = [];
+  for (let i = 0; i < 4; i++) {
+    const [x, y] = src[i], [u, v] = dst[i];
+    A.push([x, y, 1, 0, 0, 0, -u * x, -u * y]);
+    A.push([0, 0, 0, x, y, 1, -v * x, -v * y]);
+    b.push(u);
+    b.push(v);
+  }
+  const h = solveLinear8x8(A, b);
+  return [h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7], 1];
+}
+
+// Perspective-correct a quad in the source canvas to a rectangular output canvas
+function perspectiveCorrect(srcCanvas, corners, outW, outH) {
+  const H = homography(
+    [[0, 0], [outW - 1, 0], [outW - 1, outH - 1], [0, outH - 1]],
+    [[corners.tl.x, corners.tl.y], [corners.tr.x, corners.tr.y], [corners.br.x, corners.br.y], [corners.bl.x, corners.bl.y]]
+  );
+  const sw = srcCanvas.width, sh = srcCanvas.height;
+  const srcCtx = srcCanvas.getContext("2d");
+  const sd = srcCtx.getImageData(0, 0, sw, sh).data;
+
+  const dst = document.createElement("canvas");
+  dst.width = outW;
+  dst.height = outH;
+  const dstCtx = dst.getContext("2d");
+  const dstImage = dstCtx.createImageData(outW, outH);
+  const dd = dstImage.data;
+
+  const h0 = H[0], h1 = H[1], h2 = H[2], h3 = H[3], h4 = H[4], h5 = H[5], h6 = H[6], h7 = H[7], h8 = H[8];
+
+  for (let y = 0; y < outH; y++) {
+    for (let x = 0; x < outW; x++) {
+      const w = h6 * x + h7 * y + h8;
+      const sx = (h0 * x + h1 * y + h2) / w;
+      const sy = (h3 * x + h4 * y + h5) / w;
+      const di = (y * outW + x) * 4;
+      if (sx < 0 || sx >= sw - 1 || sy < 0 || sy >= sh - 1) {
+        dd[di] = 0; dd[di + 1] = 0; dd[di + 2] = 0; dd[di + 3] = 255;
+        continue;
+      }
+      const x0 = sx | 0, y0 = sy | 0;
+      const fx = sx - x0, fy = sy - y0;
+      const fx1 = 1 - fx, fy1 = 1 - fy;
+      const i00 = (y0 * sw + x0) * 4;
+      const i10 = i00 + 4;
+      const i01 = i00 + sw * 4;
+      const i11 = i01 + 4;
+      dd[di]     = (sd[i00]     * fx1 * fy1 + sd[i10]     * fx * fy1 + sd[i01]     * fx1 * fy + sd[i11]     * fx * fy) | 0;
+      dd[di + 1] = (sd[i00 + 1] * fx1 * fy1 + sd[i10 + 1] * fx * fy1 + sd[i01 + 1] * fx1 * fy + sd[i11 + 1] * fx * fy) | 0;
+      dd[di + 2] = (sd[i00 + 2] * fx1 * fy1 + sd[i10 + 2] * fx * fy1 + sd[i01 + 2] * fx1 * fy + sd[i11 + 2] * fx * fy) | 0;
+      dd[di + 3] = 255;
+    }
+  }
+  dstCtx.putImageData(dstImage, 0, 0);
+  return dst;
+}
+
+async function fetchCardCorners(imageData) {
+  try {
+    const res = await fetch("/api/find-corners", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imageData }),
+    });
+    const data = await res.json();
+    return data.corners ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function validCorners(c) {
+  if (!c?.tl || !c?.tr || !c?.br || !c?.bl) return false;
+  for (const k of ["tl", "tr", "br", "bl"]) {
+    const p = c[k];
+    if (typeof p?.x !== "number" || typeof p?.y !== "number") return false;
+    if (p.x < 0 || p.x > 1 || p.y < 0 || p.y > 1) return false;
+  }
+  // Sanity: corners should be ordered roughly correctly
+  if (c.tl.x > c.tr.x - 0.05) return false;
+  if (c.tl.y > c.bl.y - 0.05) return false;
+  if (c.bl.x > c.br.x - 0.05) return false;
+  if (c.tr.y > c.br.y - 0.05) return false;
+  return true;
+}
+
+// Run perspective correction on a base64 image using AI-detected corners
+function perspectiveCorrectImage(imageData, corners) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onerror = reject;
+    img.onload = () => {
+      const src = document.createElement("canvas");
+      src.width = img.width;
+      src.height = img.height;
+      src.getContext("2d").drawImage(img, 0, 0);
+
+      const px = {
+        tl: { x: corners.tl.x * img.width, y: corners.tl.y * img.height },
+        tr: { x: corners.tr.x * img.width, y: corners.tr.y * img.height },
+        br: { x: corners.br.x * img.width, y: corners.br.y * img.height },
+        bl: { x: corners.bl.x * img.width, y: corners.bl.y * img.height },
+      };
+
+      const avgW = (Math.hypot(px.tr.x - px.tl.x, px.tr.y - px.tl.y) + Math.hypot(px.br.x - px.bl.x, px.br.y - px.bl.y)) / 2;
+      const avgH = (Math.hypot(px.bl.x - px.tl.x, px.bl.y - px.tl.y) + Math.hypot(px.br.x - px.tr.x, px.br.y - px.tr.y)) / 2;
+
+      // Snap to standard card aspect (5:7 = 0.714)
+      const RATIO = 5 / 7;
+      let outW, outH;
+      if (avgW / avgH > RATIO) {
+        outH = Math.round(avgH);
+        outW = Math.round(outH * RATIO);
+      } else {
+        outW = Math.round(avgW);
+        outH = Math.round(outW / RATIO);
+      }
+      const MAX = 2000;
+      if (outW > MAX || outH > MAX) {
+        const s = MAX / Math.max(outW, outH);
+        outW = Math.round(outW * s);
+        outH = Math.round(outH * s);
+      }
+      if (outW < 200 || outH < 200) return reject(new Error("Output too small"));
+
+      const corrected = perspectiveCorrect(src, px, outW, outH);
+      const ctx = corrected.getContext("2d");
+      const detected = detectCardCentering(corrected, ctx);
+
+      corrected.toBlob((blob) => {
+        resolve({
+          imageData: corrected.toDataURL("image/jpeg", 0.92).split(",")[1],
+          objectURL: blob ? URL.createObjectURL(blob) : null,
+          centering: detected ? { leftPct: detected.leftPct, rightPct: detected.rightPct, topPct: detected.topPct, bottomPct: detected.bottomPct } : null,
+          centeringLines: detected?.lines ?? null,
+          cardBounds: detected?.cardBounds ?? { cL: 0, cR: outW, cT: 0, cB: outH },
+          width: outW,
+          height: outH,
+        });
+      }, "image/jpeg", 0.92);
+    };
+    img.src = `data:image/jpeg;base64,${imageData}`;
   });
 }
 
@@ -290,10 +513,26 @@ export default function CardGrader() {
     const currentCount = images.length;
     const processed = await Promise.all(
       [...files].slice(0, slots).map(async (file, fileIdx) => {
-        const { imageData, centering, centeringLines, cardBounds, width, height } = await processImageFile(file);
+        const base = await processImageFile(file);
         const slot = currentCount + fileIdx;
         const role = slot === 0 ? 'front' : slot === 1 ? 'back' : 'detail';
-        return { objectURL: URL.createObjectURL(file), imageData, centering, centeringLines, cardBounds, width, height, role };
+
+        // Path C: perspective-correct front/back only. Detail shots (3rd+) are
+        // intentionally angled to show surface flaws under raking light, so leave them alone.
+        if (role === 'front' || role === 'back') {
+          try {
+            const corners = await fetchCardCorners(base.imageData);
+            if (validCorners(corners)) {
+              const corrected = await perspectiveCorrectImage(base.imageData, corners);
+              if (base.objectURL) URL.revokeObjectURL(base.objectURL);
+              return { ...corrected, role };
+            }
+          } catch (e) {
+            console.warn('Perspective correction failed, keeping cropped image:', e);
+          }
+        }
+
+        return { ...base, role };
       })
     );
     setImages((prev) => [...prev, ...processed]);
@@ -311,8 +550,7 @@ export default function CardGrader() {
   };
 
   const updateImageCentering = (idx, centering, lines) => {
-    setImages(prev => prev.map((img, i) => i !== idx ? img : { ...img, centering, centeringLines: lines }));
-    // Only the front photo's centering drives BGS overall + PSA. Front = role 'front' or index 0.
+    setImages(prev => prev.map((img, i) => i !== idx ? img : { ...img, centering, centeringLines: lines, centeringConfirmedByUser: true }));
     setImages(prev => {
       const target = prev[idx];
       const isFront = target?.role === "front" || (idx === 0 && !prev.some(i => i.role === "front"));
@@ -343,11 +581,9 @@ export default function CardGrader() {
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      if (data.candidates?.length === 1 && (data.confidence ?? 0) >= 98) {
-        await gradeCards(data.candidates[0]);
-      } else {
-        setCandidates(data.candidates || []);
-      }
+      // Always show picker — user explicitly confirms even when AI is confident.
+      // Past experience: 98% confidence has been wrong, picker is a one-tap safety net.
+      setCandidates(data.candidates || []);
     } catch (err) {
       setError(err.message || "Could not identify card. Please try again.");
     } finally {
