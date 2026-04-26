@@ -701,22 +701,36 @@ app.post('/api/grade', async (req, res) => {
     const raw = message.content.find(b => b.type === 'text')?.text ?? '';
     let text = sanitizeGradingResponse(raw);
 
+    // Force the response's card identity to match what the USER picked, not what the AI thinks.
+    // This is critical when the user used "Other" search to pick a different variant (e.g. Stained Glass)
+    // — the AI might still output base-card identity in its response, polluting downstream logic.
+    if (confirmedCard?.player) {
+      try {
+        const parsed = JSON.parse(text);
+        parsed.player = confirmedCard.player;
+        parsed.year = confirmedCard.year;
+        parsed.set = confirmedCard.set;
+        parsed.variant = confirmedCard.variant ?? parsed.variant ?? 'Base';
+        parsed.cardNumber = confirmedCard.cardNumber ?? parsed.cardNumber ?? null;
+        text = JSON.stringify(parsed);
+      } catch {}
+    }
+
     // Decide whether to use eBay comps or trust AI estimate.
-    // Vintage (pre-1980) and high-value cards have noisy eBay data — flooded with reprints/customs/lots,
-    // and real comps usually go through major auction houses, not eBay BIN. Trust AI for those.
+    // Vintage (pre-1980) eBay data is too noisy — flooded with reprints/customs/lots,
+    // and real comps go through major auction houses. Trust AI for vintage only.
+    // For modern (incl. high-value parallels), eBay scrape gives much better data than AI training.
     let skipEbay = false;
     let skipReason = '';
     try {
       const preParsed = JSON.parse(text);
       const yearNum = parseInt(confirmedCard?.year, 10) || 0;
-      const aiPsa10 = Number(preParsed.market?.graded?.psa10) || 0;
       if (yearNum > 0 && yearNum < 1980) { skipEbay = true; skipReason = 'vintage'; }
-      else if (aiPsa10 > 5000)            { skipEbay = true; skipReason = 'high-value'; }
       if (skipEbay) {
         if (!preParsed.market) preParsed.market = {};
         preParsed.market.dataSource = `AI estimate (${skipReason} card — eBay too noisy)`;
         text = JSON.stringify(preParsed);
-        console.log(`Market: skipping eBay scrape (${skipReason}: year=${yearNum}, ai psa10=$${aiPsa10})`);
+        console.log(`Market: skipping eBay scrape (${skipReason}: year=${yearNum})`);
       }
     } catch {}
 

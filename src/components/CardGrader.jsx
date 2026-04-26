@@ -11,7 +11,8 @@
 // v1.8.0 — Centering rewrite: measures border WIDTH not center-to-edge; separate front/back measurements; PSA back=75/25; eBay cross-check logic
 // v1.9.0 — Card picker always shown: /api/identify step before grading; Mosaic/decorative card design elements; borderless centering default
 // v2.0.0 — Client-side centering: canvas pixel detection measures actual border widths; server uses as authoritative ground truth; AI no longer estimates centering
-const VERSION = "2.0.0";
+// v2.5.0 — Scanner mode: auto-crop background + AI-detected 4-corner perspective correction for front/back. AI centering re-added as initial estimate (user override updates BGS+PSA). PSA = round(avg of 4 subgrades). Forced 8-zone grading. Real eBay market comps via Haiku. User-picked card identity forces server response.
+const VERSION = "2.5.0";
 
 import { useState } from "react";
 import GradeTab from "./GradeTab";
