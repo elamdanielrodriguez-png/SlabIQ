@@ -592,15 +592,19 @@ app.post('/api/find-corners', async (req, res) => {
 
   try {
     const msg = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: 'claude-opus-4-7',
       max_tokens: 300,
       messages: [{
         role: 'user',
         content: [
           { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageData } },
-          { type: 'text', text: `Find the four corners of the trading card in this image. The card may be tilted at an angle.
+          { type: 'text', text: `Locate the FOUR PHYSICAL CORNERS of the trading card in this image. The card may be tilted, rotated, or shot at an angle. There may be a table, desk, hand, sleeve, or other background around the card — IGNORE all of that.
 
-Return ONLY this JSON (no extra text), with corners as fractions of image width/height (0.0 to 1.0):
+CRITICAL — the corners must hug the card's actual physical edges TIGHTLY. Do NOT include any background, table, sleeve, or hand. Imagine drawing a sharpie line right on top of where the card's edge meets the background — those four corner points are what we want.
+
+The output is used to crop and perspective-warp the card into a flat rectangle. Every percentage point matters — even a 2% error includes visible background in the output. Be precise.
+
+Return ONLY this JSON (no extra text). Coordinates are fractions of image width/height (0.0 to 1.0):
 {
   "tl": { "x": <num>, "y": <num> },
   "tr": { "x": <num>, "y": <num> },
@@ -608,15 +612,12 @@ Return ONLY this JSON (no extra text), with corners as fractions of image width/
   "bl": { "x": <num>, "y": <num> }
 }
 
-Where:
-- tl = the top-left physical corner of the card itself (NOT the image edge)
+- tl = top-left physical corner of the card (the actual corner of the card itself)
 - tr = top-right corner of the card
 - br = bottom-right corner of the card
 - bl = bottom-left corner of the card
 
-Be precise. The 4 points should hug the card's actual corners. If the card is held at an angle, the 4 points will not form a perfect rectangle — that's correct and expected.
-
-If you cannot reliably identify all 4 corners (e.g., a corner is out of frame or hidden), return: { "error": "no card" }` }
+If a card corner is cut off / out of frame / hidden by a finger / not visible, return: { "error": "corner missing" } and I'll fall back to a different method. Don't guess where a hidden corner would be.` }
         ],
       }],
     });
