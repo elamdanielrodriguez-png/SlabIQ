@@ -351,6 +351,91 @@ async function fetchCardCorners(imageData) {
   }
 }
 
+// Pixel-based corner detection: finds the actual physical corners of a tilted card
+// by sampling background, masking card pixels, and finding the extreme pixel in each
+// of 4 quadrants from the card centroid. Pixel-precise, no API call, no model latency.
+function findCornersFromPixels(canvas, ctx) {
+  const W = canvas.width, H = canvas.height;
+  const data = ctx.getImageData(0, 0, W, H).data;
+  const px = (x, y) => {
+    const i = (y * W + x) * 4;
+    return [data[i], data[i + 1], data[i + 2]];
+  };
+  const dist2 = (a, b) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
+
+  // Sample 8 perimeter points for background — corners + edge midpoints
+  const samples = [
+    px(3, 3), px(W - 4, 3), px(3, H - 4), px(W - 4, H - 4),
+    px(W >> 1, 3), px(W >> 1, H - 4), px(3, H >> 1), px(W - 4, H >> 1),
+  ];
+  // Background must be roughly uniform across multiple perimeter points
+  let maxVar = 0;
+  for (let i = 0; i < samples.length; i++) {
+    for (let j = i + 1; j < samples.length; j++) {
+      maxVar = Math.max(maxVar, dist2(samples[i], samples[j]));
+    }
+  }
+  if (maxVar > 4000) return null; // background too varied — can't reliably segment
+
+  const bg = [0, 0, 0];
+  for (const s of samples) { bg[0] += s[0]; bg[1] += s[1]; bg[2] += s[2]; }
+  bg[0] /= samples.length; bg[1] /= samples.length; bg[2] /= samples.length;
+  const THR = 55 * 55; // squared color distance threshold for "card" vs "background"
+
+  // Pass 1: find centroid of card pixels
+  const STEP = Math.max(2, Math.round(Math.min(W, H) / 600));
+  let count = 0, cx = 0, cy = 0;
+  for (let y = 0; y < H; y += STEP) {
+    for (let x = 0; x < W; x += STEP) {
+      if (dist2(px(x, y), bg) > THR) { count++; cx += x; cy += y; }
+    }
+  }
+  if (count < 500) return null;
+  cx /= count; cy /= count;
+
+  // Pass 2: find extreme card pixel in each quadrant relative to centroid
+  let tl = { d: -1, x: 0, y: 0 };
+  let tr = { d: -1, x: 0, y: 0 };
+  let bl = { d: -1, x: 0, y: 0 };
+  let br = { d: -1, x: 0, y: 0 };
+  for (let y = 0; y < H; y += STEP) {
+    for (let x = 0; x < W; x += STEP) {
+      if (dist2(px(x, y), bg) > THR) {
+        const d = (x - cx) ** 2 + (y - cy) ** 2;
+        const dx = x - cx, dy = y - cy;
+        if (dx <= 0 && dy <= 0 && d > tl.d) { tl = { d, x, y }; }
+        else if (dx >= 0 && dy <= 0 && d > tr.d) { tr = { d, x, y }; }
+        else if (dx <= 0 && dy >= 0 && d > bl.d) { bl = { d, x, y }; }
+        else if (dx >= 0 && dy >= 0 && d > br.d) { br = { d, x, y }; }
+      }
+    }
+  }
+  if (tl.d < 0 || tr.d < 0 || bl.d < 0 || br.d < 0) return null;
+
+  return {
+    tl: { x: tl.x / W, y: tl.y / H },
+    tr: { x: tr.x / W, y: tr.y / H },
+    br: { x: br.x / W, y: br.y / H },
+    bl: { x: bl.x / W, y: bl.y / H },
+  };
+}
+
+function detectCornersFromImageData(imageData) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onerror = reject;
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0);
+      resolve(findCornersFromPixels(canvas, ctx));
+    };
+    img.src = `data:image/jpeg;base64,${imageData}`;
+  });
+}
+
 function validCorners(c) {
   if (!c?.tl || !c?.tr || !c?.br || !c?.bl) return false;
   for (const k of ["tl", "tr", "br", "bl"]) {
@@ -530,14 +615,21 @@ export default function CardGrader() {
         // intentionally angled to show surface flaws under raking light, so leave them alone.
         if (role === 'front' || role === 'back') {
           try {
-            const corners = await fetchCardCorners(base.imageData);
+            // Try pixel-based corner detection first (precise, free, no API latency).
+            // Falls back to AI (Opus) if the background is too varied to segment cleanly.
+            let corners = await detectCornersFromImageData(base.imageData);
+            let source = 'pixel';
+            if (!validCorners(corners)) {
+              corners = await fetchCardCorners(base.imageData);
+              source = 'ai';
+            }
             if (validCorners(corners)) {
               const corrected = await perspectiveCorrectImage(base.imageData, corners);
               if (base.objectURL) URL.revokeObjectURL(base.objectURL);
-              console.log(`[scanner] ${role}: perspective-corrected ✓`);
+              console.log(`[scanner] ${role}: perspective-corrected via ${source} ✓`);
               return { ...corrected, role, scanned: true };
             } else {
-              console.warn(`[scanner] ${role}: corners invalid or missing — keeping original`, corners);
+              console.warn(`[scanner] ${role}: no valid corners (pixel + ai both failed) — keeping original`);
             }
           } catch (e) {
             console.warn(`[scanner] ${role}: failed —`, e);
