@@ -489,7 +489,7 @@ app.post('/api/search', async (req, res) => {
     }));
 
     const msg = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: 'claude-sonnet-4-6',
       max_tokens: 600,
       messages: [{
         role: 'user',
@@ -544,7 +544,7 @@ app.post('/api/identify', async (req, res) => {
     }));
 
     const msg = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: 'claude-sonnet-4-6',
       max_tokens: 400,
       messages: [{
         role: 'user',

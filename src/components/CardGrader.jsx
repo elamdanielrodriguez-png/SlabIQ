@@ -474,6 +474,16 @@ function validCorners(c) {
   const minY = Math.min(c.tl.y, c.tr.y);
   const maxY = Math.max(c.bl.y, c.br.y);
   if (maxX - minX < 0.2 || maxY - minY < 0.2) return false;
+  // Reject if quadrilateral covers >88% of image — that means detection failed and
+  // returned the image edges (no real card boundary found). Perspective correction
+  // would be a no-op, leaving the original photo untouched.
+  const area = 0.5 * Math.abs(
+    c.tl.x * (c.tr.y - c.bl.y) +
+    c.tr.x * (c.br.y - c.tl.y) +
+    c.br.x * (c.bl.y - c.tr.y) +
+    c.bl.x * (c.tl.y - c.br.y)
+  );
+  if (area > 0.88) return false;
   return true;
 }
 
