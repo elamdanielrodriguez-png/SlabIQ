@@ -143,6 +143,8 @@ A listing is INVALID if ANY of these apply:
 3. Different card number (when target specifies one)
 4. Lot or multi-card listing — title mentions: "lot", "x2", "x3", "(2)", "(3)", multiple player names, "bundle", "set break", "complete set", "20 cards", "all", etc.
 5. NOT a standard 2.5x3.5 inch trading card — exclude ANY mention of: "jumbo", "5x7", "5 x 7", "8x10", "blanket", "manu", "manupatch", "manufactured patch", "promo", "magnet", "oversized", "box topper", "topper", "mini", "micro", "stickers", "decal", "poster", "wall art", "bobblehead", "figure", "coin", "patch card" (when it implies oversized). When in doubt about size, EXCLUDE.
+
+   CRITICAL — these specific inserts ALMOST ALWAYS have oversized 5x7 versions and sellers frequently HIDE the size in the title or description: "Stained Glass", "Downtown", "Color Blast", "Sparkle", "Dynagon", "Light It Up", "Magic Numbers", "Pulsar", "Stargazer". For ANY card matching one of these inserts: EXCLUDE the listing unless the title EXPLICITLY confirms standard size (e.g. says "base size", "2.5x3.5", "regular size") OR is suspiciously priced ABOVE the typical oversized range ($100+ usually means standard). When in doubt for these inserts, EXCLUDE.
 6. Sealed product / pack / box, not a single card — "pack", "box", "case", "hot pack", "blaster", "hobby box", "mega", "factory sealed", "wax", "FOTL"
 7. Damaged / altered / fake — "altered", "trimmed", "creased", "crease", "ding", "bent", "torn", "stain", "miscut", "reprint", "custom", "proxy", "replica", "novelty", "art card"
 8. Auto/autograph variant when target is base (or vice versa) — autographs are a different card
@@ -590,7 +592,7 @@ app.post('/api/find-corners', async (req, res) => {
 
   try {
     const msg = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: 'claude-sonnet-4-6',
       max_tokens: 300,
       messages: [{
         role: 'user',
@@ -741,27 +743,40 @@ app.post('/api/grade', async (req, res) => {
           confirmedCard.player, confirmedCard.year, confirmedCard.set, confirmedCard.variant, confirmedCard.cardNumber
         );
         if (market) {
-          // Take second-lowest valid price (drop absolute lowest as outlier protection),
-          // then knock 10% off to estimate sold price from active asking
+          // Median price × 0.9 (sold-vs-asking discount), with AI-estimate sanity floor
+          // to reject oversized/wrong listings that slipped through (commonly < 30% of real value).
           const DISCOUNT = 0.10;
-          const realPrice = (m) => {
-            if (!m || !Array.isArray(m.prices) || m.prices.length < 2) return null;
-            const sorted = [...m.prices].sort((a, b) => a - b);
-            const trueLowest = sorted[1]; // skip the absolute lowest
-            return Math.round(trueLowest * (1 - DISCOUNT));
-          };
-
           const parsed = JSON.parse(text);
           if (!parsed.market) parsed.market = {};
           if (!parsed.market.graded) parsed.market.graded = {};
+
+          const realPrice = (m, aiEstimate) => {
+            if (!m || !Array.isArray(m.prices) || m.prices.length === 0) return null;
+            let prices = [...m.prices].sort((a, b) => a - b);
+            // Sanity floor: anything < 30% of AI estimate is almost certainly oversized/wrong card
+            if (aiEstimate && aiEstimate > 0) {
+              prices = prices.filter(p => p >= aiEstimate * 0.30);
+            }
+            if (prices.length < 2) return null;
+            // Median is robust against oversized junk that slipped past the filter on the low end
+            // and against scammy high listings on the top end.
+            const mid = Math.floor(prices.length / 2);
+            const median = prices.length % 2 === 0
+              ? (prices[mid - 1] + prices[mid]) / 2
+              : prices[mid];
+            return Math.round(median * (1 - DISCOUNT));
+          };
+
           const TIERS = ['psa7', 'psa8', 'psa9', 'psa10', 'bgs7', 'bgs8', 'bgs9', 'bgs9_5', 'bgs10', 'bgsBlackLabel'];
           for (const tier of TIERS) {
-            const p = realPrice(market[tier]);
+            const aiTierEstimate = Number(parsed.market.graded?.[tier]) || 0;
+            const p = realPrice(market[tier], aiTierEstimate);
             if (p) parsed.market.graded[tier] = p;
           }
-          const rawPrice = realPrice(market.raw);
+          const aiRaw = Number(parsed.market.raw) || 0;
+          const rawPrice = realPrice(market.raw, aiRaw);
           if (rawPrice) parsed.market.raw = rawPrice;
-          parsed.market.dataSource = 'eBay (lowest active − 10%)';
+          parsed.market.dataSource = 'eBay (median active − 10%, AI-estimate floor)';
           parsed.market.sampleSize = market.totalValid;
           text = JSON.stringify(parsed);
         }

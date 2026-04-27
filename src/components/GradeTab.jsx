@@ -613,6 +613,15 @@ export default function GradeTab({ images, result, candidates, loading, error, o
                       alt={`View ${idx + 1}`}
                       style={{ width: 68, height: 86, objectFit: "cover", borderRadius: 8, border: `1px solid ${ROLE_COLOR[role]}44`, display: "block" }}
                     />
+                    {img.scanned && (
+                      <div style={{
+                        position: "absolute", bottom: -4, left: -4,
+                        background: "#30d158", color: "#000",
+                        fontSize: 7, fontWeight: 800, letterSpacing: "0.08em",
+                        padding: "2px 4px", borderRadius: 6,
+                        border: "1px solid #000",
+                      }}>SCAN</div>
+                    )}
                     <button
                       onClick={() => onRemoveImage(idx)}
                       style={{
