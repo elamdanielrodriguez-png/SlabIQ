@@ -337,9 +337,11 @@ function perspectiveCorrect(srcCanvas, corners, outW, outH) {
   return dst;
 }
 
-// Pixel-based corner detection: finds the actual physical corners of a tilted card
-// by sampling background, masking card pixels, and finding the extreme pixel in each
-// of 4 quadrants from the card centroid. Pixel-precise, no API call, no model latency.
+// Pixel-based corner detection. Robust to non-uniform backgrounds via color clustering
+// of perimeter samples — we find the dominant background color even when one edge has
+// a shadow, glare patch, or other photo artifact. Then mask card pixels by color distance,
+// find centroid, and pick the extreme card pixel in each of 4 quadrants. Validate the
+// resulting quadrilateral has card-like aspect ratio. Pure JS, pixel-precise, free.
 function findCornersFromPixels(canvas, ctx) {
   const W = canvas.width, H = canvas.height;
   const data = ctx.getImageData(0, 0, W, H).data;
@@ -349,26 +351,51 @@ function findCornersFromPixels(canvas, ctx) {
   };
   const dist2 = (a, b) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
 
-  // Sample 8 perimeter points for background — corners + edge midpoints
-  const samples = [
-    px(3, 3), px(W - 4, 3), px(3, H - 4), px(W - 4, H - 4),
-    px(W >> 1, 3), px(W >> 1, H - 4), px(3, H >> 1), px(W - 4, H >> 1),
-  ];
-  // Background must be roughly uniform across multiple perimeter points
-  let maxVar = 0;
-  for (let i = 0; i < samples.length; i++) {
-    for (let j = i + 1; j < samples.length; j++) {
-      maxVar = Math.max(maxVar, dist2(samples[i], samples[j]));
+  // 1. Sample 32 perimeter points (8 per side) — densely covers the photo border
+  const samples = [];
+  const N = 8;
+  for (let i = 0; i < N; i++) {
+    const t = (i + 0.5) / N;
+    const xt = Math.round(t * (W - 1));
+    const yt = Math.round(t * (H - 1));
+    samples.push(px(xt, 3));        // top edge
+    samples.push(px(xt, H - 4));    // bottom edge
+    samples.push(px(3, yt));        // left edge
+    samples.push(px(W - 4, yt));    // right edge
+  }
+
+  // 2. Greedy color clustering of perimeter samples to find dominant background.
+  // Handles shadows / glares — if 75% of perimeter is one color, that's still detectable.
+  const CLUSTER_THR = 60 * 60;
+  const clusters = [];
+  for (const s of samples) {
+    let best = null, bestD = Infinity;
+    for (const c of clusters) {
+      const d = dist2(s, c.center);
+      if (d < CLUSTER_THR && d < bestD) { best = c; bestD = d; }
+    }
+    if (best) {
+      best.points.push(s);
+      best.center = [
+        best.points.reduce((a, p) => a + p[0], 0) / best.points.length,
+        best.points.reduce((a, p) => a + p[1], 0) / best.points.length,
+        best.points.reduce((a, p) => a + p[2], 0) / best.points.length,
+      ];
+    } else {
+      clusters.push({ center: [...s], points: [s] });
     }
   }
-  if (maxVar > 4000) return null; // background too varied — can't reliably segment
+  clusters.sort((a, b) => b.points.length - a.points.length);
+  const bgCluster = clusters[0];
+  // Dominant cluster must be at least 45% of perimeter — otherwise scene is too chaotic
+  if (bgCluster.points.length < samples.length * 0.45) return null;
+  const bg = bgCluster.center;
 
-  const bg = [0, 0, 0];
-  for (const s of samples) { bg[0] += s[0]; bg[1] += s[1]; bg[2] += s[2]; }
-  bg[0] /= samples.length; bg[1] /= samples.length; bg[2] /= samples.length;
-  const THR = 55 * 55; // squared color distance threshold for "card" vs "background"
+  // 3. Adaptive threshold: 4× the spread within the background cluster, clamped to a sane range
+  const bgVar = bgCluster.points.reduce((a, p) => a + dist2(p, bg), 0) / bgCluster.points.length;
+  const THR = Math.max(32 * 32, Math.min(70 * 70, bgVar * 4));
 
-  // Pass 1: find centroid of card pixels
+  // 4. Find centroid of card pixels (anything significantly different from background)
   const STEP = Math.max(2, Math.round(Math.min(W, H) / 600));
   let count = 0, cx = 0, cy = 0;
   for (let y = 0; y < H; y += STEP) {
@@ -376,10 +403,10 @@ function findCornersFromPixels(canvas, ctx) {
       if (dist2(px(x, y), bg) > THR) { count++; cx += x; cy += y; }
     }
   }
-  if (count < 500) return null;
+  if (count < 400) return null;
   cx /= count; cy /= count;
 
-  // Pass 2: find extreme card pixel in each quadrant relative to centroid
+  // 5. Find extreme card pixel in each quadrant relative to centroid
   let tl = { d: -1, x: 0, y: 0 };
   let tr = { d: -1, x: 0, y: 0 };
   let bl = { d: -1, x: 0, y: 0 };
@@ -389,14 +416,21 @@ function findCornersFromPixels(canvas, ctx) {
       if (dist2(px(x, y), bg) > THR) {
         const d = (x - cx) ** 2 + (y - cy) ** 2;
         const dx = x - cx, dy = y - cy;
-        if (dx <= 0 && dy <= 0 && d > tl.d) { tl = { d, x, y }; }
-        else if (dx >= 0 && dy <= 0 && d > tr.d) { tr = { d, x, y }; }
-        else if (dx <= 0 && dy >= 0 && d > bl.d) { bl = { d, x, y }; }
-        else if (dx >= 0 && dy >= 0 && d > br.d) { br = { d, x, y }; }
+        if (dx <= 0 && dy <= 0 && d > tl.d) tl = { d, x, y };
+        else if (dx >= 0 && dy <= 0 && d > tr.d) tr = { d, x, y };
+        else if (dx <= 0 && dy >= 0 && d > bl.d) bl = { d, x, y };
+        else if (dx >= 0 && dy >= 0 && d > br.d) br = { d, x, y };
       }
     }
   }
   if (tl.d < 0 || tr.d < 0 || bl.d < 0 || br.d < 0) return null;
+
+  // 6. Sanity-check the resulting quadrilateral has roughly card-like aspect (5:7 = 0.71).
+  // Reject squares (probably bad mask) and very long shapes (probably hand or arm in frame).
+  const avgW = (Math.hypot(tr.x - tl.x, tr.y - tl.y) + Math.hypot(br.x - bl.x, br.y - bl.y)) / 2;
+  const avgH = (Math.hypot(bl.x - tl.x, bl.y - tl.y) + Math.hypot(br.x - tr.x, br.y - tr.y)) / 2;
+  const ratio = Math.min(avgW, avgH) / Math.max(avgW, avgH);
+  if (ratio < 0.45 || ratio > 0.95) return null;
 
   return {
     tl: { x: tl.x / W, y: tl.y / H },
