@@ -358,11 +358,17 @@ function validCorners(c) {
     if (typeof p?.x !== "number" || typeof p?.y !== "number") return false;
     if (p.x < 0 || p.x > 1 || p.y < 0 || p.y > 1) return false;
   }
-  // Sanity: corners should be ordered roughly correctly
-  if (c.tl.x > c.tr.x - 0.05) return false;
-  if (c.tl.y > c.bl.y - 0.05) return false;
-  if (c.bl.x > c.br.x - 0.05) return false;
-  if (c.tr.y > c.br.y - 0.05) return false;
+  // Sanity: corners should be ordered roughly correctly (loose tolerance to allow tilted cards)
+  if (c.tl.x >= c.tr.x) return false;
+  if (c.tl.y >= c.bl.y) return false;
+  if (c.bl.x >= c.br.x) return false;
+  if (c.tr.y >= c.br.y) return false;
+  // Quad must have meaningful area (not a degenerate flat shape)
+  const minX = Math.min(c.tl.x, c.bl.x);
+  const maxX = Math.max(c.tr.x, c.br.x);
+  const minY = Math.min(c.tl.y, c.tr.y);
+  const maxY = Math.max(c.bl.y, c.br.y);
+  if (maxX - minX < 0.2 || maxY - minY < 0.2) return false;
   return true;
 }
 
@@ -507,11 +513,13 @@ export default function CardGrader() {
   const [candidates, setCandidates] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [scanStatus, setScanStatus] = useState(null);
 
   const addImages = async (files) => {
     const slots = 10 - images.length;
     if (slots <= 0) return;
     const currentCount = images.length;
+    setScanStatus('Scanning card edges…');
     const processed = await Promise.all(
       [...files].slice(0, slots).map(async (file, fileIdx) => {
         const base = await processImageFile(file);
@@ -526,16 +534,20 @@ export default function CardGrader() {
             if (validCorners(corners)) {
               const corrected = await perspectiveCorrectImage(base.imageData, corners);
               if (base.objectURL) URL.revokeObjectURL(base.objectURL);
-              return { ...corrected, role };
+              console.log(`[scanner] ${role}: perspective-corrected ✓`);
+              return { ...corrected, role, scanned: true };
+            } else {
+              console.warn(`[scanner] ${role}: corners invalid or missing — keeping original`, corners);
             }
           } catch (e) {
-            console.warn('Perspective correction failed, keeping cropped image:', e);
+            console.warn(`[scanner] ${role}: failed —`, e);
           }
         }
 
         return { ...base, role };
       })
     );
+    setScanStatus(null);
     setImages((prev) => [...prev, ...processed]);
     setResult(null);
     setError(null);
@@ -708,6 +720,7 @@ export default function CardGrader() {
             onConfirmCandidate={(card) => gradeCards(card)}
             onSearch={searchCards}
             onUpdateCentering={updateImageCentering}
+            scanStatus={scanStatus}
           />
         )}
         {activeTab === "market" && result && <MarketTab result={result} />}

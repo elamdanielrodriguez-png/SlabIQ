@@ -568,7 +568,7 @@ function computeCentering(cm) {
 const ROLE_LABEL = { front: 'Front', back: 'Back', detail: 'Detail' };
 const ROLE_COLOR = { front: '#c9a84c', back: '#0a84ff', detail: 'rgba(255,255,255,0.28)' };
 
-export default function GradeTab({ images, result, candidates, loading, error, onAddImages, onRemoveImage, onSetRole, onGrade, onConfirmCandidate, onSearch, onUpdateCentering }) {
+export default function GradeTab({ images, result, candidates, loading, error, onAddImages, onRemoveImage, onSetRole, onGrade, onConfirmCandidate, onSearch, onUpdateCentering, scanStatus }) {
   const fileInputRef = useRef(null);
   const [dismissedNegs, setDismissedNegs] = useState([]);
   const [dismissedDefects, setDismissedDefects] = useState([]);
@@ -590,6 +590,17 @@ export default function GradeTab({ images, result, candidates, loading, error, o
 
       {/* Upload area */}
       <div style={card}>
+        {scanStatus && (
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+            padding: "10px 12px", marginBottom: 10,
+            background: "rgba(10,132,255,0.1)", border: "1px solid rgba(10,132,255,0.3)",
+            borderRadius: 10, color: "#0a84ff", fontSize: 12, fontWeight: 600,
+          }}>
+            <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: "#0a84ff", animation: "pulse 1.2s ease-in-out infinite" }} />
+            {scanStatus}
+          </div>
+        )}
         {images.length > 0 ? (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "flex-start" }}>
             {images.map((img, idx) => {
@@ -759,7 +770,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
                       <>
                         <div style={{ color: "rgba(255,255,255,0.85)", fontSize: 20, fontWeight: 600, letterSpacing: "-0.5px" }}>{centeringDisplay}</div>
                         <div style={{ color: isManual ? "#30d158" : "rgba(255,255,255,0.25)", fontSize: 8, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginTop: 3 }}>
-                          {isManual ? "✓ manual" : "✓ ai"}
+                          {isManual ? "✓ manual" : <>✓ ai <span style={{ opacity: 0.55 }}>· tap for manual</span></>}
                         </div>
                       </>
                     ) : (
