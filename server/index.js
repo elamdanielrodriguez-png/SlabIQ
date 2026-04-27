@@ -586,54 +586,6 @@ RULES:
   }
 });
 
-app.post('/api/find-corners', async (req, res) => {
-  const { imageData, mediaType = 'image/jpeg' } = req.body;
-  if (!imageData) return res.status(400).json({ error: 'Image required' });
-
-  try {
-    const msg = await anthropic.messages.create({
-      model: 'claude-opus-4-7',
-      max_tokens: 300,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageData } },
-          { type: 'text', text: `Locate the FOUR PHYSICAL CORNERS of the trading card in this image. The card may be tilted, rotated, or shot at an angle. There may be a table, desk, hand, sleeve, or other background around the card — IGNORE all of that.
-
-CRITICAL — the corners must hug the card's actual physical edges TIGHTLY. Do NOT include any background, table, sleeve, or hand. Imagine drawing a sharpie line right on top of where the card's edge meets the background — those four corner points are what we want.
-
-The output is used to crop and perspective-warp the card into a flat rectangle. Every percentage point matters — even a 2% error includes visible background in the output. Be precise.
-
-Return ONLY this JSON (no extra text). Coordinates are fractions of image width/height (0.0 to 1.0):
-{
-  "tl": { "x": <num>, "y": <num> },
-  "tr": { "x": <num>, "y": <num> },
-  "br": { "x": <num>, "y": <num> },
-  "bl": { "x": <num>, "y": <num> }
-}
-
-- tl = top-left physical corner of the card (the actual corner of the card itself)
-- tr = top-right corner of the card
-- br = bottom-right corner of the card
-- bl = bottom-left corner of the card
-
-If a card corner is cut off / out of frame / hidden by a finger / not visible, return: { "error": "corner missing" } and I'll fall back to a different method. Don't guess where a hidden corner would be.` }
-        ],
-      }],
-    });
-    const text = msg.content.find(b => b.type === 'text')?.text ?? '';
-    const m = text.match(/\{[\s\S]*\}/);
-    if (!m) return res.json({ corners: null });
-    const parsed = JSON.parse(m[0]);
-    if (parsed.error || !parsed.tl) return res.json({ corners: null });
-    console.log(`Corners: tl=${parsed.tl.x?.toFixed(2)},${parsed.tl.y?.toFixed(2)} br=${parsed.br?.x?.toFixed(2)},${parsed.br?.y?.toFixed(2)}`);
-    res.json({ corners: parsed });
-  } catch (err) {
-    console.error('Find corners error:', err.message);
-    res.status(502).json({ corners: null });
-  }
-});
-
 app.post('/api/grade', async (req, res) => {
   const { images, imageData, mediaType = 'image/jpeg', confirmedCard, zoneCrops } = req.body;
 

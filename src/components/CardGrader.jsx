@@ -337,20 +337,6 @@ function perspectiveCorrect(srcCanvas, corners, outW, outH) {
   return dst;
 }
 
-async function fetchCardCorners(imageData) {
-  try {
-    const res = await fetch("/api/find-corners", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ imageData }),
-    });
-    const data = await res.json();
-    return data.corners ?? null;
-  } catch {
-    return null;
-  }
-}
-
 // Pixel-based corner detection: finds the actual physical corners of a tilted card
 // by sampling background, masking card pixels, and finding the extreme pixel in each
 // of 4 quadrants from the card centroid. Pixel-precise, no API call, no model latency.
@@ -615,21 +601,16 @@ export default function CardGrader() {
         // intentionally angled to show surface flaws under raking light, so leave them alone.
         if (role === 'front' || role === 'back') {
           try {
-            // Try pixel-based corner detection first (precise, free, no API latency).
-            // Falls back to AI (Opus) if the background is too varied to segment cleanly.
-            let corners = await detectCornersFromImageData(base.imageData);
-            let source = 'pixel';
-            if (!validCorners(corners)) {
-              corners = await fetchCardCorners(base.imageData);
-              source = 'ai';
-            }
+            // Pure pixel-based corner detection. Free, local, pixel-precise.
+            // No AI fallback — vision LLMs are not reliable enough at coordinates to be worth the cost.
+            const corners = await detectCornersFromImageData(base.imageData);
             if (validCorners(corners)) {
               const corrected = await perspectiveCorrectImage(base.imageData, corners);
               if (base.objectURL) URL.revokeObjectURL(base.objectURL);
-              console.log(`[scanner] ${role}: perspective-corrected via ${source} ✓`);
+              console.log(`[scanner] ${role}: perspective-corrected ✓`);
               return { ...corrected, role, scanned: true };
             } else {
-              console.warn(`[scanner] ${role}: no valid corners (pixel + ai both failed) — keeping original`);
+              console.warn(`[scanner] ${role}: pixel detection couldn't segment background — keeping Path A cropped image`);
             }
           } catch (e) {
             console.warn(`[scanner] ${role}: failed —`, e);
