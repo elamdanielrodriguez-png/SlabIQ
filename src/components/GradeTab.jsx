@@ -1,5 +1,106 @@
 import { useRef, useState } from "react";
 
+function ManualScannerEditor({ imageURL, initialCorners, onConfirm, onClose }) {
+  const DEFAULT = {
+    tl: { x: 0.05, y: 0.05 },
+    tr: { x: 0.95, y: 0.05 },
+    br: { x: 0.95, y: 0.95 },
+    bl: { x: 0.05, y: 0.95 },
+  };
+  const [corners, setCorners] = useState(initialCorners ?? DEFAULT);
+  const containerRef = useRef(null);
+  const dragRef = useRef(null);
+
+  function onMove(e) {
+    if (!dragRef.current || !containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = Math.max(0.001, Math.min(0.999, (e.clientX - rect.left) / rect.width));
+    const y = Math.max(0.001, Math.min(0.999, (e.clientY - rect.top) / rect.height));
+    setCorners(prev => ({ ...prev, [dragRef.current]: { x, y } }));
+  }
+
+  const handles = [
+    { id: 'tl', label: 'TL', color: '#c9a84c' },
+    { id: 'tr', label: 'TR', color: '#c9a84c' },
+    { id: 'br', label: 'BR', color: '#c9a84c' },
+    { id: 'bl', label: 'BL', color: '#c9a84c' },
+  ];
+
+  const polygonPoints = `${corners.tl.x * 100},${corners.tl.y * 100} ${corners.tr.x * 100},${corners.tr.y * 100} ${corners.br.x * 100},${corners.br.y * 100} ${corners.bl.x * 100},${corners.bl.y * 100}`;
+
+  return (
+    <div style={card}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <span style={{ color: '#fff', fontSize: 13, fontWeight: 600 }}>Position Card Corners</span>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: 20, cursor: 'pointer', padding: 0, lineHeight: 1 }}>×</button>
+      </div>
+      <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, margin: '0 0 14px', lineHeight: 1.55 }}>
+        Drag each handle (<span style={{ color: '#c9a84c', fontWeight: 600 }}>TL/TR/BR/BL</span>) to the matching physical corner of the card. The card will be flattened and oriented based on where you place them.
+      </p>
+
+      <div
+        ref={containerRef}
+        style={{ position: 'relative', userSelect: 'none', touchAction: 'none', marginBottom: 14 }}
+      >
+        <img src={imageURL} alt="Card" style={{ width: '100%', display: 'block', borderRadius: 10, pointerEvents: 'none' }} />
+
+        <svg
+          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+        >
+          <polygon points={polygonPoints} fill="rgba(201,168,76,0.12)" stroke="#c9a84c" strokeWidth="0.4" vectorEffect="non-scaling-stroke" />
+        </svg>
+
+        {handles.map(({ id, label, color }) => (
+          <div
+            key={id}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              e.currentTarget.setPointerCapture(e.pointerId);
+              dragRef.current = id;
+            }}
+            onPointerMove={onMove}
+            onPointerUp={() => { dragRef.current = null; }}
+            style={{
+              position: 'absolute',
+              left: `${corners[id].x * 100}%`,
+              top: `${corners[id].y * 100}%`,
+              transform: 'translate(-50%, -50%)',
+              width: 44, height: 44,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'grab', touchAction: 'none', zIndex: 10,
+            }}
+          >
+            <div style={{
+              width: 26, height: 26, borderRadius: '50%',
+              background: color, color: '#000',
+              fontSize: 9, fontWeight: 800, letterSpacing: '0.04em',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              border: '2.5px solid rgba(0,0,0,0.85)',
+              boxShadow: '0 2px 10px rgba(0,0,0,0.55)',
+              pointerEvents: 'none',
+            }}>{label}</div>
+          </div>
+        ))}
+      </div>
+
+      <button
+        onClick={() => onConfirm(corners)}
+        style={{
+          width: '100%', padding: '12px 0',
+          background: '#c9a84c', color: '#000',
+          fontWeight: 700, fontSize: 14, border: 'none',
+          borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit',
+          letterSpacing: '-0.2px',
+        }}
+      >
+        Confirm Scan
+      </button>
+    </div>
+  );
+}
+
 function CenteringEditor({ imageURL, initialLines, onConfirm, onClose }) {
   const DEFAULT = {
     leftOuter: 0.01, leftInner: 0.07,
@@ -568,7 +669,7 @@ function computeCentering(cm) {
 const ROLE_LABEL = { front: 'Front', back: 'Back', detail: 'Detail' };
 const ROLE_COLOR = { front: '#c9a84c', back: '#0a84ff', detail: 'rgba(255,255,255,0.28)' };
 
-export default function GradeTab({ images, result, candidates, loading, error, onAddImages, onRemoveImage, onSetRole, onGrade, onConfirmCandidate, onSearch, onUpdateCentering, scanStatus }) {
+export default function GradeTab({ images, result, candidates, loading, error, onAddImages, onRemoveImage, onSetRole, onGrade, onConfirmCandidate, onSearch, onUpdateCentering, scannerIdx, onOpenScanner, onCloseScanner, onConfirmScanner }) {
   const fileInputRef = useRef(null);
   const [dismissedNegs, setDismissedNegs] = useState([]);
   const [dismissedDefects, setDismissedDefects] = useState([]);
@@ -590,17 +691,6 @@ export default function GradeTab({ images, result, candidates, loading, error, o
 
       {/* Upload area */}
       <div style={card}>
-        {scanStatus && (
-          <div style={{
-            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-            padding: "10px 12px", marginBottom: 10,
-            background: "rgba(10,132,255,0.1)", border: "1px solid rgba(10,132,255,0.3)",
-            borderRadius: 10, color: "#0a84ff", fontSize: 12, fontWeight: 600,
-          }}>
-            <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: "#0a84ff", animation: "pulse 1.2s ease-in-out infinite" }} />
-            {scanStatus}
-          </div>
-        )}
         {images.length > 0 ? (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "flex-start" }}>
             {images.map((img, idx) => {
@@ -647,6 +737,23 @@ export default function GradeTab({ images, result, candidates, loading, error, o
                   >
                     {ROLE_LABEL[role]}
                   </button>
+                  {(role === "front" || role === "back") && (
+                    <button
+                      onClick={() => onOpenScanner?.(idx)}
+                      title="Manually mark card corners and flatten"
+                      style={{
+                        background: img.scanned ? "rgba(48,209,88,0.12)" : "rgba(201,168,76,0.12)",
+                        border: `1px solid ${img.scanned ? "rgba(48,209,88,0.4)" : "rgba(201,168,76,0.35)"}`,
+                        borderRadius: 6, padding: "2px 6px",
+                        color: img.scanned ? "#30d158" : "#c9a84c",
+                        fontSize: 8, fontWeight: 700, letterSpacing: "0.06em",
+                        textTransform: "uppercase", cursor: "pointer",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      {img.scanned ? "rescan" : "scan"}
+                    </button>
+                  )}
                 </div>
               );
             })}
@@ -691,6 +798,16 @@ export default function GradeTab({ images, result, candidates, loading, error, o
         )}
         <input ref={fileInputRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={(e) => onAddImages(e.target.files)} />
       </div>
+
+      {/* Manual scanner editor */}
+      {scannerIdx !== null && scannerIdx !== undefined && images[scannerIdx] && (
+        <ManualScannerEditor
+          imageURL={images[scannerIdx].objectURL}
+          initialCorners={images[scannerIdx].suggestedCorners}
+          onConfirm={onConfirmScanner}
+          onClose={onCloseScanner}
+        />
+      )}
 
       {/* Grade button */}
       {images.length > 0 && (

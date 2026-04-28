@@ -628,43 +628,44 @@ export default function CardGrader() {
   const [candidates, setCandidates] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [scanStatus, setScanStatus] = useState(null);
+  const [scannerIdx, setScannerIdx] = useState(null);
 
   const addImages = async (files) => {
     const slots = 10 - images.length;
     if (slots <= 0) return;
     const currentCount = images.length;
-    setScanStatus('Scanning card edges…');
     const processed = await Promise.all(
       [...files].slice(0, slots).map(async (file, fileIdx) => {
         const base = await processImageFile(file);
         const slot = currentCount + fileIdx;
         const role = slot === 0 ? 'front' : slot === 1 ? 'back' : 'detail';
-
-        // Path C: perspective-correct front/back only. Detail shots (3rd+) are
-        // intentionally angled to show surface flaws under raking light, so leave them alone.
+        // Auto-scan removed — manual scanner via "Scan" button is the reliable path now.
+        // Best-guess corners are stored on the image as starting position for the editor.
+        let suggestedCorners = null;
         if (role === 'front' || role === 'back') {
           try {
-            // Pure pixel-based corner detection. Free, local, pixel-precise.
-            // No AI fallback — vision LLMs are not reliable enough at coordinates to be worth the cost.
-            const corners = await detectCornersFromImageData(base.imageData);
-            if (validCorners(corners)) {
-              const corrected = await perspectiveCorrectImage(base.imageData, corners);
-              if (base.objectURL) URL.revokeObjectURL(base.objectURL);
-              console.log(`[scanner] ${role}: perspective-corrected ✓`);
-              return { ...corrected, role, scanned: true };
-            } else {
-              console.warn(`[scanner] ${role}: pixel detection couldn't segment background — keeping Path A cropped image`);
+            const detected = await detectCornersFromImageData(base.imageData);
+            if (validCorners(detected)) suggestedCorners = detected;
+          } catch {}
+          // Fallback: derive axis-aligned corners from cardBounds (Path A's detection)
+          if (!suggestedCorners && base.cardBounds && base.width && base.height) {
+            const { cL, cR, cT, cB } = base.cardBounds;
+            const W = base.width, H = base.height;
+            const w = cR - cL, h = cB - cT;
+            // Only use if cardBounds is tight (didn't return full image)
+            if (w < W * 0.96 && h < H * 0.96) {
+              suggestedCorners = {
+                tl: { x: cL / W, y: cT / H },
+                tr: { x: cR / W, y: cT / H },
+                br: { x: cR / W, y: cB / H },
+                bl: { x: cL / W, y: cB / H },
+              };
             }
-          } catch (e) {
-            console.warn(`[scanner] ${role}: failed —`, e);
           }
         }
-
-        return { ...base, role };
+        return { ...base, role, suggestedCorners };
       })
     );
-    setScanStatus(null);
     setImages((prev) => [...prev, ...processed]);
     setResult(null);
     setError(null);
@@ -677,6 +678,24 @@ export default function CardGrader() {
       const next = ROLES[(ROLES.indexOf(img.role ?? 'detail') + 1) % ROLES.length];
       return { ...img, role: next };
     }));
+  };
+
+  const confirmManualScan = async (corners) => {
+    if (scannerIdx === null) return;
+    const target = images[scannerIdx];
+    if (!target) return;
+    try {
+      const corrected = await perspectiveCorrectImage(target.imageData, corners);
+      if (target.objectURL) URL.revokeObjectURL(target.objectURL);
+      setImages(prev => prev.map((im, i) =>
+        i === scannerIdx
+          ? { ...corrected, role: im.role, scanned: true, suggestedCorners: { tl: { x: 0.001, y: 0.001 }, tr: { x: 0.999, y: 0.001 }, br: { x: 0.999, y: 0.999 }, bl: { x: 0.001, y: 0.999 } } }
+          : im
+      ));
+    } catch (e) {
+      console.warn('Manual scan failed:', e);
+    }
+    setScannerIdx(null);
   };
 
   const updateImageCentering = (idx, centering, lines) => {
@@ -837,7 +856,10 @@ export default function CardGrader() {
             onConfirmCandidate={(card) => gradeCards(card)}
             onSearch={searchCards}
             onUpdateCentering={updateImageCentering}
-            scanStatus={scanStatus}
+            scannerIdx={scannerIdx}
+            onOpenScanner={(i) => setScannerIdx(i)}
+            onCloseScanner={() => setScannerIdx(null)}
+            onConfirmScanner={confirmManualScan}
           />
         )}
         {activeTab === "market" && result && <MarketTab result={result} />}
