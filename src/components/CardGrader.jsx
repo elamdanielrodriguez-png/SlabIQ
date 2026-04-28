@@ -387,8 +387,8 @@ function findCornersFromPixels(canvas, ctx) {
   }
   clusters.sort((a, b) => b.points.length - a.points.length);
   const bgCluster = clusters[0];
-  // Dominant cluster must be at least 45% of perimeter — otherwise scene is too chaotic
-  if (bgCluster.points.length < samples.length * 0.45) return null;
+  // Dominant cluster must be at least 35% of perimeter — otherwise scene is too chaotic
+  if (bgCluster.points.length < samples.length * 0.35) return null;
   const bg = bgCluster.center;
 
   // 3. Adaptive threshold: 4× the spread within the background cluster, clamped to a sane range
@@ -474,16 +474,16 @@ function validCorners(c) {
   const minY = Math.min(c.tl.y, c.tr.y);
   const maxY = Math.max(c.bl.y, c.br.y);
   if (maxX - minX < 0.2 || maxY - minY < 0.2) return false;
-  // Reject if quadrilateral covers >88% of image — that means detection failed and
-  // returned the image edges (no real card boundary found). Perspective correction
-  // would be a no-op, leaving the original photo untouched.
-  const area = 0.5 * Math.abs(
-    c.tl.x * (c.tr.y - c.bl.y) +
-    c.tr.x * (c.br.y - c.tl.y) +
-    c.br.x * (c.bl.y - c.tr.y) +
-    c.bl.x * (c.tl.y - c.br.y)
-  );
-  if (area > 0.88) return false;
+  // Reject only the literal failure case: corners exactly at the image edges,
+  // which happens when background segmentation failed entirely. Tightly-framed
+  // cards (90%+ fill) are legitimate and should pass.
+  const atEdge = 0.012;
+  const allCornersAtImageEdges =
+    c.tl.x < atEdge && c.tl.y < atEdge &&
+    c.tr.x > 1 - atEdge && c.tr.y < atEdge &&
+    c.br.x > 1 - atEdge && c.br.y > 1 - atEdge &&
+    c.bl.x < atEdge && c.bl.y > 1 - atEdge;
+  if (allCornersAtImageEdges) return false;
   return true;
 }
 
