@@ -1,102 +1,128 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 
-function ManualScannerEditor({ imageURL, initialCorners, onConfirm, onClose }) {
-  const DEFAULT = {
-    tl: { x: 0.05, y: 0.05 },
-    tr: { x: 0.95, y: 0.05 },
-    br: { x: 0.95, y: 0.95 },
-    bl: { x: 0.05, y: 0.95 },
-  };
-  const [corners, setCorners] = useState(initialCorners ?? DEFAULT);
+// Camera capture with a fixed 5:7 rectangle overlay. User aligns the card inside
+// the rectangle and taps capture. Captured frame is cropped to exactly the
+// rectangle area — no detection, no AI, no post-processing. Card is the rectangle.
+function CameraCapture({ onCapture, onClose }) {
+  const videoRef = useRef(null);
   const containerRef = useRef(null);
-  const dragRef = useRef(null);
+  const rectRef = useRef(null);
+  const streamRef = useRef(null);
+  const [error, setError] = useState(null);
+  const [ready, setReady] = useState(false);
 
-  function onMove(e) {
-    if (!dragRef.current || !containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const x = Math.max(0.001, Math.min(0.999, (e.clientX - rect.left) / rect.width));
-    const y = Math.max(0.001, Math.min(0.999, (e.clientY - rect.top) / rect.height));
-    setCorners(prev => ({ ...prev, [dragRef.current]: { x, y } }));
+  useEffect(() => {
+    let active = true;
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false })
+      .then(s => {
+        if (!active) { s.getTracks().forEach(t => t.stop()); return; }
+        streamRef.current = s;
+        if (videoRef.current) {
+          videoRef.current.srcObject = s;
+          videoRef.current.onloadedmetadata = () => setReady(true);
+        }
+      })
+      .catch(err => setError(err.message || "Camera unavailable. Check permissions."));
+    return () => {
+      active = false;
+      if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+    };
+  }, []);
+
+  function capture() {
+    const video = videoRef.current;
+    const container = containerRef.current;
+    const rectEl = rectRef.current;
+    if (!video || !container || !rectEl) return;
+
+    const vw = video.videoWidth, vh = video.videoHeight;
+    const cw = container.clientWidth, ch = container.clientHeight;
+
+    // Container uses object-fit: cover. Compute what part of the video is visible.
+    const videoAspect = vw / vh;
+    const containerAspect = cw / ch;
+    let visW, visH, offX, offY;
+    if (videoAspect > containerAspect) {
+      // video wider — sides cropped
+      visH = vh; visW = vh * containerAspect;
+      offX = (vw - visW) / 2; offY = 0;
+    } else {
+      // video taller — top/bottom cropped
+      visW = vw; visH = vw / containerAspect;
+      offX = 0; offY = (vh - visH) / 2;
+    }
+
+    const cBox = container.getBoundingClientRect();
+    const rBox = rectEl.getBoundingClientRect();
+    const xFrac = (rBox.left - cBox.left) / cw;
+    const yFrac = (rBox.top - cBox.top) / ch;
+    const wFrac = rBox.width / cw;
+    const hFrac = rBox.height / ch;
+
+    const cropX = offX + xFrac * visW;
+    const cropY = offY + yFrac * visH;
+    const cropW = wFrac * visW;
+    const cropH = hFrac * visH;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(cropW);
+    canvas.height = Math.round(cropH);
+    canvas.getContext("2d").drawImage(video, cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height);
+
+    canvas.toBlob(blob => {
+      if (!blob) return;
+      const file = new File([blob], `card-${Date.now()}.jpg`, { type: "image/jpeg" });
+      onCapture(file);
+    }, "image/jpeg", 0.92);
   }
 
-  const handles = [
-    { id: 'tl', label: 'TL', color: '#c9a84c' },
-    { id: 'tr', label: 'TR', color: '#c9a84c' },
-    { id: 'br', label: 'BR', color: '#c9a84c' },
-    { id: 'bl', label: 'BL', color: '#c9a84c' },
-  ];
-
-  const polygonPoints = `${corners.tl.x * 100},${corners.tl.y * 100} ${corners.tr.x * 100},${corners.tr.y * 100} ${corners.br.x * 100},${corners.br.y * 100} ${corners.bl.x * 100},${corners.bl.y * 100}`;
-
   return (
-    <div style={card}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <span style={{ color: '#fff', fontSize: 13, fontWeight: 600 }}>Position Card Corners</span>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: 20, cursor: 'pointer', padding: 0, lineHeight: 1 }}>×</button>
+    <div style={{ position: "fixed", inset: 0, background: "#000", zIndex: 1000, display: "flex", flexDirection: "column" }}>
+      <div style={{ padding: "14px 20px", color: "#fff", textAlign: "center", fontSize: 13, fontWeight: 600, letterSpacing: "-0.2px" }}>
+        Align card inside the rectangle
       </div>
-      <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, margin: '0 0 14px', lineHeight: 1.55 }}>
-        Drag each handle (<span style={{ color: '#c9a84c', fontWeight: 600 }}>TL/TR/BR/BL</span>) to the matching physical corner of the card. The card will be flattened and oriented based on where you place them.
-      </p>
 
-      <div
-        ref={containerRef}
-        style={{ position: 'relative', userSelect: 'none', touchAction: 'none', marginBottom: 14 }}
-      >
-        <img src={imageURL} alt="Card" style={{ width: '100%', display: 'block', borderRadius: 10, pointerEvents: 'none' }} />
+      <div ref={containerRef} style={{ flex: 1, position: "relative", overflow: "hidden" }}>
+        <video
+          ref={videoRef}
+          autoPlay playsInline muted
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+        />
 
-        <svg
-          style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
-          viewBox="0 0 100 100"
-          preserveAspectRatio="none"
-        >
-          <polygon points={polygonPoints} fill="rgba(201,168,76,0.12)" stroke="#c9a84c" strokeWidth="0.4" vectorEffect="non-scaling-stroke" />
-        </svg>
+        {/* Centered card-aspect rectangle, dim outside via huge box-shadow */}
+        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+          <div ref={rectRef} style={{
+            width: "min(78vw, calc(75vh * 5 / 7))",
+            aspectRatio: "5 / 7",
+            border: "2px solid #c9a84c",
+            borderRadius: 8,
+            boxShadow: "0 0 0 9999px rgba(0,0,0,0.55)",
+          }} />
+        </div>
 
-        {handles.map(({ id, label, color }) => (
-          <div
-            key={id}
-            onPointerDown={(e) => {
-              e.preventDefault();
-              e.currentTarget.setPointerCapture(e.pointerId);
-              dragRef.current = id;
-            }}
-            onPointerMove={onMove}
-            onPointerUp={() => { dragRef.current = null; }}
-            style={{
-              position: 'absolute',
-              left: `${corners[id].x * 100}%`,
-              top: `${corners[id].y * 100}%`,
-              transform: 'translate(-50%, -50%)',
-              width: 44, height: 44,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'grab', touchAction: 'none', zIndex: 10,
-            }}
-          >
-            <div style={{
-              width: 26, height: 26, borderRadius: '50%',
-              background: color, color: '#000',
-              fontSize: 9, fontWeight: 800, letterSpacing: '0.04em',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              border: '2.5px solid rgba(0,0,0,0.85)',
-              boxShadow: '0 2px 10px rgba(0,0,0,0.55)',
-              pointerEvents: 'none',
-            }}>{label}</div>
+        {error && (
+          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#ff453a", padding: 24, textAlign: "center", background: "rgba(0,0,0,0.85)", fontSize: 13 }}>
+            {error}
           </div>
-        ))}
+        )}
       </div>
 
-      <button
-        onClick={() => onConfirm(corners)}
-        style={{
-          width: '100%', padding: '12px 0',
-          background: '#c9a84c', color: '#000',
-          fontWeight: 700, fontSize: 14, border: 'none',
-          borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit',
-          letterSpacing: '-0.2px',
-        }}
-      >
-        Confirm Scan
-      </button>
+      <div style={{ padding: 16, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <button onClick={onClose} style={{ background: "transparent", border: "none", color: "#fff", fontSize: 14, padding: 12, cursor: "pointer", fontFamily: "inherit" }}>
+          Cancel
+        </button>
+        <button
+          onClick={capture}
+          disabled={!ready}
+          style={{
+            width: 72, height: 72, borderRadius: "50%",
+            background: ready ? "#c9a84c" : "rgba(201,168,76,0.3)",
+            border: "4px solid rgba(255,255,255,0.5)",
+            cursor: ready ? "pointer" : "not-allowed",
+          }}
+        />
+        <div style={{ width: 60 }} />
+      </div>
     </div>
   );
 }
@@ -669,7 +695,8 @@ function computeCentering(cm) {
 const ROLE_LABEL = { front: 'Front', back: 'Back', detail: 'Detail' };
 const ROLE_COLOR = { front: '#c9a84c', back: '#0a84ff', detail: 'rgba(255,255,255,0.28)' };
 
-export default function GradeTab({ images, result, candidates, loading, error, onAddImages, onRemoveImage, onSetRole, onGrade, onConfirmCandidate, onSearch, onUpdateCentering, scannerIdx, onOpenScanner, onCloseScanner, onConfirmScanner }) {
+export default function GradeTab({ images, result, candidates, loading, error, onAddImages, onRemoveImage, onSetRole, onGrade, onConfirmCandidate, onSearch, onUpdateCentering }) {
+  const [cameraOpen, setCameraOpen] = useState(false);
   const fileInputRef = useRef(null);
   const [dismissedNegs, setDismissedNegs] = useState([]);
   const [dismissedDefects, setDismissedDefects] = useState([]);
@@ -703,15 +730,6 @@ export default function GradeTab({ images, result, candidates, loading, error, o
                       alt={`View ${idx + 1}`}
                       style={{ width: 68, height: 86, objectFit: "cover", borderRadius: 8, border: `1px solid ${ROLE_COLOR[role]}44`, display: "block" }}
                     />
-                    {img.scanned && (
-                      <div style={{
-                        position: "absolute", bottom: -4, left: -4,
-                        background: "#30d158", color: "#000",
-                        fontSize: 7, fontWeight: 800, letterSpacing: "0.08em",
-                        padding: "2px 4px", borderRadius: 6,
-                        border: "1px solid #000",
-                      }}>SCAN</div>
-                    )}
                     <button
                       onClick={() => onRemoveImage(idx)}
                       style={{
@@ -737,75 +755,88 @@ export default function GradeTab({ images, result, candidates, loading, error, o
                   >
                     {ROLE_LABEL[role]}
                   </button>
-                  {(role === "front" || role === "back") && (
-                    <button
-                      onClick={() => onOpenScanner?.(idx)}
-                      title="Manually mark card corners and flatten"
-                      style={{
-                        background: img.scanned ? "rgba(48,209,88,0.12)" : "rgba(201,168,76,0.12)",
-                        border: `1px solid ${img.scanned ? "rgba(48,209,88,0.4)" : "rgba(201,168,76,0.35)"}`,
-                        borderRadius: 6, padding: "2px 6px",
-                        color: img.scanned ? "#30d158" : "#c9a84c",
-                        fontSize: 8, fontWeight: 700, letterSpacing: "0.06em",
-                        textTransform: "uppercase", cursor: "pointer",
-                        fontFamily: "inherit",
-                      }}
-                    >
-                      {img.scanned ? "rescan" : "scan"}
-                    </button>
-                  )}
                 </div>
               );
             })}
             {images.length < 10 && (
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                style={{
-                  width: 68, height: 86, borderRadius: 8,
-                  border: "1px dashed rgba(255,255,255,0.14)",
-                  background: "rgba(255,255,255,0.03)",
-                  color: "rgba(255,255,255,0.25)", fontSize: 22,
-                  cursor: "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}
-              >+</button>
+              <>
+                <button
+                  onClick={() => setCameraOpen(true)}
+                  title="Take photo with alignment rectangle"
+                  style={{
+                    width: 68, height: 86, borderRadius: 8,
+                    border: "1px solid rgba(201,168,76,0.4)",
+                    background: "rgba(201,168,76,0.1)",
+                    color: "#c9a84c", fontSize: 9, fontWeight: 700, letterSpacing: "0.06em",
+                    textTransform: "uppercase", cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontFamily: "inherit",
+                  }}
+                >Camera</button>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Upload existing photo"
+                  style={{
+                    width: 68, height: 86, borderRadius: 8,
+                    border: "1px dashed rgba(255,255,255,0.14)",
+                    background: "rgba(255,255,255,0.03)",
+                    color: "rgba(255,255,255,0.25)", fontSize: 22,
+                    cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}
+                >+</button>
+              </>
             )}
           </div>
         ) : (
           <div
             onDrop={handleDrop}
             onDragOver={(e) => e.preventDefault()}
-            onClick={() => fileInputRef.current?.click()}
             style={{
               border: "1px dashed rgba(255,255,255,0.1)",
               borderRadius: 12,
-              padding: "44px 24px",
+              padding: "32px 24px 24px",
               textAlign: "center",
-              cursor: "pointer",
             }}
           >
-            <div style={{ fontSize: 36, marginBottom: 12, opacity: 0.3 }}>↑</div>
             <div style={{ color: "#fff", fontSize: 15, fontWeight: 600, letterSpacing: "-0.2px", marginBottom: 5 }}>
-              Upload Card Photos
+              Add Card Photos
             </div>
-            <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 12, marginBottom: 12 }}>
-              Click or drag — up to 10 photos
+            <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 12, marginBottom: 18 }}>
+              Use the camera with alignment rectangle, or upload existing photos.
             </div>
-            <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 11, lineHeight: 1.65, maxWidth: 260, margin: "0 auto" }}>
-              Photograph the card only — no background clutter, sleeves, or other cards in frame. Flat, even lighting gives the best results.
+            <div style={{ display: "flex", gap: 10, justifyContent: "center", marginBottom: 14 }}>
+              <button
+                onClick={() => setCameraOpen(true)}
+                style={{
+                  background: "#c9a84c", color: "#000",
+                  border: "none", borderRadius: 10,
+                  padding: "12px 22px", fontSize: 14, fontWeight: 700, letterSpacing: "-0.1px",
+                  cursor: "pointer", fontFamily: "inherit",
+                }}
+              >Take Photo</button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                style={{
+                  background: "rgba(255,255,255,0.06)", color: "#fff",
+                  border: "1px solid rgba(255,255,255,0.14)", borderRadius: 10,
+                  padding: "12px 22px", fontSize: 14, fontWeight: 600, letterSpacing: "-0.1px",
+                  cursor: "pointer", fontFamily: "inherit",
+                }}
+              >Upload</button>
+            </div>
+            <div style={{ color: "rgba(255,255,255,0.22)", fontSize: 11, lineHeight: 1.65, maxWidth: 280, margin: "0 auto" }}>
+              For best results, use Camera and align the card inside the gold rectangle.
             </div>
           </div>
         )}
         <input ref={fileInputRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={(e) => onAddImages(e.target.files)} />
       </div>
 
-      {/* Manual scanner editor */}
-      {scannerIdx !== null && scannerIdx !== undefined && images[scannerIdx] && (
-        <ManualScannerEditor
-          imageURL={images[scannerIdx].objectURL}
-          initialCorners={images[scannerIdx].suggestedCorners}
-          onConfirm={onConfirmScanner}
-          onClose={onCloseScanner}
+      {cameraOpen && (
+        <CameraCapture
+          onCapture={(file) => { onAddImages([file]); setCameraOpen(false); }}
+          onClose={() => setCameraOpen(false)}
         />
       )}
 

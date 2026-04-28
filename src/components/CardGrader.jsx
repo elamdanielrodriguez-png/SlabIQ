@@ -12,7 +12,8 @@
 // v1.9.0 — Card picker always shown: /api/identify step before grading; Mosaic/decorative card design elements; borderless centering default
 // v2.0.0 — Client-side centering: canvas pixel detection measures actual border widths; server uses as authoritative ground truth; AI no longer estimates centering
 // v2.5.0 — Scanner mode: auto-crop background + AI-detected 4-corner perspective correction for front/back. AI centering re-added as initial estimate (user override updates BGS+PSA). PSA = round(avg of 4 subgrades). Forced 8-zone grading. Real eBay market comps via Haiku. User-picked card identity forces server response.
-const VERSION = "2.5.0";
+// v3.0.0 — Camera capture replaces scanner: live camera feed with fixed 5:7 alignment rectangle. User aligns card inside, captures, frame is cropped to rectangle. No detection, no AI, just static crop. All scanner code (perspective correction, pixel detection, manual corner editor, AI corner detection) removed.
+const VERSION = "3.0.0";
 
 import { useState } from "react";
 import GradeTab from "./GradeTab";
@@ -188,361 +189,21 @@ function processImageFile(file) {
         ctx.drawImage(img, 0, 0, w, h);
         const detected = detectCardCentering(canvas, ctx);
 
-        // Auto-crop to just the card (scanner-feel) when detection found a card
-        // smaller than the frame. Keeps a 4% margin so we never shave the card.
-        let finalCanvas = canvas;
-        let finalW = w, finalH = h;
-        let finalBounds = detected?.cardBounds ?? { cL: 0, cR: w, cT: 0, cB: h };
-        let finalLines = detected?.lines ?? null;
-
-        if (detected?.cardBounds) {
-          const { cL, cR, cT, cB } = detected.cardBounds;
-          const cardW = cR - cL, cardH = cB - cT;
-          const cardFillsFrame = (cardW / w) > 0.92 && (cardH / h) > 0.92;
-          if (!cardFillsFrame) {
-            const mX = Math.round(cardW * 0.04);
-            const mY = Math.round(cardH * 0.04);
-            const cropX = Math.max(0, cL - mX);
-            const cropY = Math.max(0, cT - mY);
-            const cropW = Math.min(w - cropX, cardW + mX * 2);
-            const cropH = Math.min(h - cropY, cardH + mY * 2);
-
-            const cropped = document.createElement("canvas");
-            cropped.width = cropW;
-            cropped.height = cropH;
-            cropped.getContext("2d").drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
-
-            finalCanvas = cropped;
-            finalW = cropW;
-            finalH = cropH;
-            finalBounds = { cL: cL - cropX, cR: cR - cropX, cT: cT - cropY, cB: cB - cropY };
-
-            // Translate the auto-detected centering lines from the original frame's
-            // coordinate system to the cropped frame so the editor still places them
-            // correctly on the card edges.
-            if (detected.lines) {
-              const tx = (frac, total, off, newTot) => (frac * total - off) / newTot;
-              finalLines = {
-                leftOuter:   Math.max(tx(detected.lines.leftOuter,   w, cropX, cropW), 0.001),
-                leftInner:           tx(detected.lines.leftInner,    w, cropX, cropW),
-                rightInner:          tx(detected.lines.rightInner,   w, cropX, cropW),
-                rightOuter:  Math.min(tx(detected.lines.rightOuter,  w, cropX, cropW), 0.999),
-                topOuter:    Math.max(tx(detected.lines.topOuter,    h, cropY, cropH), 0.001),
-                topInner:            tx(detected.lines.topInner,     h, cropY, cropH),
-                bottomInner:         tx(detected.lines.bottomInner,  h, cropY, cropH),
-                bottomOuter: Math.min(tx(detected.lines.bottomOuter, h, cropY, cropH), 0.999),
-              };
-            }
-          }
-        }
-
-        finalCanvas.toBlob((blob) => {
+        canvas.toBlob((blob) => {
           resolve({
-            imageData: finalCanvas.toDataURL("image/jpeg", 0.92).split(",")[1],
-            objectURL: blob ? URL.createObjectURL(blob) : null,
+            imageData: canvas.toDataURL("image/jpeg", 0.92).split(",")[1],
+            objectURL: blob ? URL.createObjectURL(blob) : URL.createObjectURL(file),
             centering: detected ? { leftPct: detected.leftPct, rightPct: detected.rightPct, topPct: detected.topPct, bottomPct: detected.bottomPct } : null,
-            centeringLines: finalLines,
-            cardBounds: finalBounds,
-            width: finalW,
-            height: finalH,
+            centeringLines: detected?.lines ?? null,
+            cardBounds: detected?.cardBounds ?? { cL: 0, cR: w, cT: 0, cB: h },
+            width: w,
+            height: h,
           });
         }, "image/jpeg", 0.92);
       };
       img.src = e.target.result;
     };
     reader.readAsDataURL(file);
-  });
-}
-
-// ─── Perspective correction (Path C: scanner mode) ────────────────────────────
-// Solve 8x8 linear system via Gaussian elimination with partial pivoting
-function solveLinear8x8(A, b) {
-  const n = 8;
-  const M = A.map((row, i) => [...row, b[i]]);
-  for (let i = 0; i < n; i++) {
-    let max = i;
-    for (let k = i + 1; k < n; k++) if (Math.abs(M[k][i]) > Math.abs(M[max][i])) max = k;
-    [M[i], M[max]] = [M[max], M[i]];
-    for (let k = i + 1; k < n; k++) {
-      const f = M[k][i] / M[i][i];
-      for (let j = i; j <= n; j++) M[k][j] -= f * M[i][j];
-    }
-  }
-  const x = new Array(n);
-  for (let i = n - 1; i >= 0; i--) {
-    x[i] = M[i][n];
-    for (let j = i + 1; j < n; j++) x[i] -= M[i][j] * x[j];
-    x[i] /= M[i][i];
-  }
-  return x;
-}
-
-// Homography mapping 4 source points to 4 destination points (returns 9 floats)
-function homography(src, dst) {
-  const A = [], b = [];
-  for (let i = 0; i < 4; i++) {
-    const [x, y] = src[i], [u, v] = dst[i];
-    A.push([x, y, 1, 0, 0, 0, -u * x, -u * y]);
-    A.push([0, 0, 0, x, y, 1, -v * x, -v * y]);
-    b.push(u);
-    b.push(v);
-  }
-  const h = solveLinear8x8(A, b);
-  return [h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7], 1];
-}
-
-// Perspective-correct a quad in the source canvas to a rectangular output canvas
-function perspectiveCorrect(srcCanvas, corners, outW, outH) {
-  const H = homography(
-    [[0, 0], [outW - 1, 0], [outW - 1, outH - 1], [0, outH - 1]],
-    [[corners.tl.x, corners.tl.y], [corners.tr.x, corners.tr.y], [corners.br.x, corners.br.y], [corners.bl.x, corners.bl.y]]
-  );
-  const sw = srcCanvas.width, sh = srcCanvas.height;
-  const srcCtx = srcCanvas.getContext("2d");
-  const sd = srcCtx.getImageData(0, 0, sw, sh).data;
-
-  const dst = document.createElement("canvas");
-  dst.width = outW;
-  dst.height = outH;
-  const dstCtx = dst.getContext("2d");
-  const dstImage = dstCtx.createImageData(outW, outH);
-  const dd = dstImage.data;
-
-  const h0 = H[0], h1 = H[1], h2 = H[2], h3 = H[3], h4 = H[4], h5 = H[5], h6 = H[6], h7 = H[7], h8 = H[8];
-
-  for (let y = 0; y < outH; y++) {
-    for (let x = 0; x < outW; x++) {
-      const w = h6 * x + h7 * y + h8;
-      const sx = (h0 * x + h1 * y + h2) / w;
-      const sy = (h3 * x + h4 * y + h5) / w;
-      const di = (y * outW + x) * 4;
-      if (sx < 0 || sx >= sw - 1 || sy < 0 || sy >= sh - 1) {
-        dd[di] = 0; dd[di + 1] = 0; dd[di + 2] = 0; dd[di + 3] = 255;
-        continue;
-      }
-      const x0 = sx | 0, y0 = sy | 0;
-      const fx = sx - x0, fy = sy - y0;
-      const fx1 = 1 - fx, fy1 = 1 - fy;
-      const i00 = (y0 * sw + x0) * 4;
-      const i10 = i00 + 4;
-      const i01 = i00 + sw * 4;
-      const i11 = i01 + 4;
-      dd[di]     = (sd[i00]     * fx1 * fy1 + sd[i10]     * fx * fy1 + sd[i01]     * fx1 * fy + sd[i11]     * fx * fy) | 0;
-      dd[di + 1] = (sd[i00 + 1] * fx1 * fy1 + sd[i10 + 1] * fx * fy1 + sd[i01 + 1] * fx1 * fy + sd[i11 + 1] * fx * fy) | 0;
-      dd[di + 2] = (sd[i00 + 2] * fx1 * fy1 + sd[i10 + 2] * fx * fy1 + sd[i01 + 2] * fx1 * fy + sd[i11 + 2] * fx * fy) | 0;
-      dd[di + 3] = 255;
-    }
-  }
-  dstCtx.putImageData(dstImage, 0, 0);
-  return dst;
-}
-
-// Pixel-based corner detection. Robust to non-uniform backgrounds via color clustering
-// of perimeter samples — we find the dominant background color even when one edge has
-// a shadow, glare patch, or other photo artifact. Then mask card pixels by color distance,
-// find centroid, and pick the extreme card pixel in each of 4 quadrants. Validate the
-// resulting quadrilateral has card-like aspect ratio. Pure JS, pixel-precise, free.
-function findCornersFromPixels(canvas, ctx) {
-  const W = canvas.width, H = canvas.height;
-  const data = ctx.getImageData(0, 0, W, H).data;
-  const px = (x, y) => {
-    const i = (y * W + x) * 4;
-    return [data[i], data[i + 1], data[i + 2]];
-  };
-  const dist2 = (a, b) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
-
-  // 1. Sample 32 perimeter points (8 per side) — densely covers the photo border
-  const samples = [];
-  const N = 8;
-  for (let i = 0; i < N; i++) {
-    const t = (i + 0.5) / N;
-    const xt = Math.round(t * (W - 1));
-    const yt = Math.round(t * (H - 1));
-    samples.push(px(xt, 3));        // top edge
-    samples.push(px(xt, H - 4));    // bottom edge
-    samples.push(px(3, yt));        // left edge
-    samples.push(px(W - 4, yt));    // right edge
-  }
-
-  // 2. Greedy color clustering of perimeter samples to find dominant background.
-  // Handles shadows / glares — if 75% of perimeter is one color, that's still detectable.
-  const CLUSTER_THR = 60 * 60;
-  const clusters = [];
-  for (const s of samples) {
-    let best = null, bestD = Infinity;
-    for (const c of clusters) {
-      const d = dist2(s, c.center);
-      if (d < CLUSTER_THR && d < bestD) { best = c; bestD = d; }
-    }
-    if (best) {
-      best.points.push(s);
-      best.center = [
-        best.points.reduce((a, p) => a + p[0], 0) / best.points.length,
-        best.points.reduce((a, p) => a + p[1], 0) / best.points.length,
-        best.points.reduce((a, p) => a + p[2], 0) / best.points.length,
-      ];
-    } else {
-      clusters.push({ center: [...s], points: [s] });
-    }
-  }
-  clusters.sort((a, b) => b.points.length - a.points.length);
-  const bgCluster = clusters[0];
-  // Dominant cluster must be at least 35% of perimeter — otherwise scene is too chaotic
-  if (bgCluster.points.length < samples.length * 0.35) return null;
-  const bg = bgCluster.center;
-
-  // 3. Adaptive threshold: 4× the spread within the background cluster, clamped to a sane range
-  const bgVar = bgCluster.points.reduce((a, p) => a + dist2(p, bg), 0) / bgCluster.points.length;
-  const THR = Math.max(32 * 32, Math.min(70 * 70, bgVar * 4));
-
-  // 4. Find centroid of card pixels (anything significantly different from background)
-  const STEP = Math.max(2, Math.round(Math.min(W, H) / 600));
-  let count = 0, cx = 0, cy = 0;
-  for (let y = 0; y < H; y += STEP) {
-    for (let x = 0; x < W; x += STEP) {
-      if (dist2(px(x, y), bg) > THR) { count++; cx += x; cy += y; }
-    }
-  }
-  if (count < 400) return null;
-  cx /= count; cy /= count;
-
-  // 5. Find extreme card pixel in each quadrant relative to centroid
-  let tl = { d: -1, x: 0, y: 0 };
-  let tr = { d: -1, x: 0, y: 0 };
-  let bl = { d: -1, x: 0, y: 0 };
-  let br = { d: -1, x: 0, y: 0 };
-  for (let y = 0; y < H; y += STEP) {
-    for (let x = 0; x < W; x += STEP) {
-      if (dist2(px(x, y), bg) > THR) {
-        const d = (x - cx) ** 2 + (y - cy) ** 2;
-        const dx = x - cx, dy = y - cy;
-        if (dx <= 0 && dy <= 0 && d > tl.d) tl = { d, x, y };
-        else if (dx >= 0 && dy <= 0 && d > tr.d) tr = { d, x, y };
-        else if (dx <= 0 && dy >= 0 && d > bl.d) bl = { d, x, y };
-        else if (dx >= 0 && dy >= 0 && d > br.d) br = { d, x, y };
-      }
-    }
-  }
-  if (tl.d < 0 || tr.d < 0 || bl.d < 0 || br.d < 0) return null;
-
-  // 6. Sanity-check the resulting quadrilateral has roughly card-like aspect (5:7 = 0.71).
-  // Reject squares (probably bad mask) and very long shapes (probably hand or arm in frame).
-  const avgW = (Math.hypot(tr.x - tl.x, tr.y - tl.y) + Math.hypot(br.x - bl.x, br.y - bl.y)) / 2;
-  const avgH = (Math.hypot(bl.x - tl.x, bl.y - tl.y) + Math.hypot(br.x - tr.x, br.y - tr.y)) / 2;
-  const ratio = Math.min(avgW, avgH) / Math.max(avgW, avgH);
-  if (ratio < 0.45 || ratio > 0.95) return null;
-
-  return {
-    tl: { x: tl.x / W, y: tl.y / H },
-    tr: { x: tr.x / W, y: tr.y / H },
-    br: { x: br.x / W, y: br.y / H },
-    bl: { x: bl.x / W, y: bl.y / H },
-  };
-}
-
-function detectCornersFromImageData(imageData) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onerror = reject;
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(img, 0, 0);
-      resolve(findCornersFromPixels(canvas, ctx));
-    };
-    img.src = `data:image/jpeg;base64,${imageData}`;
-  });
-}
-
-function validCorners(c) {
-  if (!c?.tl || !c?.tr || !c?.br || !c?.bl) return false;
-  for (const k of ["tl", "tr", "br", "bl"]) {
-    const p = c[k];
-    if (typeof p?.x !== "number" || typeof p?.y !== "number") return false;
-    if (p.x < 0 || p.x > 1 || p.y < 0 || p.y > 1) return false;
-  }
-  // Sanity: corners should be ordered roughly correctly (loose tolerance to allow tilted cards)
-  if (c.tl.x >= c.tr.x) return false;
-  if (c.tl.y >= c.bl.y) return false;
-  if (c.bl.x >= c.br.x) return false;
-  if (c.tr.y >= c.br.y) return false;
-  // Quad must have meaningful area (not a degenerate flat shape)
-  const minX = Math.min(c.tl.x, c.bl.x);
-  const maxX = Math.max(c.tr.x, c.br.x);
-  const minY = Math.min(c.tl.y, c.tr.y);
-  const maxY = Math.max(c.bl.y, c.br.y);
-  if (maxX - minX < 0.2 || maxY - minY < 0.2) return false;
-  // Reject only the literal failure case: corners exactly at the image edges,
-  // which happens when background segmentation failed entirely. Tightly-framed
-  // cards (90%+ fill) are legitimate and should pass.
-  const atEdge = 0.012;
-  const allCornersAtImageEdges =
-    c.tl.x < atEdge && c.tl.y < atEdge &&
-    c.tr.x > 1 - atEdge && c.tr.y < atEdge &&
-    c.br.x > 1 - atEdge && c.br.y > 1 - atEdge &&
-    c.bl.x < atEdge && c.bl.y > 1 - atEdge;
-  if (allCornersAtImageEdges) return false;
-  return true;
-}
-
-// Run perspective correction on a base64 image using AI-detected corners
-function perspectiveCorrectImage(imageData, corners) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onerror = reject;
-    img.onload = () => {
-      const src = document.createElement("canvas");
-      src.width = img.width;
-      src.height = img.height;
-      src.getContext("2d").drawImage(img, 0, 0);
-
-      const px = {
-        tl: { x: corners.tl.x * img.width, y: corners.tl.y * img.height },
-        tr: { x: corners.tr.x * img.width, y: corners.tr.y * img.height },
-        br: { x: corners.br.x * img.width, y: corners.br.y * img.height },
-        bl: { x: corners.bl.x * img.width, y: corners.bl.y * img.height },
-      };
-
-      const avgW = (Math.hypot(px.tr.x - px.tl.x, px.tr.y - px.tl.y) + Math.hypot(px.br.x - px.bl.x, px.br.y - px.bl.y)) / 2;
-      const avgH = (Math.hypot(px.bl.x - px.tl.x, px.bl.y - px.tl.y) + Math.hypot(px.br.x - px.tr.x, px.br.y - px.tr.y)) / 2;
-
-      // Snap to standard card aspect (5:7 = 0.714)
-      const RATIO = 5 / 7;
-      let outW, outH;
-      if (avgW / avgH > RATIO) {
-        outH = Math.round(avgH);
-        outW = Math.round(outH * RATIO);
-      } else {
-        outW = Math.round(avgW);
-        outH = Math.round(outW / RATIO);
-      }
-      const MAX = 2000;
-      if (outW > MAX || outH > MAX) {
-        const s = MAX / Math.max(outW, outH);
-        outW = Math.round(outW * s);
-        outH = Math.round(outH * s);
-      }
-      if (outW < 200 || outH < 200) return reject(new Error("Output too small"));
-
-      const corrected = perspectiveCorrect(src, px, outW, outH);
-      const ctx = corrected.getContext("2d");
-      const detected = detectCardCentering(corrected, ctx);
-
-      corrected.toBlob((blob) => {
-        resolve({
-          imageData: corrected.toDataURL("image/jpeg", 0.92).split(",")[1],
-          objectURL: blob ? URL.createObjectURL(blob) : null,
-          centering: detected ? { leftPct: detected.leftPct, rightPct: detected.rightPct, topPct: detected.topPct, bottomPct: detected.bottomPct } : null,
-          centeringLines: detected?.lines ?? null,
-          cardBounds: detected?.cardBounds ?? { cL: 0, cR: outW, cT: 0, cB: outH },
-          width: outW,
-          height: outH,
-        });
-      }, "image/jpeg", 0.92);
-    };
-    img.src = `data:image/jpeg;base64,${imageData}`;
   });
 }
 
@@ -628,7 +289,6 @@ export default function CardGrader() {
   const [candidates, setCandidates] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [scannerIdx, setScannerIdx] = useState(null);
 
   const addImages = async (files) => {
     const slots = 10 - images.length;
@@ -639,31 +299,7 @@ export default function CardGrader() {
         const base = await processImageFile(file);
         const slot = currentCount + fileIdx;
         const role = slot === 0 ? 'front' : slot === 1 ? 'back' : 'detail';
-        // Auto-scan removed — manual scanner via "Scan" button is the reliable path now.
-        // Best-guess corners are stored on the image as starting position for the editor.
-        let suggestedCorners = null;
-        if (role === 'front' || role === 'back') {
-          try {
-            const detected = await detectCornersFromImageData(base.imageData);
-            if (validCorners(detected)) suggestedCorners = detected;
-          } catch {}
-          // Fallback: derive axis-aligned corners from cardBounds (Path A's detection)
-          if (!suggestedCorners && base.cardBounds && base.width && base.height) {
-            const { cL, cR, cT, cB } = base.cardBounds;
-            const W = base.width, H = base.height;
-            const w = cR - cL, h = cB - cT;
-            // Only use if cardBounds is tight (didn't return full image)
-            if (w < W * 0.96 && h < H * 0.96) {
-              suggestedCorners = {
-                tl: { x: cL / W, y: cT / H },
-                tr: { x: cR / W, y: cT / H },
-                br: { x: cR / W, y: cB / H },
-                bl: { x: cL / W, y: cB / H },
-              };
-            }
-          }
-        }
-        return { ...base, role, suggestedCorners };
+        return { ...base, role };
       })
     );
     setImages((prev) => [...prev, ...processed]);
@@ -678,24 +314,6 @@ export default function CardGrader() {
       const next = ROLES[(ROLES.indexOf(img.role ?? 'detail') + 1) % ROLES.length];
       return { ...img, role: next };
     }));
-  };
-
-  const confirmManualScan = async (corners) => {
-    if (scannerIdx === null) return;
-    const target = images[scannerIdx];
-    if (!target) return;
-    try {
-      const corrected = await perspectiveCorrectImage(target.imageData, corners);
-      if (target.objectURL) URL.revokeObjectURL(target.objectURL);
-      setImages(prev => prev.map((im, i) =>
-        i === scannerIdx
-          ? { ...corrected, role: im.role, scanned: true, suggestedCorners: { tl: { x: 0.001, y: 0.001 }, tr: { x: 0.999, y: 0.001 }, br: { x: 0.999, y: 0.999 }, bl: { x: 0.001, y: 0.999 } } }
-          : im
-      ));
-    } catch (e) {
-      console.warn('Manual scan failed:', e);
-    }
-    setScannerIdx(null);
   };
 
   const updateImageCentering = (idx, centering, lines) => {
@@ -856,10 +474,6 @@ export default function CardGrader() {
             onConfirmCandidate={(card) => gradeCards(card)}
             onSearch={searchCards}
             onUpdateCentering={updateImageCentering}
-            scannerIdx={scannerIdx}
-            onOpenScanner={(i) => setScannerIdx(i)}
-            onCloseScanner={() => setScannerIdx(null)}
-            onConfirmScanner={confirmManualScan}
           />
         )}
         {activeTab === "market" && result && <MarketTab result={result} />}
