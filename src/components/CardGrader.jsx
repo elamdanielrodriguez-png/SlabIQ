@@ -353,7 +353,11 @@ export default function CardGrader() {
   const [error, setError] = useState(null);
   const [spotlightActive, setSpotlightActive] = useState(false);
 
-  useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }); }, [activeTab]);
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, [activeTab]);
 
   const saveGrading = (parsed) => {
     try {
