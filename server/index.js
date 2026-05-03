@@ -750,13 +750,11 @@ app.post('/api/grade', async (req, res) => {
           const realPrice = (m, aiEstimate) => {
             if (!m || !Array.isArray(m.prices) || m.prices.length === 0) return null;
             let prices = [...m.prices].sort((a, b) => a - b);
-            // Sanity floor: anything < 30% of AI estimate is almost certainly oversized/wrong card
+            // Floor + ceiling relative to AI estimate: rejects oversized/wrong cards at both ends
             if (aiEstimate && aiEstimate > 0) {
-              prices = prices.filter(p => p >= aiEstimate * 0.30);
+              prices = prices.filter(p => p >= aiEstimate * 0.30 && p <= aiEstimate * 3.5);
             }
             if (prices.length < 2) return null;
-            // Median is robust against oversized junk that slipped past the filter on the low end
-            // and against scammy high listings on the top end.
             const mid = Math.floor(prices.length / 2);
             const median = prices.length % 2 === 0
               ? (prices[mid - 1] + prices[mid]) / 2
@@ -773,7 +771,36 @@ app.post('/api/grade', async (req, res) => {
           const aiRaw = Number(parsed.market.raw) || 0;
           const rawPrice = realPrice(market.raw, aiRaw);
           if (rawPrice) parsed.market.raw = rawPrice;
-          parsed.market.dataSource = 'eBay (median active − 10%, AI-estimate floor)';
+
+          // BGS / PSA cross-validation: PSA doesn't grade oversized cards so PSA prices are
+          // inherently clean. If a BGS value is wildly above its PSA equivalent it almost
+          // certainly came from an oversized listing that slipped through.
+          {
+            const g = parsed.market.graded;
+            const psa10 = Number(g.psa10) || 0;
+            const psa9  = Number(g.psa9)  || 0;
+            const psa8  = Number(g.psa8)  || 0;
+            const checks = [
+              // BGS 9.5 is normally 50–80% of PSA 10 — flag if > 2.2×
+              { key: 'bgs9_5',        ref: psa10, maxMult: 2.2  },
+              // BGS 10 Pristine is normally 100–150% of PSA 10 — flag if > 3.5×
+              { key: 'bgs10',         ref: psa10, maxMult: 3.5  },
+              // BGS Black Label can be rare but > 25× PSA 10 is almost certainly wrong
+              { key: 'bgsBlackLabel', ref: psa10, maxMult: 25   },
+              // BGS 9 should track near PSA 9 — flag if > 2×
+              { key: 'bgs9',          ref: psa9,  maxMult: 2.0  },
+              // BGS 8 should track near PSA 8 — flag if > 2×
+              { key: 'bgs8',          ref: psa8,  maxMult: 2.0  },
+            ];
+            for (const { key, ref, maxMult } of checks) {
+              if (ref > 0 && Number(g[key]) > ref * maxMult) {
+                console.log(`BGS cross-check: ${key} $${g[key]} is ${Math.round(Number(g[key])/ref*100)}% of ref $${ref} (max ${maxMult*100}%) — removing as likely oversized`);
+                delete g[key];
+              }
+            }
+          }
+
+          parsed.market.dataSource = 'eBay (median active − 10%, AI-estimate floor+ceiling, BGS/PSA cross-check)';
           parsed.market.sampleSize = market.totalValid;
           text = JSON.stringify(parsed);
         }
