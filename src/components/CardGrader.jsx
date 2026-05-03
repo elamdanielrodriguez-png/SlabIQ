@@ -353,6 +353,8 @@ export default function CardGrader() {
   const [error, setError] = useState(null);
   const [spotlightActive, setSpotlightActive] = useState(false);
 
+  useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }); }, [activeTab]);
+
   const saveGrading = (parsed) => {
     try {
       const existing = JSON.parse(localStorage.getItem('slabiq_history') || '[]');
