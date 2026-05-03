@@ -31,11 +31,19 @@ body {
 }
 
 @keyframes gradeSlam {
-  0%   { transform: scale(1.45); opacity: 0; }
-  40%  { transform: scale(0.88); opacity: 1; }
-  70%  { transform: scale(1.1); }
-  88%  { transform: scale(0.96); }
-  100% { transform: scale(1); }
+  0%   { transform: scale(1.0); }
+  22%  { transform: scale(1.55); }
+  48%  { transform: scale(0.84); }
+  67%  { transform: scale(1.13); }
+  82%  { transform: scale(0.97); }
+  100% { transform: scale(1.0); }
+}
+
+@keyframes spotlightReveal {
+  0%   { opacity: 0; }
+  8%   { opacity: 1; }
+  78%  { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 

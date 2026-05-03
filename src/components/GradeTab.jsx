@@ -1310,7 +1310,7 @@ function GradeHalf({ label, grade: gradeProp, sub, side, blackLabel }) {
     setLanded(false);
     if (grade == null) { setDisplay(null); return; }
     setDisplay(isInt ? 0 : 0.0);
-    const STEPS = 22, INTERVAL = 860 / STEPS;
+    const STEPS = 22, INTERVAL = 1360 / STEPS;
     let step = 0;
     const id = setInterval(() => {
       step++;
@@ -1330,6 +1330,8 @@ function GradeHalf({ label, grade: gradeProp, sub, side, blackLabel }) {
   const pad   = side === "left" ? "12px 20px 12px 0" : "12px 0 12px 20px";
 
   const displayStr = display == null ? "—" : isInt ? String(display) : Number(display).toFixed(1);
+  const progress = (grade > 0 && display != null) ? Math.min(1, display / grade) : 0;
+  const countScale = 0.3 + 0.7 * progress;
 
   return (
     <div style={{ textAlign: "center", padding: pad }}>
@@ -1344,7 +1346,8 @@ function GradeHalf({ label, grade: gradeProp, sub, side, blackLabel }) {
         fontSize: 72, fontWeight: 700, lineHeight: 1,
         letterSpacing: "-3px", marginBottom: 10,
         textShadow: landed ? gradeGlow(grade, blackLabel) : "none",
-        animation: landed ? "gradeSlam 0.55s cubic-bezier(0.22,1,0.36,1) forwards" : "none",
+        transform: landed ? undefined : `scale(${countScale})`,
+        animation: landed ? "gradeSlam 0.8s cubic-bezier(0.22,1,0.36,1) forwards" : "none",
       }}>{displayStr}</div>
 
       <div style={{

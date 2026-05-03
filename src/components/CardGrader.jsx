@@ -351,6 +351,7 @@ export default function CardGrader() {
   const [loadingMessage, setLoadingMessage] = useState(null);
   const [toast, setToast] = useState(false);
   const [error, setError] = useState(null);
+  const [spotlightActive, setSpotlightActive] = useState(false);
 
   const saveGrading = (parsed) => {
     try {
@@ -498,6 +499,7 @@ export default function CardGrader() {
         setCandidates(null);
         saveGrading(parsed);
         setToast(true);
+        setSpotlightActive(true);
       }
     } catch (err) {
       setError(err.message || "API error. Please try again.");
@@ -583,6 +585,16 @@ export default function CardGrader() {
         </div>
       </main>
 
+      {spotlightActive && (
+        <div
+          onAnimationEnd={() => setSpotlightActive(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 250, pointerEvents: "none",
+            background: "radial-gradient(ellipse 320px 200px at 50% 36vh, transparent 0%, rgba(0,0,0,0.88) 55%)",
+            animation: "spotlightReveal 2.8s ease forwards",
+          }}
+        />
+      )}
       <LoadingOverlay message={loadingMessage} />
       {toast && <Toast onDone={() => setToast(false)} />}
 
