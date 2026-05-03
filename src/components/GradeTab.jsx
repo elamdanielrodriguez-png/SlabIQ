@@ -944,7 +944,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
             {/* CTA buttons */}
             <div style={{ display: "flex", gap: 10, position: "relative" }}>
               <button
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => setCameraOpen(true)}
                 style={{
                   flex: 1, padding: "15px 0",
                   background: "#c9a84c", color: "#000",
@@ -952,6 +952,16 @@ export default function GradeTab({ images, result, candidates, loading, error, o
                   fontSize: 15, fontWeight: 700, letterSpacing: "-0.2px",
                   cursor: "pointer", fontFamily: "inherit",
                   boxShadow: "0 4px 24px rgba(201,168,76,0.45)",
+                }}
+              >Take Photo</button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                style={{
+                  flex: 1, padding: "15px 0",
+                  background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.75)",
+                  border: "1px solid rgba(255,255,255,0.12)", borderRadius: 14,
+                  fontSize: 15, fontWeight: 600, letterSpacing: "-0.2px",
+                  cursor: "pointer", fontFamily: "inherit",
                 }}
               >Upload Photo</button>
             </div>
