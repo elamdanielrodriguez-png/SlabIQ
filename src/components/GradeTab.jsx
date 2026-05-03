@@ -839,7 +839,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
 
       {/* Upload area */}
-      <div style={card}>
+      <div style={images.length > 0 ? card : heroUploadCard}>
         {images.length > 0 ? (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "flex-start" }}>
             {images.map((img, idx) => {
@@ -914,46 +914,96 @@ export default function GradeTab({ images, result, candidates, loading, error, o
           <div
             onDrop={handleDrop}
             onDragOver={(e) => e.preventDefault()}
-            style={{
-              border: "1px dashed rgba(255,255,255,0.1)",
-              borderRadius: 12,
-              padding: "32px 24px 24px",
-              textAlign: "center",
-            }}
+            style={{ padding: "36px 20px 32px", textAlign: "center", position: "relative" }}
           >
-            <div style={{ color: "#fff", fontSize: 15, fontWeight: 600, letterSpacing: "-0.2px", marginBottom: 5 }}>
-              Add Card Photos
+            {/* Ambient top glow */}
+            <div style={{
+              position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)",
+              width: "130%", height: 180,
+              background: "radial-gradient(ellipse 60% 100% at 50% 0%, rgba(201,168,76,0.22) 0%, transparent 100%)",
+              pointerEvents: "none",
+            }} />
+
+            {/* Mock grade badges */}
+            <div style={{ display: "flex", justifyContent: "center", gap: 16, marginBottom: 28, position: "relative" }}>
+              {[
+                { company: "PSA", grade: "10", sub: "GEM MT" },
+                { company: "BGS", grade: "9.5", sub: "GEM MINT" },
+              ].map(({ company, grade, sub }) => (
+                <div key={company} style={{
+                  background: "rgba(0,0,0,0.5)",
+                  border: "1px solid rgba(201,168,76,0.32)",
+                  borderRadius: 18,
+                  padding: "16px 22px",
+                  minWidth: 95,
+                  boxShadow: "0 4px 24px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.07)",
+                }}>
+                  <div style={{ color: "rgba(255,255,255,0.28)", fontSize: 9, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", marginBottom: 6 }}>{company}</div>
+                  <div style={{ color: "#c9a84c", fontSize: 42, fontWeight: 800, lineHeight: 1, letterSpacing: "-2.5px", textShadow: "0 0 28px rgba(201,168,76,0.6)" }}>{grade}</div>
+                  <div style={{ color: "rgba(255,255,255,0.25)", fontSize: 9, fontWeight: 600, letterSpacing: "0.07em", textTransform: "uppercase", marginTop: 6 }}>{sub}</div>
+                </div>
+              ))}
             </div>
-            <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 12, marginBottom: 18 }}>
-              Use the camera with alignment rectangle, or upload existing photos.
+
+            {/* Headline */}
+            <div style={{ color: "#fff", fontSize: 26, fontWeight: 800, letterSpacing: "-0.8px", lineHeight: 1.15, marginBottom: 10, position: "relative" }}>
+              Grade Your Cards<br />with AI
             </div>
-            <div style={{ display: "flex", gap: 10, justifyContent: "center", marginBottom: 14 }}>
+
+            {/* Subtitle */}
+            <div style={{ color: "rgba(255,255,255,0.38)", fontSize: 13, letterSpacing: "-0.1px", lineHeight: 1.7, margin: "0 auto 28px", maxWidth: 250, position: "relative" }}>
+              PSA & BGS grades, live eBay market comps, and submission ROI — from a photo.
+            </div>
+
+            {/* CTA buttons */}
+            <div style={{ display: "flex", gap: 10, position: "relative" }}>
               <button
                 onClick={() => setCameraOpen(true)}
                 style={{
+                  flex: 1, padding: "15px 0",
                   background: "#c9a84c", color: "#000",
-                  border: "none", borderRadius: 10,
-                  padding: "12px 22px", fontSize: 14, fontWeight: 700, letterSpacing: "-0.1px",
+                  border: "none", borderRadius: 14,
+                  fontSize: 15, fontWeight: 700, letterSpacing: "-0.2px",
                   cursor: "pointer", fontFamily: "inherit",
+                  boxShadow: "0 4px 24px rgba(201,168,76,0.45)",
                 }}
               >Take Photo</button>
               <button
                 onClick={() => fileInputRef.current?.click()}
                 style={{
-                  background: "rgba(255,255,255,0.06)", color: "#fff",
-                  border: "1px solid rgba(255,255,255,0.14)", borderRadius: 10,
-                  padding: "12px 22px", fontSize: 14, fontWeight: 600, letterSpacing: "-0.1px",
+                  flex: 1, padding: "15px 0",
+                  background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.75)",
+                  border: "1px solid rgba(255,255,255,0.12)", borderRadius: 14,
+                  fontSize: 15, fontWeight: 600, letterSpacing: "-0.2px",
                   cursor: "pointer", fontFamily: "inherit",
                 }}
-              >Upload</button>
-            </div>
-            <div style={{ color: "rgba(255,255,255,0.22)", fontSize: 11, lineHeight: 1.65, maxWidth: 280, margin: "0 auto" }}>
-              For best results, use Camera and align the card inside the gold rectangle.
+              >Upload Photo</button>
             </div>
           </div>
         )}
         <input ref={fileInputRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={(e) => onAddImages(e.target.files)} />
       </div>
+
+      {images.length === 0 && !result && !candidates && !loading && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          {[
+            { title: "PSA + BGS Grades",  desc: "Both grading scales from one photo" },
+            { title: "Live Market Data",  desc: "Real eBay prices per grade tier"     },
+            { title: "Submission ROI",    desc: "Dollar math on whether to grade"     },
+            { title: "Defect Detection",  desc: "AI finds flaws corner by corner"     },
+          ].map(({ title, desc }, i) => (
+            <div key={title} className={`result-card-${i}`} style={{
+              background: "rgba(255,255,255,0.03)",
+              border: "1px solid rgba(255,255,255,0.06)",
+              borderRadius: 16,
+              padding: "14px 14px",
+            }}>
+              <div style={{ color: "rgba(255,255,255,0.72)", fontSize: 13, fontWeight: 600, letterSpacing: "-0.2px", marginBottom: 4 }}>{title}</div>
+              <div style={{ color: "rgba(255,255,255,0.28)", fontSize: 12, lineHeight: 1.5 }}>{desc}</div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {cameraOpen && (
         <CameraCapture
@@ -1372,6 +1422,14 @@ const card = {
   borderRadius: 20,
   padding: "18px 18px",
   boxShadow: "0 2px 20px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.09)",
+};
+
+const heroUploadCard = {
+  background: "linear-gradient(180deg, rgba(201,168,76,0.11) 0%, #1c1c1e 52%)",
+  border: "1px solid rgba(201,168,76,0.22)",
+  borderRadius: 24,
+  overflow: "hidden",
+  boxShadow: "0 2px 40px rgba(201,168,76,0.10), inset 0 1px 0 rgba(255,255,255,0.08)",
 };
 
 const sectionLabel = {
