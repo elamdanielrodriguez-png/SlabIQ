@@ -1,3 +1,5 @@
+import { useState, useEffect } from "react";
+
 export default function SubmitTab({ result }) {
   const { submission, market, bgs } = result;
   const bgsIsBlackLabel = bgs?.isBlackLabel === true;
@@ -5,7 +7,7 @@ export default function SubmitTab({ result }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       {/* Company cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      <div className="result-card-0" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <CompanyCard
           company="PSA"
           recommended={submission?.psaRecommended}
@@ -34,7 +36,7 @@ export default function SubmitTab({ result }) {
       </div>
 
       {/* Analysis */}
-      <div style={card}>
+      <div className="result-card-1" style={card}>
         <div style={{ ...sectionLabel, marginBottom: 12 }}>Submission Analysis</div>
         <p style={{ color: "rgba(255,255,255,0.5)", margin: 0, fontSize: 14, lineHeight: 1.75, letterSpacing: "-0.1px" }}>
           {submission?.analysis}
@@ -42,7 +44,7 @@ export default function SubmitTab({ result }) {
       </div>
 
       {/* Tier guide */}
-      <div style={card}>
+      <div className="result-card-2" style={card}>
         <div style={{ ...sectionLabel, marginBottom: 16 }}>Submission Tier Reference</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           <TierGuide
@@ -74,71 +76,93 @@ function CompanyCard({ company, recommended, tier, cost, expectedGrade, expected
   const roiPositive = (roi ?? 0) > 0;
   const profit = (expectedValue ?? 0) - (rawValue ?? 0) - (cost ?? 0);
   const accentColor = recommended ? "#30d158" : "#ff453a";
+  const roiVal = Number(roi) || 0;
+
+  const [profitDisplay, setProfitDisplay] = useState(0);
+  const [roiDisplay, setRoiDisplay]       = useState(0);
+
+  useEffect(() => {
+    setProfitDisplay(0);
+    const STEPS = 20, INTERVAL = 860 / STEPS;
+    let step = 0;
+    const id = setInterval(() => {
+      step++;
+      const eased = 1 - Math.pow(1 - step / STEPS, 2.5);
+      if (step >= STEPS) { clearInterval(id); setProfitDisplay(profit); }
+      else setProfitDisplay(Math.round(eased * profit));
+    }, INTERVAL);
+    return () => clearInterval(id);
+  }, [profit]);
+
+  useEffect(() => {
+    setRoiDisplay(0);
+    const STEPS = 22, INTERVAL = 950 / STEPS;
+    let step = 0;
+    const id = setInterval(() => {
+      step++;
+      const eased = 1 - Math.pow(1 - step / STEPS, 2.5);
+      if (step >= STEPS) { clearInterval(id); setRoiDisplay(roiVal); }
+      else setRoiDisplay(Math.round(eased * roiVal));
+    }, INTERVAL);
+    return () => clearInterval(id);
+  }, [roiVal]);
 
   return (
     <div style={{
       background: "#1c1c1e",
-      border: `1px solid ${recommended ? "rgba(48,209,88,0.2)" : "rgba(255,255,255,0.07)"}`,
-      borderRadius: 16,
-      padding: "18px 16px",
-      display: "flex",
-      flexDirection: "column",
+      border: `1px solid ${recommended ? "rgba(48,209,88,0.22)" : "rgba(255,255,255,0.08)"}`,
+      borderRadius: 20,
+      padding: "20px 20px",
+      boxShadow: recommended ? "0 2px 20px rgba(48,209,88,0.06)" : "0 2px 20px rgba(0,0,0,0.4)",
     }}>
-      {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18 }}>
-        <div style={{ color: "#c9a84c", fontSize: 20, fontWeight: 700, letterSpacing: "-0.5px" }}>
+      {/* Header row */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+        <div style={{ color: "#c9a84c", fontSize: 22, fontWeight: 700, letterSpacing: "-0.5px" }}>
           {company}
         </div>
         <div style={{
           background: recommended ? "rgba(48,209,88,0.1)" : "rgba(255,69,58,0.08)",
           border: `1px solid ${accentColor}35`,
           color: accentColor,
-          padding: "4px 11px",
+          padding: "5px 14px",
           borderRadius: 100,
-          fontSize: 11,
+          fontSize: 12,
           fontWeight: 600,
-          letterSpacing: "-0.1px",
-          whiteSpace: "nowrap",
         }}>
           {recommended ? "✓ Submit" : "✗ Skip"}
         </div>
       </div>
 
-      {/* Metrics */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1 }}>
+      {/* Metrics — 2 columns on full width */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 24px", marginBottom: 18 }}>
         <MetricRow label="Tier" value={tier} bold />
         <MetricRow label="Fee" value={`$${cost}`} />
         <MetricRow
-          label="Exp. Grade"
+          label="Expected Grade"
           value={expectedGradeLabel ? `${expectedGrade} ${expectedGradeLabel}` : expectedGrade}
           blackLabel={expectedGradeLabel === "Black Label"}
         />
-        <MetricRow label="Exp. Value" value={`$${expectedValue?.toLocaleString()}`} highlight />
+        <MetricRow label="Expected Value" value={`$${expectedValue?.toLocaleString() ?? "—"}`} highlight />
       </div>
 
-      {/* ROI */}
+      {/* ROI bar */}
       <div style={{
-        marginTop: 16,
-        paddingTop: 14,
+        paddingTop: 16,
         borderTop: "1px solid rgba(255,255,255,0.06)",
         display: "flex",
         justifyContent: "space-between",
-        alignItems: "flex-end",
+        alignItems: "center",
       }}>
         <div>
-          <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
-            Profit
-          </div>
-          <div style={{ color: profit > 0 ? "#30d158" : "#ff453a", fontSize: 15, fontWeight: 600, letterSpacing: "-0.3px" }}>
-            {profit > 0 ? "+" : ""}${profit.toLocaleString()}
+          <div style={{ color: "rgba(255,255,255,0.22)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 5 }}>Profit</div>
+          <div style={{ color: profit > 0 ? "#30d158" : "#ff453a", fontSize: 18, fontWeight: 700, letterSpacing: "-0.5px" }}>
+            {profitDisplay > 0 ? `+$${profitDisplay.toLocaleString()}` : profitDisplay < 0 ? `-$${Math.abs(profitDisplay).toLocaleString()}` : "$0"}
           </div>
         </div>
         <div style={{ textAlign: "right" }}>
-          <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
-            ROI
-          </div>
-          <div style={{ color: roiPositive ? "#30d158" : "#ff453a", fontSize: 26, fontWeight: 700, letterSpacing: "-1px", lineHeight: 1 }}>
-            {roiPositive ? "+" : ""}{Number(roi).toFixed(0)}%
+          <div style={{ color: "rgba(255,255,255,0.22)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 5 }}>ROI</div>
+          <div style={{ color: roiPositive ? "#30d158" : "#ff453a", fontSize: 34, fontWeight: 700, letterSpacing: "-1.5px", lineHeight: 1 }}>
+            {roiDisplay > 0 ? "+" : ""}{roiDisplay}%
           </div>
         </div>
       </div>
@@ -189,9 +213,10 @@ function TierGuide({ company, tiers }) {
 
 const card = {
   background: "#1c1c1e",
-  border: "1px solid rgba(255,255,255,0.07)",
-  borderRadius: 16,
+  border: "1px solid rgba(255,255,255,0.08)",
+  borderRadius: 20,
   padding: "18px 20px",
+  boxShadow: "0 2px 20px rgba(0,0,0,0.4)",
 };
 
 const sectionLabel = {

@@ -15,15 +15,72 @@
 // v3.0.0 — Camera capture replaces scanner: live camera feed with fixed 5:7 alignment rectangle. User aligns card inside, captures, frame is cropped to rectangle. No detection, no AI, just static crop. All scanner code (perspective correction, pixel detection, manual corner editor, AI corner detection) removed.
 const VERSION = "3.0.0";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import GradeTab from "./GradeTab";
 import MarketTab from "./MarketTab";
 import SubmitTab from "./SubmitTab";
+import HistoryPanel from "./HistoryPanel";
+
+function LoadingOverlay({ message }) {
+  if (!message) return null;
+  return (
+    <div style={{
+      position: "fixed", inset: 0,
+      background: "rgba(0,0,0,0.94)",
+      backdropFilter: "blur(24px)",
+      WebkitBackdropFilter: "blur(24px)",
+      zIndex: 500,
+      display: "flex", flexDirection: "column",
+      alignItems: "center", justifyContent: "center",
+      gap: 28,
+    }}>
+      <div style={{ position: "relative", width: 88, height: 88 }}>
+        <svg width="88" height="88" style={{ display: "block" }} className="slabiq-spin">
+          <circle cx="44" cy="44" r="36" fill="none" stroke="rgba(201,168,76,0.12)" strokeWidth="3.5" />
+          <circle cx="44" cy="44" r="36" fill="none" stroke="#c9a84c" strokeWidth="3.5"
+            strokeDasharray="70 156" strokeLinecap="round" transform="rotate(-90 44 44)" />
+        </svg>
+        <div style={{
+          position: "absolute", inset: 0,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          color: "#c9a84c", fontSize: 12, fontWeight: 800, letterSpacing: "0.06em",
+        }}>IQ</div>
+      </div>
+      <div style={{ textAlign: "center", padding: "0 32px" }}>
+        <div style={{ color: "#fff", fontSize: 17, fontWeight: 600, letterSpacing: "-0.4px", marginBottom: 8 }}>{message}</div>
+        <div style={{ color: "rgba(255,255,255,0.28)", fontSize: 13 }}>Usually takes 20–30 seconds</div>
+      </div>
+    </div>
+  );
+}
+
+function Toast({ onDone }) {
+  useEffect(() => {
+    const t = setTimeout(onDone, 2500);
+    return () => clearTimeout(t);
+  }, []);
+  return (
+    <div className="slabiq-toast" style={{
+      position: "fixed", bottom: 108, left: "50%",
+      transform: "translateX(-50%)",
+      background: "rgba(28,28,30,0.98)",
+      border: "1px solid rgba(48,209,88,0.25)",
+      borderRadius: 100, padding: "10px 22px",
+      color: "#30d158", fontSize: 13, fontWeight: 600,
+      zIndex: 300,
+      boxShadow: "0 8px 32px rgba(0,0,0,0.7)",
+      whiteSpace: "nowrap",
+    }}>
+      ✓ Saved to history
+    </div>
+  );
+}
 
 const TABS = [
   { id: "grade", label: "Grade" },
   { id: "market", label: "Market" },
   { id: "submit", label: "Submit" },
+  { id: "history", label: "History" },
 ];
 
 function extractJSON(text) {
@@ -284,11 +341,36 @@ function recomputeBgsAndPsa(prevResult, centering) {
 
 export default function CardGrader() {
   const [activeTab, setActiveTab] = useState("grade");
+  const [tabKey, setTabKey] = useState(0);
   const [images, setImages] = useState([]);
   const [result, setResult] = useState(null);
   const [candidates, setCandidates] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState(null);
+  const [toast, setToast] = useState(false);
   const [error, setError] = useState(null);
+
+  const saveGrading = (parsed) => {
+    try {
+      const existing = JSON.parse(localStorage.getItem('slabiq_history') || '[]');
+      const entry = {
+        id: Date.now().toString(),
+        savedAt: new Date().toISOString(),
+        player: parsed.player,
+        year: parsed.year,
+        set_name: parsed.set,
+        variant: parsed.variant,
+        card_number: parsed.cardNumber ?? null,
+        psa_grade: parsed.psa?.grade ?? null,
+        bgs_overall: parsed.bgs?.overall ?? null,
+        raw_value: parsed.market?.raw ?? null,
+        result: parsed,
+      };
+      localStorage.setItem('slabiq_history', JSON.stringify([entry, ...existing].slice(0, 50)));
+    } catch (e) {
+      console.warn('Failed to save grading:', e.message);
+    }
+  };
 
   const addImages = async (files) => {
     const slots = 10 - images.length;
@@ -337,6 +419,7 @@ export default function CardGrader() {
   const identifyCard = async () => {
     if (!images.length) return;
     setLoading(true);
+    setLoadingMessage("Identifying card…");
     setError(null);
     setCandidates(null);
     setResult(null);
@@ -355,6 +438,7 @@ export default function CardGrader() {
       setError(err.message || "Could not identify card. Please try again.");
     } finally {
       setLoading(false);
+      setLoadingMessage(null);
     }
   };
 
@@ -375,6 +459,7 @@ export default function CardGrader() {
   const gradeCards = async (confirmedCard) => {
     if (!images.length || !confirmedCard) return;
     setLoading(true);
+    setLoadingMessage("Analyzing card…");
     setError(null);
     try {
       const { player, year, set, variant, cardNumber } = confirmedCard;
@@ -389,6 +474,8 @@ export default function CardGrader() {
           console.warn("Zone cropping failed:", err);
         }
       }
+
+      setLoadingMessage("Fetching market data…");
 
       const res = await fetch("/api/grade", {
         method: "POST",
@@ -407,11 +494,14 @@ export default function CardGrader() {
       } else {
         setResult(parsed);
         setCandidates(null);
+        saveGrading(parsed);
+        setToast(true);
       }
     } catch (err) {
       setError(err.message || "API error. Please try again.");
     } finally {
       setLoading(false);
+      setLoadingMessage(null);
     }
   };
 
@@ -447,10 +537,10 @@ export default function CardGrader() {
               SlabIQ
             </span>
             <span style={{ fontSize: 11, fontWeight: 500, color: "#c9a84c", letterSpacing: "0.06em" }}>
-              PSA · BGS · v{VERSION}
+              PSA · BGS · BETA
             </span>
           </div>
-          {result && (
+          {result && activeTab !== "history" && (
             <span style={{ fontSize: 12, color: "rgba(255,255,255,0.28)", fontWeight: 400, letterSpacing: "-0.1px" }}>
               {result.player}
             </span>
@@ -459,63 +549,78 @@ export default function CardGrader() {
       </header>
 
       {/* Main content */}
-      <main style={{ maxWidth: 700, margin: "0 auto", padding: "20px 20px 120px" }}>
-        {activeTab === "grade" && (
-          <GradeTab
-            images={images}
-            result={result}
-            candidates={candidates}
-            loading={loading}
-            error={error}
-            onAddImages={addImages}
-            onRemoveImage={removeImage}
-            onSetRole={cycleRole}
-            onGrade={identifyCard}
-            onConfirmCandidate={(card) => gradeCards(card)}
-            onSearch={searchCards}
-            onUpdateCentering={updateImageCentering}
-          />
-        )}
-        {activeTab === "market" && result && <MarketTab result={result} />}
-        {activeTab === "submit" && result && <SubmitTab result={result} />}
+      <main style={{ maxWidth: 700, margin: "0 auto", padding: "20px 16px 148px" }}>
+        <div key={tabKey} className="anim-fade-up">
+          {activeTab === "grade" && (
+            <GradeTab
+              images={images}
+              result={result}
+              candidates={candidates}
+              loading={loading}
+              error={error}
+              onAddImages={addImages}
+              onRemoveImage={removeImage}
+              onSetRole={cycleRole}
+              onGrade={identifyCard}
+              onConfirmCandidate={(card) => gradeCards(card)}
+              onSearch={searchCards}
+              onUpdateCentering={updateImageCentering}
+            />
+          )}
+          {activeTab === "market" && result && <MarketTab result={result} />}
+          {activeTab === "submit" && result && <SubmitTab result={result} />}
+          {activeTab === "history" && (
+            <HistoryPanel
+              onRestore={(savedResult) => {
+                setResult(savedResult);
+                setActiveTab("grade");
+                setTabKey(k => k + 1);
+              }}
+            />
+          )}
+        </div>
       </main>
 
-      {/* Floating tab bar — always visible */}
+      <LoadingOverlay message={loadingMessage} />
+      {toast && <Toast onDone={() => setToast(false)} />}
+
+      {/* Floating tab bar */}
       <nav style={{
         position: "fixed",
-        bottom: 28,
+        bottom: 32,
         left: "50%",
         transform: "translateX(-50%)",
-        background: "rgba(28,28,30,0.86)",
-        backdropFilter: "saturate(180%) blur(28px)",
-        WebkitBackdropFilter: "saturate(180%) blur(28px)",
-        border: "1px solid rgba(255,255,255,0.1)",
+        background: "rgba(22,22,24,0.92)",
+        backdropFilter: "saturate(200%) blur(32px)",
+        WebkitBackdropFilter: "saturate(200%) blur(32px)",
+        border: "1px solid rgba(255,255,255,0.11)",
         borderRadius: 100,
-        padding: "5px",
+        padding: "4px",
         display: "flex",
         zIndex: 200,
-        boxShadow: "0 12px 40px rgba(0,0,0,0.7), 0 2px 8px rgba(0,0,0,0.5)",
+        boxShadow: "0 16px 48px rgba(0,0,0,0.75), 0 2px 10px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06)",
       }}>
         {TABS.map((tab) => {
-          const locked = tab.id !== "grade" && !result;
+          const locked = (tab.id === "market" || tab.id === "submit") && !result;
           const active = activeTab === tab.id;
           return (
             <button
               key={tab.id}
-              onClick={() => !locked && setActiveTab(tab.id)}
+              onClick={() => { if (!locked) { setActiveTab(tab.id); setTabKey(k => k + 1); } }}
               style={{
-                padding: "9px 28px",
+                padding: "9px 18px",
                 borderRadius: 100,
                 border: "none",
-                background: active ? "rgba(255,255,255,0.14)" : "transparent",
-                color: active ? "#fff" : locked ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.42)",
+                background: active ? "rgba(255,255,255,0.13)" : "transparent",
+                color: active ? "#fff" : locked ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.4)",
                 fontWeight: active ? 600 : 400,
-                fontSize: 14,
+                fontSize: 13,
                 letterSpacing: "-0.01em",
-                cursor: locked ? "not-allowed" : "pointer",
+                cursor: locked ? "default" : "pointer",
                 fontFamily: "inherit",
-                transition: "background 0.18s ease, color 0.18s ease",
+                transition: "background 0.15s ease, color 0.15s ease",
                 whiteSpace: "nowrap",
+                boxShadow: active ? "0 1px 6px rgba(0,0,0,0.35)" : "none",
               }}
             >
               {tab.label}
@@ -526,3 +631,4 @@ export default function CardGrader() {
     </div>
   );
 }
+

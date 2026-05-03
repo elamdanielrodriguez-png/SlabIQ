@@ -286,6 +286,41 @@ Submission threshold: net profit ≥ $30 AND ROI ≥ 25%
 PSA tiers: Value $28(<$500), Regular $75(<$1500), Express $160(<$3000), Super Express $300(<$5000), Walk-Through $600
 BGS tiers: Standard $25(<$499), Express $40(<$999), Fast Track $100(<$2000), Walk-Through $300
 
+POP REPORT CALIBRATION — real anchors for accurate popData estimates:
+
+CARD TYPE → PSA TOTAL (all grades) / TYPICAL PSA 10 GEM RATE:
+  Modern mega-star base rookie (Mahomes, Luka, Zion, Burrow, Tatum — 2017+): 30,000–120,000 / 30–45%
+  Modern solid-prospect base rookie (2017+): 3,000–25,000 / 25–40%
+  Modern veteran/non-rookie base: 500–8,000 / 35–50%
+  Modern Silver Prizm parallel: ~25–40% of the base card's total
+  Modern numbered parallel /99–/49: 500–3,000 / 40–55%
+  Modern numbered parallel /25 or rarer: 30–400 / 45–60%
+  Modern 1/1: 1–8 PSA graded
+  Semi-vintage star rookie (1990–2010): 2,000–40,000 / 10–25%
+  Vintage star (pre-1980): 500–60,000 / 1–8% (centering/surface much harder to pass)
+  Vintage common (pre-1980): 20–800 / 1–5%
+
+KNOWN REAL ANCHORS:
+  2020 Prizm Patrick Mahomes base: ~60,000 PSA total, ~35% gem rate
+  2018 Prizm Luka Doncic base rookie: ~85,000 PSA total, ~27% gem rate
+  2019 Prizm Zion Williamson Silver Prizm: ~8,500 PSA total, ~35% gem rate
+  2003 Topps Chrome LeBron James rookie: ~18,000 PSA total, ~28% gem rate
+  1986 Fleer Michael Jordan rookie: ~55,000 PSA total, ~6% gem rate
+  1952 Topps Mickey Mantle: ~3,500 PSA total, <1% gem rate
+
+BGS POPULATION (derive from PSA total):
+  BGS total ≈ 8–15% of PSA total for the same card
+  BGS 9.5 Gem Mint rate: 15–30% of BGS submissions on modern cards
+  BGS Pristine 10 rate: 2–8% of BGS submissions
+  BGS Black Label (all four 10s): <1% of BGS submissions even on perfect modern cards
+
+GRADE DISTRIBUTION SHAPE:
+  Modern chrome/prizm: clusters high — PSA 8 ~15%, PSA 9 ~30–35%, PSA 10 ~30–45%, lower grades small
+  Semi-vintage: PSA 8 ~20%, PSA 9 ~25%, PSA 10 ~15%, grades 5–7 collectively ~30%
+  Vintage: spread low — grades 1–6 dominate, PSA 10 <5%, PSA 9 5–15%
+
+Use these to estimate realistic counts per grade — never invent implausibly round or extreme numbers.
+
 Return ONLY raw JSON. If card identity uncertain: needsClarification:true with candidates only.
 
 {
@@ -329,8 +364,8 @@ function categoryGrade(severities) {
               : severities.includes('visible')  ? 'visible'
               : 'microscopic';
   if (worst === 'microscopic') return n >= 2 ? 9.0 : 9.5;
-  if (worst === 'visible')     return n >= 2 ? 8.5 : 9.0;
-  return n >= 2 ? 8.0 : 8.5; // obvious
+  if (worst === 'visible')     return n >= 2 ? 8.0 : 8.5;
+  return n >= 2 ? 7.0 : 7.5; // obvious
 }
 
 function computeSubgradesFromVerifications(verifications) {
@@ -444,6 +479,12 @@ function sanitizeGradingResponse(rawText, measuredCenterings) {
       console.log(`Subgrades [${subs.join(',')}] avg=${avg.toFixed(2)} → BGS ${parsed.bgs.overall}, PSA ${psaGrade}`);
       parsed.psa.grade = psaGrade;
       parsed.psa.label = PSA_LABELS[psaGrade] || '';
+
+      // Force submission expected grades to match computed grades so both tabs agree
+      if (parsed.submission) {
+        parsed.submission.psaExpectedGrade = psaGrade;
+        parsed.submission.bgsExpectedGrade = parsed.bgs.overall;
+      }
     }
   }
 
@@ -736,6 +777,63 @@ app.post('/api/grade', async (req, res) => {
       } catch (e) {
         console.warn('Market injection failed:', e.message);
       }
+    }
+
+    // Sync all submission fields to match computed grades and actual market values.
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed.market?.graded && parsed.submission) {
+        const s = parsed.submission;
+        const g = parsed.market.graded;
+        const raw = parsed.market.raw ?? 0;
+
+        const psaTierFor = (v) => {
+          if (v < 500)  return { tier: 'Value',         cost: 28  };
+          if (v < 1500) return { tier: 'Regular',       cost: 75  };
+          if (v < 3000) return { tier: 'Express',       cost: 160 };
+          if (v < 5000) return { tier: 'Super Express', cost: 300 };
+          return               { tier: 'Walk-Through',  cost: 600 };
+        };
+        const bgsTierFor = (v) => {
+          if (v < 499)  return { tier: 'Standard',    cost: 25  };
+          if (v < 999)  return { tier: 'Express',     cost: 40  };
+          if (v < 2000) return { tier: 'Fast Track',  cost: 100 };
+          return               { tier: 'Walk-Through', cost: 300 };
+        };
+
+        const psaKey = `psa${s.psaExpectedGrade}`;
+        if (g[psaKey]) {
+          s.psaExpectedValue = g[psaKey];
+          const { tier, cost } = psaTierFor(s.psaExpectedValue);
+          s.psaTier = tier;
+          s.psaCost = cost;
+          const profit = s.psaExpectedValue - raw - cost;
+          s.psaRoi = raw > 0 ? Math.round((profit / raw) * 100) : 0;
+          s.psaRecommended = profit >= 30 && s.psaRoi >= 25;
+        }
+
+        let bgsKey;
+        if (parsed.bgs?.isBlackLabel) bgsKey = 'bgsBlackLabel';
+        else if (s.bgsExpectedGrade === 10)  bgsKey = 'bgs10';
+        else if (s.bgsExpectedGrade === 9.5) bgsKey = 'bgs9_5';
+        else if (s.bgsExpectedGrade === 9)   bgsKey = 'bgs9';
+        else if (s.bgsExpectedGrade === 8)   bgsKey = 'bgs8';
+        else if (s.bgsExpectedGrade === 7)   bgsKey = 'bgs7';
+
+        if (bgsKey && g[bgsKey]) {
+          s.bgsExpectedValue = g[bgsKey];
+          const { tier, cost } = bgsTierFor(s.bgsExpectedValue);
+          s.bgsTier = tier;
+          s.bgsCost = cost;
+          const profit = s.bgsExpectedValue - raw - cost;
+          s.bgsRoi = raw > 0 ? Math.round((profit / raw) * 100) : 0;
+          s.bgsRecommended = profit >= 30 && s.bgsRoi >= 25;
+        }
+
+        text = JSON.stringify(parsed);
+      }
+    } catch (e) {
+      console.warn('Submission sync failed:', e.message);
     }
 
     // debug

@@ -1,3 +1,41 @@
+import { useState, useEffect } from "react";
+
+function AnimPrice({ value, style }) {
+  const [display, setDisplay] = useState(null);
+  useEffect(() => {
+    if (value == null) { setDisplay(null); return; }
+    setDisplay(0);
+    const STEPS = 22, INTERVAL = 880 / STEPS;
+    let step = 0;
+    const id = setInterval(() => {
+      step++;
+      const eased = 1 - Math.pow(1 - step / STEPS, 2.5);
+      if (step >= STEPS) { clearInterval(id); setDisplay(value); }
+      else setDisplay(Math.round(eased * value));
+    }, INTERVAL);
+    return () => clearInterval(id);
+  }, [value]);
+  return <span style={style}>{display == null ? "—" : `$${Number(display).toLocaleString()}`}</span>;
+}
+
+function AnimPct({ value, sign }) {
+  const [display, setDisplay] = useState(null);
+  useEffect(() => {
+    if (value == null) { setDisplay(null); return; }
+    setDisplay(0);
+    const STEPS = 20, INTERVAL = 820 / STEPS;
+    let step = 0;
+    const id = setInterval(() => {
+      step++;
+      const eased = 1 - Math.pow(1 - step / STEPS, 2.5);
+      if (step >= STEPS) { clearInterval(id); setDisplay(value); }
+      else setDisplay(Math.round(eased * value));
+    }, INTERVAL);
+    return () => clearInterval(id);
+  }, [value]);
+  return <span>{display == null ? "—" : `${sign}${display}%`}</span>;
+}
+
 export default function MarketTab({ result }) {
   const { popData, market, psa, bgs } = result;
   const psaGrade = psa?.grade;
@@ -17,7 +55,7 @@ export default function MarketTab({ result }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
 
       {/* Pop reports */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      <div className="result-card-0" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <PopPanel
           title="PSA"
           subtitle="Population"
@@ -43,13 +81,13 @@ export default function MarketTab({ result }) {
       </div>
 
       {/* Market values */}
-      <div style={card}>
+      <div className="result-card-1" style={card}>
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 22 }}>
           <div>
             <div style={sectionLabel}>Raw Value</div>
             <div style={{ color: "#fff", fontSize: 30, fontWeight: 700, letterSpacing: "-1px", marginTop: 4, lineHeight: 1 }}>
-              ${market?.raw?.toLocaleString()}
+              <AnimPrice value={market?.raw} />
             </div>
           </div>
           <div style={{
@@ -60,7 +98,7 @@ export default function MarketTab({ result }) {
             textAlign: "right",
           }}>
             <div style={{ color: trendColor, fontSize: 20, fontWeight: 700, letterSpacing: "-0.5px", lineHeight: 1 }}>
-              {trendSign}{market?.trendPercent}%
+              <AnimPct value={market?.trendPercent} sign={trendSign} />
             </div>
             <div style={{ color: "rgba(255,255,255,0.22)", fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", marginTop: 4 }}>
               90-day
@@ -152,7 +190,7 @@ function PopPanel({ title, subtitle, total, gemRate, gemLabel, distribution, hig
               </span>
             </div>
             <div style={{ background: "rgba(255,255,255,0.05)", borderRadius: 3, height: 2.5, overflow: "hidden" }}>
-              <div style={{ background: barColor, width: `${pct}%`, height: "100%", borderRadius: 3, transition: "width 0.5s ease" }} />
+              <div className="pop-bar" style={{ background: barColor, width: `${pct}%`, height: "100%", borderRadius: 3 }} />
             </div>
           </div>
         );
@@ -194,9 +232,7 @@ function ValueTable({ heading, rows }) {
               {row.grade}
               {row.active && <span style={{ fontSize: 9, marginLeft: 4, color: "rgba(255,255,255,0.18)" }}>←</span>}
             </span>
-            <span style={{ fontSize: 12, color: valueColor, fontWeight: row.active ? 700 : 400 }}>
-              ${row.value?.toLocaleString() ?? "—"}
-            </span>
+            <AnimPrice value={row.value} style={{ fontSize: 12, color: valueColor, fontWeight: row.active ? 700 : 400 }} />
           </div>
         );
       })}
@@ -206,9 +242,10 @@ function ValueTable({ heading, rows }) {
 
 const card = {
   background: "#1c1c1e",
-  border: "1px solid rgba(255,255,255,0.07)",
-  borderRadius: 16,
+  border: "1px solid rgba(255,255,255,0.08)",
+  borderRadius: 20,
   padding: "18px 20px",
+  boxShadow: "0 2px 20px rgba(0,0,0,0.4)",
 };
 
 const sectionLabel = {

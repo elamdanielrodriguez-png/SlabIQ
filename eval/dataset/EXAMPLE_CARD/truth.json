@@ -1,0 +1,22 @@
+{
+  "_comment": "Rename this folder to identify the card (e.g. mahomes-2017-prizm-base). Drop your photos in this folder (any .jpg/.jpeg/.png), then list them under 'images' in order: front first, then back, then any details. Fill in 'card' with the confirmed identity. Fill in 'actual' with the real PSA/BGS result. Either psa or bgs can be null if you only got one. Delete this entire folder when you're ready, or keep it as a template.",
+  "card": {
+    "player": "Patrick Mahomes",
+    "year": "2017",
+    "set": "Panini Prizm",
+    "variant": "Base Rookie",
+    "cardNumber": "248"
+  },
+  "actual": {
+    "psa": 9,
+    "bgs": {
+      "overall": 9.5,
+      "centering": 9.5,
+      "corners": 9.5,
+      "edges": 9.5,
+      "surface": 10
+    }
+  },
+  "images": ["front.jpg", "back.jpg"],
+  "notes": "Optional notes about this submission."
+}

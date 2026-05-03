@@ -286,8 +286,12 @@ function CenteringEditor({ imageURL, initialLines, onConfirm, onClose }) {
 
 function AnnotatedCard({ images, defects = [] }) {
   const [activeIdx, setActiveIdx] = useState(0);
+  const [fullscreen, setFullscreen] = useState(false);
   const src = images[activeIdx]?.objectURL;
-  const hasDefects = defects.length > 0;
+  const isFront = activeIdx === 0;
+  const hasDefects = defects.length > 0 && isFront;
+  const role = images[activeIdx]?.role ?? (activeIdx === 0 ? 'front' : activeIdx === 1 ? 'back' : 'detail');
+  const roleLabel = { front: 'Front', back: 'Back', detail: 'Detail' }[role] ?? 'Detail';
 
   return (
     <div style={card}>
@@ -295,8 +299,11 @@ function AnnotatedCard({ images, defects = [] }) {
         <img
           src={src}
           alt="Card"
-          style={{ width: "100%", height: "auto", display: "block", borderRadius: 12 }}
+          onClick={() => setFullscreen(true)}
+          style={{ width: "100%", height: "auto", display: "block", borderRadius: 12, cursor: "zoom-in" }}
         />
+
+        {/* Defect pins — only on front photo */}
         {hasDefects && defects.map((d, i) => {
           const flipDown = d.y < 0.18;
           return (
@@ -319,21 +326,13 @@ function AnnotatedCard({ images, defects = [] }) {
                 width: 0, height: 0,
                 borderLeft: "5px solid transparent",
                 borderRight: "5px solid transparent",
-                ...(flipDown
-                  ? { borderBottom: "8px solid #c9a84c" }
-                  : { borderTop: "8px solid #c9a84c" }),
+                ...(flipDown ? { borderBottom: "8px solid #c9a84c" } : { borderTop: "8px solid #c9a84c" }),
               }} />
               <div style={{
-                background: "#c9a84c",
-                color: "#000",
-                minWidth: 20, height: 20,
-                borderRadius: 4,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 10,
-                fontWeight: 700,
-                padding: "0 5px",
+                background: "#c9a84c", color: "#000",
+                minWidth: 20, height: 20, borderRadius: 4,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 10, fontWeight: 700, padding: "0 5px",
               }}>
                 {i + 1}
               </div>
@@ -341,25 +340,82 @@ function AnnotatedCard({ images, defects = [] }) {
           );
         })}
 
+        {/* Navigation — only when multiple images */}
         {images.length > 1 && (
-          <div style={{ position: "absolute", bottom: 10, right: 10, display: "flex", gap: 5 }}>
-            {images.map((_, i) => (
+          <>
+            {/* Role label badge */}
+            <div style={{
+              position: "absolute", top: 10, left: 10,
+              background: "rgba(0,0,0,0.62)", backdropFilter: "blur(8px)",
+              borderRadius: 8, padding: "4px 10px",
+              color: "rgba(255,255,255,0.75)", fontSize: 11, fontWeight: 600, letterSpacing: "0.04em",
+            }}>
+              {roleLabel} {activeIdx + 1}/{images.length}
+            </div>
+
+            {/* Prev arrow */}
+            {activeIdx > 0 && (
               <button
-                key={i}
-                onClick={() => setActiveIdx(i)}
+                onClick={() => setActiveIdx(i => i - 1)}
                 style={{
-                  width: 7, height: 7,
-                  borderRadius: "50%",
-                  border: "none",
-                  padding: 0,
-                  background: i === activeIdx ? "#c9a84c" : "rgba(255,255,255,0.3)",
-                  cursor: "pointer",
+                  position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)",
+                  width: 34, height: 34, borderRadius: "50%",
+                  background: "rgba(0,0,0,0.55)", backdropFilter: "blur(8px)",
+                  border: "1px solid rgba(255,255,255,0.15)",
+                  color: "#fff", fontSize: 16, cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  zIndex: 20,
                 }}
-              />
-            ))}
-          </div>
+              >‹</button>
+            )}
+
+            {/* Next arrow */}
+            {activeIdx < images.length - 1 && (
+              <button
+                onClick={() => setActiveIdx(i => i + 1)}
+                style={{
+                  position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)",
+                  width: 34, height: 34, borderRadius: "50%",
+                  background: "rgba(0,0,0,0.55)", backdropFilter: "blur(8px)",
+                  border: "1px solid rgba(255,255,255,0.15)",
+                  color: "#fff", fontSize: 16, cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  zIndex: 20,
+                }}
+              >›</button>
+            )}
+
+            {/* Dot indicators */}
+            <div style={{ position: "absolute", bottom: 10, left: "50%", transform: "translateX(-50%)", display: "flex", gap: 5 }}>
+              {images.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setActiveIdx(i)}
+                  style={{
+                    width: 6, height: 6, borderRadius: "50%", border: "none", padding: 0,
+                    background: i === activeIdx ? "#c9a84c" : "rgba(255,255,255,0.35)",
+                    cursor: "pointer",
+                  }}
+                />
+              ))}
+            </div>
+          </>
         )}
       </div>
+
+      {fullscreen && (
+        <div
+          onClick={() => setFullscreen(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 2000,
+            background: "rgba(0,0,0,0.97)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+        >
+          <img src={src} alt="Card" style={{ maxWidth: "95vw", maxHeight: "90vh", objectFit: "contain", borderRadius: 10 }} />
+          <div style={{ position: "absolute", top: 20, right: 24, color: "rgba(255,255,255,0.35)", fontSize: 32, lineHeight: 1, pointerEvents: "none" }}>×</div>
+        </div>
+      )}
 
       {hasDefects ? (
         <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
@@ -586,13 +642,63 @@ function CandidatePicker({ candidates, onConfirm, loading, onSearch }) {
   );
 }
 
+function SubgradeNumber({ value }) {
+  const [display, setDisplay] = useState(null);
+  useEffect(() => {
+    if (value == null) { setDisplay(null); return; }
+    setDisplay(0);
+    const STEPS = 16, INTERVAL = 680 / STEPS;
+    let step = 0;
+    const id = setInterval(() => {
+      step++;
+      const eased = 1 - Math.pow(1 - step / STEPS, 2.5);
+      if (step >= STEPS) {
+        clearInterval(id);
+        setDisplay(Number(value));
+      } else {
+        setDisplay(Math.round(eased * value * 2) / 2);
+      }
+    }, INTERVAL);
+    return () => clearInterval(id);
+  }, [value]);
+  return (
+    <div style={{ color: "rgba(255,255,255,0.85)", fontSize: 20, fontWeight: 600, letterSpacing: "-0.5px" }}>
+      {display == null ? "—" : Number(display).toFixed(1)}
+    </div>
+  );
+}
+
 function ConfidenceArc({ confidence }) {
-  const size = 80;
+  const size   = 80;
   const stroke = 6;
-  const r = (size - stroke) / 2;
-  const circ = 2 * Math.PI * r;
-  const offset = circ - (confidence / 100) * circ;
-  const color = confidence >= 70 ? "#30d158" : confidence >= 40 ? "#ffd60a" : "#ff453a";
+  const r      = (size - stroke) / 2;
+  const circ   = 2 * Math.PI * r;
+  const color  = confidence >= 70 ? "#30d158" : confidence >= 40 ? "#ffd60a" : "#ff453a";
+
+  const [pct, setPct]       = useState(0);
+  const [glowing, setGlowing] = useState(false);
+
+  useEffect(() => {
+    setPct(0);
+    setGlowing(false);
+    const STEPS = 24, INTERVAL = 900 / STEPS;
+    let step = 0;
+    const id = setInterval(() => {
+      step++;
+      const eased = 1 - Math.pow(1 - step / STEPS, 2.5);
+      if (step >= STEPS) {
+        clearInterval(id);
+        setPct(confidence);
+        setGlowing(true);
+        setTimeout(() => setGlowing(false), 600);
+      } else {
+        setPct(Math.round(eased * confidence));
+      }
+    }, INTERVAL);
+    return () => clearInterval(id);
+  }, [confidence]);
+
+  const offset = circ - (pct / 100) * circ;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, flexShrink: 0 }}>
@@ -601,15 +707,16 @@ function ConfidenceArc({ confidence }) {
           <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={stroke} />
           <circle
             cx={size / 2} cy={size / 2} r={r}
-            fill="none" stroke={color} strokeWidth={stroke}
+            fill="none" stroke={color}
+            strokeWidth={glowing ? 9 : stroke}
             strokeDasharray={circ} strokeDashoffset={offset}
             strokeLinecap="round"
             transform={`rotate(-90 ${size / 2} ${size / 2})`}
-            style={{ transition: "stroke-dashoffset 0.6s ease" }}
+            style={{ transition: glowing ? "stroke-width 0.4s ease, filter 0.5s ease" : "none", filter: glowing ? `drop-shadow(0 0 7px ${color})` : "none" }}
           />
         </svg>
         <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <span style={{ color, fontSize: 15, fontWeight: 700, letterSpacing: "-0.5px" }}>{confidence}%</span>
+          <span style={{ color, fontSize: 15, fontWeight: 700, letterSpacing: "-0.5px" }}>{pct}%</span>
         </div>
       </div>
       <div style={{ textAlign: "center" }}>
@@ -697,6 +804,7 @@ const ROLE_COLOR = { front: '#c9a84c', back: '#0a84ff', detail: 'rgba(255,255,25
 
 export default function GradeTab({ images, result, candidates, loading, error, onAddImages, onRemoveImage, onSetRole, onGrade, onConfirmCandidate, onSearch, onUpdateCentering }) {
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [gradePressed, setGradePressed] = useState(false);
   const fileInputRef = useRef(null);
   const [dismissedNegs, setDismissedNegs] = useState([]);
   const [dismissedDefects, setDismissedDefects] = useState([]);
@@ -845,6 +953,9 @@ export default function GradeTab({ images, result, candidates, loading, error, o
         <button
           onClick={onGrade}
           disabled={loading}
+          onPointerDown={() => !loading && setGradePressed(true)}
+          onPointerUp={() => setGradePressed(false)}
+          onPointerCancel={() => setGradePressed(false)}
           style={{
             width: "100%",
             padding: "14px 0",
@@ -857,7 +968,8 @@ export default function GradeTab({ images, result, candidates, loading, error, o
             borderRadius: 14,
             cursor: loading ? "not-allowed" : "pointer",
             fontFamily: "inherit",
-            transition: "all 0.18s ease",
+            transition: "background 0.18s ease, color 0.18s ease, transform 0.08s ease",
+            transform: gradePressed && !loading ? "scale(0.97)" : "scale(1)",
           }}
         >
           {loading ? "Analyzing…" : `Grade ${images.length > 1 ? `${images.length} Photos` : "Card"}`}
@@ -880,7 +992,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
       {result && (
         <>
           {/* Confidence + Card identity in one row */}
-          <div style={{ ...card, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+          <div className="result-card-0" style={{ ...card, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ color: "#fff", fontSize: 17, fontWeight: 700, letterSpacing: "-0.4px", marginBottom: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                 {result.player}
@@ -894,21 +1006,22 @@ export default function GradeTab({ images, result, candidates, loading, error, o
           </div>
 
           {/* PSA | BGS hero */}
-          <div style={card}>
+          <div className="result-card-1" style={card}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1px 1fr" }}>
-              <div style={{ textAlign: "center", padding: "8px 24px 8px 0" }}>
-                <div style={graderLabel}>PSA</div>
-                <div style={bigNum}>{result.psa?.grade}</div>
-                <div style={gradeTag}>{result.psa?.label}</div>
-              </div>
+              <GradeHalf
+                label="PSA"
+                grade={result.psa?.grade}
+                sub={result.psa?.label}
+                side="left"
+              />
               <div style={{ background: "rgba(255,255,255,0.06)" }} />
-              <div style={{ textAlign: "center", padding: "8px 0 8px 24px" }}>
-                <div style={graderLabel}>BGS</div>
-                <div style={bigNum}>{result.bgs?.overall}</div>
-                <div style={gradeTag}>
-                  {result.bgs?.isBlackLabel ? "Black Label" : result.bgs?.overall === 10 ? "Pristine" : result.bgs?.overall === 9.5 ? "Gem Mint" : "Beckett"}
-                </div>
-              </div>
+              <GradeHalf
+                label="BGS"
+                grade={result.bgs?.overall}
+                sub={result.bgs?.isBlackLabel ? "Black Label" : result.bgs?.overall === 10 ? "Pristine" : result.bgs?.overall === 9.5 ? "Gem Mint" : "Beckett"}
+                side="right"
+                blackLabel={result.bgs?.isBlackLabel}
+              />
             </div>
 
             {/* BGS subgrades */}
@@ -925,7 +1038,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
                     <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>Centering</div>
                     {centeringDisplay != null ? (
                       <>
-                        <div style={{ color: "rgba(255,255,255,0.85)", fontSize: 20, fontWeight: 600, letterSpacing: "-0.5px" }}>{centeringDisplay}</div>
+                        <SubgradeNumber value={typeof centeringDisplay === "number" ? centeringDisplay : Number(centeringDisplay)} />
                         <div style={{ color: isManual ? "#30d158" : "rgba(255,255,255,0.25)", fontSize: 8, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginTop: 3 }}>
                           {isManual ? "✓ manual" : <>✓ ai <span style={{ opacity: 0.55 }}>· tap for manual</span></>}
                         </div>
@@ -948,7 +1061,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
                   ].map((s) => (
                     <div key={s.label} style={{ textAlign: "center" }}>
                       <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>{s.label}</div>
-                      <div style={{ color: "rgba(255,255,255,0.85)", fontSize: 20, fontWeight: 600, letterSpacing: "-0.5px" }}>{s.value}</div>
+                      <SubgradeNumber value={s.value} />
                     </div>
                   ))}
                 </div>
@@ -1091,10 +1204,10 @@ export default function GradeTab({ images, result, candidates, loading, error, o
           )}
 
           {/* Annotated card */}
-          <AnnotatedCard images={images} defects={activeDefects} />
+          <div className="result-card-2"><AnnotatedCard images={images} defects={activeDefects} /></div>
 
           {/* Positives / Issues */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div className="result-card-3" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div style={card}>
               <div style={{ ...sectionLabel, color: "#30d158", marginBottom: 12 }}>Positives</div>
               {result.positives?.length > 0
@@ -1146,7 +1259,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
           )}
 
           {/* Verdict */}
-          <div style={card}>
+          <div className="result-card-5" style={card}>
             <div style={{ ...sectionLabel, marginBottom: 12 }}>Expert Verdict</div>
             <p style={{ color: "rgba(255,255,255,0.5)", margin: 0, fontSize: 14, lineHeight: 1.75, letterSpacing: "-0.1px" }}>
               {cleanCenteringText(result.verdict, cm)}
@@ -1158,11 +1271,90 @@ export default function GradeTab({ images, result, candidates, loading, error, o
   );
 }
 
+function gradeColor(g, blackLabel) {
+  if (blackLabel) return "#fff";
+  if (!g && g !== 0) return "rgba(255,255,255,0.2)";
+  if (g >= 10) return "#c9a84c";
+  if (g >= 9)  return "#f0f0f0";
+  if (g >= 8)  return "rgba(255,255,255,0.65)";
+  return "rgba(255,255,255,0.38)";
+}
+
+function gradeGlow(g, blackLabel) {
+  if (blackLabel) return "0 0 56px rgba(255,255,255,0.18)";
+  if (!g) return "none";
+  if (g >= 10) return "0 0 56px rgba(201,168,76,0.32)";
+  if (g >= 9)  return "0 0 40px rgba(240,240,240,0.12)";
+  return "none";
+}
+
+function GradeHalf({ label, grade: gradeProp, sub, side, blackLabel }) {
+  const grade = gradeProp != null ? Number(gradeProp) : null;
+  const isInt = grade != null && Number.isInteger(grade);
+  const [display, setDisplay] = useState(null);
+  const [landed, setLanded]   = useState(false);
+
+  useEffect(() => {
+    setLanded(false);
+    if (grade == null) { setDisplay(null); return; }
+    setDisplay(isInt ? 0 : 0.0);
+    const STEPS = 22, INTERVAL = 860 / STEPS;
+    let step = 0;
+    const id = setInterval(() => {
+      step++;
+      const eased = 1 - Math.pow(1 - step / STEPS, 2.5);
+      if (step >= STEPS) {
+        clearInterval(id);
+        setDisplay(grade);
+        setLanded(true);
+      } else {
+        setDisplay(isInt ? Math.floor(eased * grade) : Math.round(eased * grade * 2) / 2);
+      }
+    }, INTERVAL);
+    return () => clearInterval(id);
+  }, [grade]);
+
+  const color = gradeColor(grade, blackLabel);
+  const pad   = side === "left" ? "12px 20px 12px 0" : "12px 0 12px 20px";
+
+  const displayStr = display == null ? "—" : isInt ? String(display) : Number(display).toFixed(1);
+
+  return (
+    <div style={{ textAlign: "center", padding: pad }}>
+      <div style={{
+        fontSize: 10, fontWeight: 600, letterSpacing: "0.12em",
+        textTransform: "uppercase", color: "rgba(255,255,255,0.25)", marginBottom: 12,
+      }}>{label}</div>
+
+      <div style={{
+        display: "inline-block",
+        color,
+        fontSize: 72, fontWeight: 700, lineHeight: 1,
+        letterSpacing: "-3px", marginBottom: 10,
+        textShadow: landed ? gradeGlow(grade, blackLabel) : "none",
+        animation: landed ? "gradeSlam 0.55s cubic-bezier(0.22,1,0.36,1) forwards" : "none",
+      }}>{displayStr}</div>
+
+      <div style={{
+        display: "inline-block",
+        background: blackLabel ? "rgba(255,255,255,0.08)" : grade >= 9 ? "rgba(201,168,76,0.1)" : "rgba(255,255,255,0.05)",
+        border: `1px solid ${blackLabel ? "rgba(255,255,255,0.15)" : grade >= 9 ? "rgba(201,168,76,0.25)" : "rgba(255,255,255,0.08)"}`,
+        borderRadius: 6, padding: "3px 9px",
+        color: blackLabel ? "#fff" : grade >= 9 ? "#c9a84c" : "rgba(255,255,255,0.38)",
+        fontSize: 10, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase",
+        opacity: landed ? 1 : 0,
+        transition: "opacity 0.25s ease 0.2s",
+      }}>{sub || "—"}</div>
+    </div>
+  );
+}
+
 const card = {
   background: "#1c1c1e",
-  border: "1px solid rgba(255,255,255,0.07)",
-  borderRadius: 16,
-  padding: "18px 20px",
+  border: "1px solid rgba(255,255,255,0.08)",
+  borderRadius: 20,
+  padding: "18px 18px",
+  boxShadow: "0 2px 20px rgba(0,0,0,0.4)",
 };
 
 const sectionLabel = {
@@ -1171,31 +1363,6 @@ const sectionLabel = {
   letterSpacing: "0.08em",
   textTransform: "uppercase",
   color: "rgba(255,255,255,0.3)",
-};
-
-const graderLabel = {
-  fontSize: 10,
-  fontWeight: 600,
-  letterSpacing: "0.12em",
-  textTransform: "uppercase",
-  color: "rgba(255,255,255,0.25)",
-  marginBottom: 10,
-};
-
-const bigNum = {
-  color: "#c9a84c",
-  fontSize: 68,
-  fontWeight: 700,
-  lineHeight: 1,
-  letterSpacing: "-3px",
-  marginBottom: 8,
-};
-
-const gradeTag = {
-  color: "rgba(255,255,255,0.35)",
-  fontSize: 11,
-  letterSpacing: "0.02em",
-  fontWeight: 400,
 };
 
 const listItem = {
