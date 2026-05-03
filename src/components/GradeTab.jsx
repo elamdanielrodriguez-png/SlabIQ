@@ -92,26 +92,12 @@ function CameraCapture({ onCapture, onClose }) {
         {/* Centered card-aspect rectangle, dim outside via huge box-shadow */}
         <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
           <div ref={rectRef} style={{
-            position: "relative",
             width: "min(78vw, calc(75vh * 5 / 7))",
             aspectRatio: "5 / 7",
-            boxShadow: "0 0 0 9999px rgba(0,0,0,0.55)",
-            border: "2px solid rgba(201,168,76,0.45)",
+            border: "3px solid #c9a84c",
             borderRadius: 8,
-          }}>
-            {[
-              { top: -2,    left: -2,    borderTop: "3px solid #c9a84c",    borderLeft: "3px solid #c9a84c",    borderRadius: "8px 0 0 0" },
-              { top: -2,    right: -2,   borderTop: "3px solid #c9a84c",    borderRight: "3px solid #c9a84c",   borderRadius: "0 8px 0 0" },
-              { bottom: -2, left: -2,    borderBottom: "3px solid #c9a84c", borderLeft: "3px solid #c9a84c",    borderRadius: "0 0 0 8px" },
-              { bottom: -2, right: -2,   borderBottom: "3px solid #c9a84c", borderRight: "3px solid #c9a84c",   borderRadius: "0 0 8px 0" },
-            ].map((s, i) => (
-              <div key={i} style={{
-                position: "absolute", width: 36, height: 36,
-                animation: `cornerBreathe 2.4s ease-in-out ${i * 0.15}s infinite`,
-                ...s,
-              }} />
-            ))}
-          </div>
+            boxShadow: "0 0 0 9999px rgba(0,0,0,0.65), 0 0 0 5px rgba(201,168,76,0.3), 0 0 32px rgba(201,168,76,0.6)",
+          }} />
         </div>
 
         {error && (
@@ -951,8 +937,8 @@ export default function GradeTab({ images, result, candidates, loading, error, o
             </div>
 
             {/* Subtitle */}
-            <div style={{ color: "rgba(255,255,255,0.38)", fontSize: 13, letterSpacing: "-0.1px", lineHeight: 1.7, margin: "0 auto 28px", maxWidth: 250, position: "relative" }}>
-              PSA & BGS grades, live eBay market comps, and submission ROI — from a photo.
+            <div style={{ color: "rgba(255,255,255,0.38)", fontSize: 13, letterSpacing: "-0.1px", lineHeight: 1.7, margin: "0 auto 28px", maxWidth: 270, position: "relative" }}>
+              Cross-checks every zone against real PSA 10 copies. Spots actual defects — never mistakes prizm, foil, or holo for damage.
             </div>
 
             {/* CTA buttons */}
@@ -987,10 +973,10 @@ export default function GradeTab({ images, result, candidates, loading, error, o
       {images.length === 0 && !result && !candidates && !loading && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
           {[
-            { title: "PSA + BGS Grades",  desc: "Both grading scales from one photo" },
-            { title: "Live Market Data",  desc: "Real eBay prices per grade tier"     },
-            { title: "Submission ROI",    desc: "Dollar math on whether to grade"     },
-            { title: "Defect Detection",  desc: "AI finds flaws corner by corner"     },
+            { title: "Real PSA 10 Refs",   desc: "Every zone cross-checked against actual graded copies — not AI guesses" },
+            { title: "No False Defects",   desc: "Prizm, foil, and holo patterns are never confused with damage"          },
+            { title: "True Defect Scan",   desc: "Corner-by-corner analysis that finds flaws other AI graders miss"       },
+            { title: "Market + ROI",       desc: "Live eBay comps and submission dollar math per grade tier"              },
           ].map(({ title, desc }, i) => (
             <div key={title} className={`result-card-${i}`} style={{
               background: "rgba(255,255,255,0.03)",
