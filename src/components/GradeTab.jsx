@@ -1018,7 +1018,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
           </div>
 
           {/* PSA | BGS hero */}
-          <div className="result-card-1" style={card}>
+          <div className="result-card-1" data-grade-hero="true" style={card}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1px 1fr" }}>
               <GradeHalf
                 label="PSA"

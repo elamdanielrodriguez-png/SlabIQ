@@ -352,12 +352,27 @@ export default function CardGrader() {
   const [toast, setToast] = useState(false);
   const [error, setError] = useState(null);
   const [spotlightActive, setSpotlightActive] = useState(false);
+  const [spotlightPos, setSpotlightPos] = useState(null);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
   }, [activeTab]);
+
+  useEffect(() => {
+    if (!spotlightActive) return;
+    const el = document.querySelector('[data-grade-hero]');
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'instant', block: 'center' });
+    const rect = el.getBoundingClientRect();
+    setSpotlightPos({
+      cx: Math.round(rect.left + rect.width / 2),
+      cy: Math.round(rect.top + rect.height / 2),
+      rx: Math.round(rect.width / 2) + 48,
+      ry: Math.round(rect.height / 2) + 36,
+    });
+  }, [spotlightActive]);
 
   const saveGrading = (parsed) => {
     try {
@@ -591,14 +606,14 @@ export default function CardGrader() {
         </div>
       </main>
 
-      {spotlightActive && (
+      {spotlightActive && spotlightPos && (
         <div
-          onAnimationEnd={() => setSpotlightActive(false)}
+          onAnimationEnd={() => { setSpotlightActive(false); setSpotlightPos(null); }}
           style={{
-            position: "fixed", inset: 0, zIndex: 250, pointerEvents: "none",
+            position: "fixed", inset: 0, zIndex: 250, pointerEvents: "all", cursor: "default",
             background: [
-              "radial-gradient(ellipse 220px 155px at 50% 44vh, rgba(255,218,100,0.28) 0%, rgba(255,218,100,0.10) 48%, transparent 70%)",
-              "radial-gradient(ellipse 290px 200px at 50% 44vh, transparent 0%, transparent 48%, rgba(0,0,0,0.97) 66%)",
+              `radial-gradient(ellipse ${spotlightPos.rx + 30}px ${spotlightPos.ry + 20}px at ${spotlightPos.cx}px ${spotlightPos.cy}px, rgba(255,218,100,0.28) 0%, rgba(255,218,100,0.10) 48%, transparent 70%)`,
+              `radial-gradient(ellipse ${spotlightPos.rx + 80}px ${spotlightPos.ry + 60}px at ${spotlightPos.cx}px ${spotlightPos.cy}px, transparent 0%, transparent 48%, rgba(0,0,0,0.97) 66%)`,
             ].join(", "),
             animation: "spotlightReveal 3s ease forwards",
           }}
