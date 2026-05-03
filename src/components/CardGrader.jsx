@@ -48,7 +48,9 @@ function LoadingOverlay({ message }) {
       </div>
       <div style={{ textAlign: "center", padding: "0 32px" }}>
         <div style={{ color: "#fff", fontSize: 17, fontWeight: 600, letterSpacing: "-0.4px", marginBottom: 8 }}>{message}</div>
-        <div style={{ color: "rgba(255,255,255,0.28)", fontSize: 13 }}>Usually takes 20–30 seconds</div>
+        <div style={{ color: "rgba(255,255,255,0.28)", fontSize: 13 }}>
+          {message?.toLowerCase().includes("identify") ? "~10 seconds" : "~30 seconds"}
+        </div>
       </div>
     </div>
   );

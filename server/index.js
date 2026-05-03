@@ -556,7 +556,8 @@ Return ONLY a JSON object:
 
 Rules:
 - Return 1–4 candidates. Most likely match first.
-- VARIANT IS CRITICAL: if the user says "Prizm" but doesn't specify the parallel, list Base Prizm and Silver Prizm as separate candidates.
+- VARIANT IS CRITICAL: if the user says "Prizm" but doesn't specify the parallel, list Base Prizm and Silver Prizm as SEPARATE candidates — never combine them.
+- NEVER use "or" in the variant field. NEVER write "Silver or Base", "Downtown or Base", etc. Each candidate must have exactly one specific variant. If unsure between two, make two entries.
 - If you are certain from the description and images, return only 1 candidate.
 - Never guess at variants you cannot confirm.` }
         ],
@@ -609,9 +610,11 @@ app.post('/api/identify', async (req, res) => {
 RULES:
 - YEAR: Look at the back of the card first — the year is almost always printed there explicitly. Use what you read, do not guess from the front design.
 - List 1–4 candidates in order of likelihood.
-- VARIANT ACCURACY IS CRITICAL: A Prizm base card looks similar to a Silver Prizm and a White Prizm — they are DIFFERENT cards with very different values. If you cannot clearly confirm which parallel it is from the photo, list each possibility as a separate candidate.
+- VARIANT ACCURACY IS CRITICAL: A Prizm base card, Silver Prizm, and White Prizm are DIFFERENT cards with very different values. Each possibility must be its own separate candidate entry.
+- NEVER use "or" in the variant field (e.g. NEVER write "Silver or Base", "Downtown or Base", "Silver Prizm or Base Prizm"). If you are unsure between two variants, create TWO separate candidates — one for each.
+- Each candidate must have exactly one specific variant. One card per entry, always.
 - Set confidence to 98+ ONLY when you are certain of the exact variant, not just the player and set.
-- If there is any chance the card is a parallel (silver, white, gold, blue, etc.) rather than the base version, list both.
+- If there is any chance the card is a parallel (silver, white, gold, blue, etc.) rather than the base version, list both as separate candidates.
 - Never assume base — always consider that it could be a more valuable parallel.` }
         ],
       }],
