@@ -96,15 +96,17 @@ function CameraCapture({ onCapture, onClose }) {
             width: "min(78vw, calc(75vh * 5 / 7))",
             aspectRatio: "5 / 7",
             boxShadow: "0 0 0 9999px rgba(0,0,0,0.55)",
+            border: "2px solid rgba(201,168,76,0.45)",
+            borderRadius: 8,
           }}>
             {[
-              { top: 0,    left: 0,    borderTop: "3px solid #c9a84c",    borderLeft: "3px solid #c9a84c",    borderRadius: "6px 0 0 0" },
-              { top: 0,    right: 0,   borderTop: "3px solid #c9a84c",    borderRight: "3px solid #c9a84c",   borderRadius: "0 6px 0 0" },
-              { bottom: 0, left: 0,    borderBottom: "3px solid #c9a84c", borderLeft: "3px solid #c9a84c",    borderRadius: "0 0 0 6px" },
-              { bottom: 0, right: 0,   borderBottom: "3px solid #c9a84c", borderRight: "3px solid #c9a84c",   borderRadius: "0 0 6px 0" },
+              { top: -2,    left: -2,    borderTop: "3px solid #c9a84c",    borderLeft: "3px solid #c9a84c",    borderRadius: "8px 0 0 0" },
+              { top: -2,    right: -2,   borderTop: "3px solid #c9a84c",    borderRight: "3px solid #c9a84c",   borderRadius: "0 8px 0 0" },
+              { bottom: -2, left: -2,    borderBottom: "3px solid #c9a84c", borderLeft: "3px solid #c9a84c",    borderRadius: "0 0 0 8px" },
+              { bottom: -2, right: -2,   borderBottom: "3px solid #c9a84c", borderRight: "3px solid #c9a84c",   borderRadius: "0 0 8px 0" },
             ].map((s, i) => (
               <div key={i} style={{
-                position: "absolute", width: 28, height: 28,
+                position: "absolute", width: 36, height: 36,
                 animation: `cornerBreathe 2.4s ease-in-out ${i * 0.15}s infinite`,
                 ...s,
               }} />
