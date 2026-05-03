@@ -43,6 +43,11 @@ body {
   from { width: 0; }
 }
 
+@keyframes cornerBreathe {
+  0%, 100% { opacity: 0.65; transform: scale(1); }
+  50%       { opacity: 1;    transform: scale(1.06); }
+}
+
 /* ── Utility animation classes ─────────────────────────────── */
 
 .pop-bar {

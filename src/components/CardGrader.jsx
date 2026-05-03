@@ -510,7 +510,7 @@ export default function CardGrader() {
   return (
     <div style={{
       minHeight: "100vh",
-      background: "#000",
+      background: "radial-gradient(ellipse 100% 38% at 50% 0%, rgba(201,168,76,0.07) 0%, transparent 70%), #000",
       color: "#fff",
       fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif",
       WebkitFontSmoothing: "antialiased",
@@ -626,6 +626,7 @@ export default function CardGrader() {
               }}
             >
               {tab.label}
+              {active && <div style={{ width: 4, height: 4, borderRadius: "50%", background: "#c9a84c", margin: "3px auto 0" }} />}
             </button>
           );
         })}

@@ -92,12 +92,24 @@ function CameraCapture({ onCapture, onClose }) {
         {/* Centered card-aspect rectangle, dim outside via huge box-shadow */}
         <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
           <div ref={rectRef} style={{
+            position: "relative",
             width: "min(78vw, calc(75vh * 5 / 7))",
             aspectRatio: "5 / 7",
-            border: "2px solid #c9a84c",
-            borderRadius: 8,
             boxShadow: "0 0 0 9999px rgba(0,0,0,0.55)",
-          }} />
+          }}>
+            {[
+              { top: 0,    left: 0,    borderTop: "3px solid #c9a84c",    borderLeft: "3px solid #c9a84c",    borderRadius: "6px 0 0 0" },
+              { top: 0,    right: 0,   borderTop: "3px solid #c9a84c",    borderRight: "3px solid #c9a84c",   borderRadius: "0 6px 0 0" },
+              { bottom: 0, left: 0,    borderBottom: "3px solid #c9a84c", borderLeft: "3px solid #c9a84c",    borderRadius: "0 0 0 6px" },
+              { bottom: 0, right: 0,   borderBottom: "3px solid #c9a84c", borderRight: "3px solid #c9a84c",   borderRadius: "0 0 6px 0" },
+            ].map((s, i) => (
+              <div key={i} style={{
+                position: "absolute", width: 28, height: 28,
+                animation: `cornerBreathe 2.4s ease-in-out ${i * 0.15}s infinite`,
+                ...s,
+              }} />
+            ))}
+          </div>
         </div>
 
         {error && (
@@ -1354,7 +1366,7 @@ const card = {
   border: "1px solid rgba(255,255,255,0.08)",
   borderRadius: 20,
   padding: "18px 18px",
-  boxShadow: "0 2px 20px rgba(0,0,0,0.4)",
+  boxShadow: "0 2px 20px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.09)",
 };
 
 const sectionLabel = {

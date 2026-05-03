@@ -245,7 +245,7 @@ const card = {
   border: "1px solid rgba(255,255,255,0.08)",
   borderRadius: 20,
   padding: "18px 20px",
-  boxShadow: "0 2px 20px rgba(0,0,0,0.4)",
+  boxShadow: "0 2px 20px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.09)",
 };
 
 const sectionLabel = {
