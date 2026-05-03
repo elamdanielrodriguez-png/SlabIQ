@@ -590,8 +590,11 @@ export default function CardGrader() {
           onAnimationEnd={() => setSpotlightActive(false)}
           style={{
             position: "fixed", inset: 0, zIndex: 250, pointerEvents: "none",
-            background: "radial-gradient(ellipse 320px 200px at 50% 36vh, transparent 0%, rgba(0,0,0,0.88) 55%)",
-            animation: "spotlightReveal 2.8s ease forwards",
+            background: [
+              "radial-gradient(ellipse 220px 155px at 50% 44vh, rgba(255,218,100,0.28) 0%, rgba(255,218,100,0.10) 48%, transparent 70%)",
+              "radial-gradient(ellipse 290px 200px at 50% 44vh, transparent 0%, transparent 48%, rgba(0,0,0,0.97) 66%)",
+            ].join(", "),
+            animation: "spotlightReveal 3s ease forwards",
           }}
         />
       )}
