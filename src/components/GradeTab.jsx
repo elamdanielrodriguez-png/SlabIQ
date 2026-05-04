@@ -1348,28 +1348,32 @@ function GradeHalf({ label, grade: gradeProp, sub, side, blackLabel }) {
     setLanded(false);
     if (grade == null) { setDisplay(null); return; }
     setDisplay(isInt ? 0 : 0.0);
-    const STEPS = 22, INTERVAL = 1360 / STEPS;
-    let step = 0;
-    const id = setInterval(() => {
+    // Fast phase (55ms/step) counts to ~85% of the grade, then slow phase (220ms/step)
+    // crawls the last few ticks — the suspense before the slam.
+    const FAST = 18, SLOW = 5, TOTAL = FAST + SLOW;
+    let step = 0, tid;
+    const tick = () => {
       step++;
-      const eased = 1 - Math.pow(1 - step / STEPS, 2.5);
-      if (step >= STEPS) {
-        clearInterval(id);
-        setDisplay(grade);
-        setLanded(true);
-      } else {
-        setDisplay(isInt ? Math.floor(eased * grade) : Math.round(eased * grade * 2) / 2);
-      }
-    }, INTERVAL);
-    return () => clearInterval(id);
+      const eased = 1 - Math.pow(1 - step / TOTAL, 2.5);
+      if (step >= TOTAL) { setDisplay(grade); setLanded(true); return; }
+      setDisplay(isInt ? Math.floor(eased * grade) : Math.round(eased * grade * 2) / 2);
+      tid = setTimeout(tick, step > FAST ? 220 : 55);
+    };
+    tid = setTimeout(tick, 55);
+    return () => clearTimeout(tid);
   }, [grade]);
 
   const color = gradeColor(grade, blackLabel);
   const pad   = side === "left" ? "12px 20px 12px 0" : "12px 0 12px 20px";
-
   const displayStr = display == null ? "—" : isInt ? String(display) : Number(display).toFixed(1);
-  const progress = (grade > 0 && display != null) ? Math.min(1, display / grade) : 0;
+  const progress   = (grade > 0 && display != null) ? Math.min(1, display / grade) : 0;
   const countScale = 0.3 + 0.7 * progress;
+
+  const particleColor = blackLabel ? "#fff"          : "#c9a84c";
+  const particleGlow  = blackLabel ? "rgba(255,255,255,0.9)" : "rgba(201,168,76,0.9)";
+  const particleCount = grade >= 10 ? 8 : grade >= 9 ? 5 : 0;
+  const particleSize  = grade >= 10 ? 7 : 5;
+  const ringCount     = grade >= 10 ? 2 : grade >= 9 ? 1 : 0;
 
   return (
     <div style={{ textAlign: "center", padding: pad }}>
@@ -1378,16 +1382,73 @@ function GradeHalf({ label, grade: gradeProp, sub, side, blackLabel }) {
         textTransform: "uppercase", color: "rgba(255,255,255,0.25)", marginBottom: 12,
       }}>{label}</div>
 
-      <div style={{
-        display: "inline-block",
-        color,
-        fontSize: 72, fontWeight: 700, lineHeight: 1,
-        letterSpacing: "-3px", marginBottom: 10,
-        textShadow: landed ? gradeGlow(grade, blackLabel) : "none",
-        transform: landed ? undefined : `scale(${countScale})`,
-        animation: landed ? "gradeSlam 0.8s cubic-bezier(0.22,1,0.36,1) forwards" : "none",
-      }}>{displayStr}</div>
+      {/* position:relative so flash / ring / particles can be absolute children */}
+      <div style={{ position: "relative", display: "inline-block", marginBottom: 10 }}>
 
+        {/* Radial flash burst at the moment of landing */}
+        {landed && (
+          <div style={{
+            position: "absolute", top: "50%", left: "50%",
+            width: 80, height: 80, marginLeft: -40, marginTop: -40,
+            borderRadius: "50%",
+            background: blackLabel
+              ? "radial-gradient(circle, rgba(255,255,255,0.55) 0%, transparent 70%)"
+              : grade >= 10
+                ? "radial-gradient(circle, rgba(201,168,76,0.65) 0%, transparent 70%)"
+                : "radial-gradient(circle, rgba(255,255,255,0.30) 0%, transparent 70%)",
+            animation: "gradeFlash 0.65s cubic-bezier(0.22,1,0.36,1) forwards",
+            pointerEvents: "none",
+          }} />
+        )}
+
+        {/* Expanding shockwave ring(s) */}
+        {landed && [...Array(ringCount)].map((_, i) => (
+          <div key={i} style={{
+            position: "absolute", top: "50%", left: "50%",
+            width: 50, height: 50, marginLeft: -25, marginTop: -25,
+            borderRadius: "50%",
+            border: `2px solid ${blackLabel ? "rgba(255,255,255,0.7)" : "rgba(201,168,76,0.75)"}`,
+            animation: `gradeRing ${0.85 + i * 0.3}s cubic-bezier(0.22,1,0.36,1) ${i * 0.12}s forwards`,
+            pointerEvents: "none",
+          }} />
+        ))}
+
+        {/* The grade number itself */}
+        <div style={{
+          display: "inline-block",
+          color,
+          fontSize: 72, fontWeight: 700, lineHeight: 1,
+          letterSpacing: "-3px",
+          textShadow: landed ? gradeGlow(grade, blackLabel) : "none",
+          transform: landed ? undefined : `scale(${countScale})`,
+          animation: landed ? "gradeSlam 0.9s cubic-bezier(0.22,1,0.36,1) forwards" : "none",
+        }}>{displayStr}</div>
+
+        {/* Scatter particles (rotated wrappers so translateX goes in each direction) */}
+        {landed && particleCount > 0 && (
+          <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+            {[...Array(particleCount)].map((_, i) => (
+              <div key={i} style={{
+                position: "absolute", top: "50%", left: "50%",
+                width: 0, height: 0,
+                transform: `rotate(${(360 / particleCount) * i}deg)`,
+              }}>
+                <div style={{
+                  width: particleSize, height: particleSize,
+                  borderRadius: "50%",
+                  background: particleColor,
+                  boxShadow: `0 0 8px ${particleGlow}`,
+                  marginLeft: -(particleSize / 2),
+                  marginTop:  -(particleSize / 2),
+                  animation: `particleFly ${0.55 + i * 0.025}s cubic-bezier(0.22,1,0.36,1) 0.08s both`,
+                }} />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Sub-label badge — springs up after the slam */}
       <div style={{
         display: "inline-block",
         background: blackLabel ? "rgba(255,255,255,0.08)" : grade >= 9 ? "rgba(201,168,76,0.1)" : "rgba(255,255,255,0.05)",
@@ -1395,8 +1456,8 @@ function GradeHalf({ label, grade: gradeProp, sub, side, blackLabel }) {
         borderRadius: 6, padding: "3px 9px",
         color: blackLabel ? "#fff" : grade >= 9 ? "#c9a84c" : "rgba(255,255,255,0.38)",
         fontSize: 10, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase",
-        opacity: landed ? 1 : 0,
-        transition: "opacity 0.25s ease 0.2s",
+        opacity: landed ? undefined : 0,
+        animation: landed ? "labelRise 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.18s both" : "none",
       }}>{sub || "—"}</div>
     </div>
   );

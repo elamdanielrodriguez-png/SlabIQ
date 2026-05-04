@@ -23,6 +23,33 @@ import HistoryPanel from "./HistoryPanel";
 
 function LoadingOverlay({ message }) {
   if (!message) return null;
+  const mode = message.toLowerCase().includes("identify") ? "identify" : "grade";
+  return <LoadingOverlayInner key={mode} isIdentify={mode === "identify"} />;
+}
+
+function LoadingOverlayInner({ isIdentify }) {
+  const duration  = isIdentify ? 10000 : 33000;
+  const checkpoints = isIdentify
+    ? ["Reading image", "Detecting card details", "Identifying set & variant", "Confirming match"]
+    : ["Inspecting corners & edges", "Analyzing surface", "Fetching market data", "Computing grades"];
+  const pcts = [14, 38, 62, 83];
+
+  const [progress, setProgress] = useState(0);
+  useEffect(() => {
+    const STEP = 80;
+    const inc  = 92 / (duration / STEP);
+    const id   = setInterval(() => {
+      setProgress(p => {
+        const next = p + inc;
+        if (next >= 92) { clearInterval(id); return 92; }
+        return next;
+      });
+    }, STEP);
+    return () => clearInterval(id);
+  }, []);
+
+  const activeStep = pcts.findIndex(t => progress < t);
+
   return (
     <div style={{
       position: "fixed", inset: 0,
@@ -32,24 +59,69 @@ function LoadingOverlay({ message }) {
       zIndex: 500,
       display: "flex", flexDirection: "column",
       alignItems: "center", justifyContent: "center",
-      gap: 28,
+      gap: 32,
     }}>
-      <div style={{ position: "relative", width: 88, height: 88 }}>
-        <svg width="88" height="88" style={{ display: "block" }} className="slabiq-spin">
-          <circle cx="44" cy="44" r="36" fill="none" stroke="rgba(201,168,76,0.12)" strokeWidth="3.5" />
-          <circle cx="44" cy="44" r="36" fill="none" stroke="#c9a84c" strokeWidth="3.5"
-            strokeDasharray="70 156" strokeLinecap="round" transform="rotate(-90 44 44)" />
+      <div style={{ position: "relative", width: 72, height: 72 }}>
+        <svg width="72" height="72" style={{ display: "block" }} className="slabiq-spin">
+          <circle cx="36" cy="36" r="30" fill="none" stroke="rgba(201,168,76,0.12)" strokeWidth="3" />
+          <circle cx="36" cy="36" r="30" fill="none" stroke="#c9a84c" strokeWidth="3"
+            strokeDasharray="58 130" strokeLinecap="round" transform="rotate(-90 36 36)" />
         </svg>
         <div style={{
           position: "absolute", inset: 0,
           display: "flex", alignItems: "center", justifyContent: "center",
-          color: "#c9a84c", fontSize: 12, fontWeight: 800, letterSpacing: "0.06em",
+          color: "#c9a84c", fontSize: 11, fontWeight: 800, letterSpacing: "0.06em",
         }}>IQ</div>
       </div>
-      <div style={{ textAlign: "center", padding: "0 32px" }}>
-        <div style={{ color: "#fff", fontSize: 17, fontWeight: 600, letterSpacing: "-0.4px", marginBottom: 8 }}>{message}</div>
-        <div style={{ color: "rgba(255,255,255,0.28)", fontSize: 13 }}>
-          {message?.toLowerCase().includes("identify") ? "~10 seconds" : "~30 seconds"}
+
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20, padding: "0 40px" }}>
+        <div style={{ color: "#fff", fontSize: 17, fontWeight: 600, letterSpacing: "-0.4px" }}>
+          {isIdentify ? "Identifying Card" : "Analyzing Card"}
+        </div>
+
+        <div style={{ width: 240, height: 3, background: "rgba(255,255,255,0.07)", borderRadius: 99, overflow: "hidden" }}>
+          <div style={{
+            height: "100%",
+            width: `${progress}%`,
+            background: "linear-gradient(90deg, rgba(201,168,76,0.6) 0%, #c9a84c 100%)",
+            borderRadius: 99,
+            transition: "width 0.08s linear",
+          }} />
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 11, alignItems: "flex-start", width: 240 }}>
+          {checkpoints.map((label, i) => {
+            const done   = progress >= pcts[i];
+            const active = activeStep === i;
+            return (
+              <div key={label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{
+                  width: 18, height: 18, borderRadius: "50%", flexShrink: 0,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  background: done ? "rgba(48,209,88,0.12)" : "transparent",
+                  border: `1px solid ${done ? "rgba(48,209,88,0.35)" : active ? "rgba(201,168,76,0.55)" : "rgba(255,255,255,0.1)"}`,
+                  transition: "all 0.4s ease",
+                }}>
+                  {done ? (
+                    <svg width="9" height="7" viewBox="0 0 9 7" fill="none">
+                      <path d="M1 3.5L3 5.5L8 1" stroke="#30d158" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  ) : active ? (
+                    <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#c9a84c", animation: "cornerBreathe 1.2s ease-in-out infinite" }} />
+                  ) : null}
+                </div>
+                <span style={{
+                  fontSize: 13,
+                  color: done ? "#30d158" : active ? "#fff" : "rgba(255,255,255,0.22)",
+                  fontWeight: active ? 500 : 400,
+                  letterSpacing: "-0.1px",
+                  transition: "color 0.4s ease",
+                }}>
+                  {label}
+                </span>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

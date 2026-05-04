@@ -50,11 +50,12 @@ export default function SubmitTab({ result }) {
           <TierGuide
             company="PSA"
             tiers={[
-              { name: "Value", cost: "$28", note: "Under $500" },
+              { name: "Value", cost: "$22", note: "Under $500" },
               { name: "Regular", cost: "$75", note: "Under $1,500" },
-              { name: "Express", cost: "$160", note: "Under $2,999" },
-              { name: "Super Express", cost: "$300", note: "Under $4,999" },
-              { name: "Walk-Through", cost: "$600", note: "Under $9,999" },
+              { name: "Express", cost: "$150", note: "Under $2,500" },
+              { name: "Super Express", cost: "$250", note: "Under $5,000" },
+              { name: "Walk-Through", cost: "$600", note: "Under $10,000" },
+              { name: "Premium", cost: "$1k/25k", note: "$10k+ · per $25k insured" },
             ]}
           />
           <TierGuide

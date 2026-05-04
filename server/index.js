@@ -106,6 +106,8 @@ async function ebayListingSearch(token, query, limit = 25) {
   }
 }
 
+const OVERSIZED_PRONE_VARIANTS = ['downtown', 'stained glass', 'color blast', 'sparkle', 'dynagon', 'light it up', 'magic numbers', 'pulsar', 'stargazer'];
+
 async function fetchMarketComps(player, year, set, variant, cardNumber) {
   const token = await getEbayToken();
   if (!token) return null;
@@ -113,10 +115,17 @@ async function fetchMarketComps(player, year, set, variant, cardNumber) {
   const baseParts = [year, set, player, variant, cardNumber ? `#${cardNumber}` : ''].filter(Boolean);
   const base = baseParts.join(' ');
 
+  // For variants that exist in both standard and oversized 5x7 formats, filter at the eBay API
+  // level to cut oversized listings before they even reach the AI bucketing step.
+  const variantLower = (variant ?? '').toLowerCase();
+  const oversizedFilter = OVERSIZED_PRONE_VARIANTS.some(v => variantLower.includes(v))
+    ? ' -5x7 -"5 x 7" -oversized -jumbo -topper'
+    : '';
+
   const [rawList, psaList, bgsList] = await Promise.all([
-    ebayListingSearch(token, `${base}`, 25),
-    ebayListingSearch(token, `${base} PSA`, 25),
-    ebayListingSearch(token, `${base} BGS`, 25),
+    ebayListingSearch(token, `${base}${oversizedFilter}`, 25),
+    ebayListingSearch(token, `${base} PSA${oversizedFilter}`, 25),
+    ebayListingSearch(token, `${base} BGS${oversizedFilter}`, 25),
   ]);
 
   const seen = new Set();
@@ -144,7 +153,7 @@ A listing is INVALID if ANY of these apply:
 4. Lot or multi-card listing — title mentions: "lot", "x2", "x3", "(2)", "(3)", multiple player names, "bundle", "set break", "complete set", "20 cards", "all", etc.
 5. NOT a standard 2.5x3.5 inch trading card — exclude ANY mention of: "jumbo", "5x7", "5 x 7", "8x10", "blanket", "manu", "manupatch", "manufactured patch", "promo", "magnet", "oversized", "box topper", "topper", "mini", "micro", "stickers", "decal", "poster", "wall art", "bobblehead", "figure", "coin", "patch card" (when it implies oversized). When in doubt about size, EXCLUDE.
 
-   CRITICAL — these specific inserts ALMOST ALWAYS have oversized 5x7 versions and sellers frequently HIDE the size in the title or description: "Stained Glass", "Downtown", "Color Blast", "Sparkle", "Dynagon", "Light It Up", "Magic Numbers", "Pulsar", "Stargazer". For ANY card matching one of these inserts: EXCLUDE the listing UNLESS the title EXPLICITLY confirms standard size (e.g. "standard", "base size", "2.5x3.5", "regular size"). DO NOT use price as a signal — oversized versions often command higher prices than the standard card. When in doubt for these inserts, EXCLUDE.
+   CRITICAL — these specific inserts exist in BOTH standard 2.5×3.5 AND oversized 5×7 formats. Sellers rarely label the size in the title: "Stained Glass", "Downtown", "Color Blast", "Sparkle", "Dynagon", "Light It Up", "Magic Numbers", "Pulsar", "Stargazer". THE OVERSIZED VERSION IS CHEAPER — often 3–10× less than the standard card. USE PRICE CLUSTERING for raw listings: if you see two distinct price groups (e.g. $10–$40 and $100–$300), the HIGHER cluster is the standard 2.5×3.5 card — include ONLY those. The lower cluster is the cheap oversized novelty print — EXCLUDE those. If all raw listings are tightly grouped, include them all. For already-graded (PSA/BGS) listings, include normally — the grade company and number are sufficient identity.
 6. Sealed product / pack / box, not a single card — "pack", "box", "case", "hot pack", "blaster", "hobby box", "mega", "factory sealed", "wax", "FOTL"
 7. Damaged / altered / fake — "altered", "trimmed", "creased", "crease", "ding", "bent", "torn", "stain", "miscut", "reprint", "custom", "proxy", "replica", "novelty", "art card"
 8. Auto/autograph variant when target is base (or vice versa) — autographs are a different card
@@ -283,7 +292,7 @@ This is an INITIAL estimate. The user may override it after grading.
 
 Market ratios: PSA10=100% | PSA9=20-40% | BGS BL=200-1000% | BGS10=100-150% | BGS9.5=50-75% | BGS9=40-60%
 Submission threshold: net profit ≥ $30 AND ROI ≥ 25%
-PSA tiers: Value $28(<$500), Regular $75(<$1500), Express $160(<$3000), Super Express $300(<$5000), Walk-Through $600
+PSA tiers: Value $22(<$500), Regular $75(<$1500), Express $150(<$2500), Super Express $250(<$5000), Walk-Through $600(<$10000), Premium ≥$10000 ($1000 per $25k declared value, e.g. $10k card=$1000, $26k card=$2000)
 BGS tiers: Standard $25(<$499), Express $40(<$999), Fast Track $100(<$2000), Walk-Through $300
 
 POP REPORT CALIBRATION — real anchors for accurate popData estimates:
@@ -350,7 +359,7 @@ Return ONLY raw JSON. If card identity uncertain: needsClarification:true with c
   },
   "submission": {
     "psaRecommended": <bool>, "bgsRecommended": <bool>,
-    "psaTier": "Value|Regular|Express|Super Express|Walk-Through", "bgsTier": "Standard|Express|Fast Track|Walk-Through",
+    "psaTier": "Value|Regular|Express|Super Express|Walk-Through|Premium", "bgsTier": "Standard|Express|Fast Track|Walk-Through",
     "psaCost": <USD>, "bgsCost": <USD>, "psaExpectedGrade": <num>, "bgsExpectedGrade": <num>,
     "psaExpectedValue": <USD>, "bgsExpectedValue": <USD>, "psaRoi": <num>, "bgsRoi": <num>,
     "analysis": "2-3 sentences with dollar math."
@@ -772,35 +781,8 @@ app.post('/api/grade', async (req, res) => {
           const rawPrice = realPrice(market.raw, aiRaw);
           if (rawPrice) parsed.market.raw = rawPrice;
 
-          // BGS / PSA cross-validation: PSA doesn't grade oversized cards so PSA prices are
-          // inherently clean. If a BGS value is wildly above its PSA equivalent it almost
-          // certainly came from an oversized listing that slipped through.
-          {
-            const g = parsed.market.graded;
-            const psa10 = Number(g.psa10) || 0;
-            const psa9  = Number(g.psa9)  || 0;
-            const psa8  = Number(g.psa8)  || 0;
-            const checks = [
-              // BGS 9.5 is normally 50–80% of PSA 10 — flag if > 2.2×
-              { key: 'bgs9_5',        ref: psa10, maxMult: 2.2  },
-              // BGS 10 Pristine is normally 100–150% of PSA 10 — flag if > 3.5×
-              { key: 'bgs10',         ref: psa10, maxMult: 3.5  },
-              // BGS Black Label can be rare but > 25× PSA 10 is almost certainly wrong
-              { key: 'bgsBlackLabel', ref: psa10, maxMult: 25   },
-              // BGS 9 should track near PSA 9 — flag if > 2×
-              { key: 'bgs9',          ref: psa9,  maxMult: 2.0  },
-              // BGS 8 should track near PSA 8 — flag if > 2×
-              { key: 'bgs8',          ref: psa8,  maxMult: 2.0  },
-            ];
-            for (const { key, ref, maxMult } of checks) {
-              if (ref > 0 && Number(g[key]) > ref * maxMult) {
-                console.log(`BGS cross-check: ${key} $${g[key]} is ${Math.round(Number(g[key])/ref*100)}% of ref $${ref} (max ${maxMult*100}%) — removing as likely oversized`);
-                delete g[key];
-              }
-            }
-          }
 
-          parsed.market.dataSource = 'eBay (median active − 10%, AI-estimate floor+ceiling, BGS/PSA cross-check)';
+          parsed.market.dataSource = 'eBay (median active − 10%, AI-estimate floor+ceiling)';
           parsed.market.sampleSize = market.totalValid;
           text = JSON.stringify(parsed);
         }
@@ -818,11 +800,12 @@ app.post('/api/grade', async (req, res) => {
         const raw = parsed.market.raw ?? 0;
 
         const psaTierFor = (v) => {
-          if (v < 500)  return { tier: 'Value',         cost: 28  };
-          if (v < 1500) return { tier: 'Regular',       cost: 75  };
-          if (v < 3000) return { tier: 'Express',       cost: 160 };
-          if (v < 5000) return { tier: 'Super Express', cost: 300 };
-          return               { tier: 'Walk-Through',  cost: 600 };
+          if (v < 500)   return { tier: 'Value',         cost: 22   };
+          if (v < 1500)  return { tier: 'Regular',       cost: 75   };
+          if (v < 2500)  return { tier: 'Express',       cost: 150  };
+          if (v < 5000)  return { tier: 'Super Express', cost: 250  };
+          if (v < 10000) return { tier: 'Walk-Through',  cost: 600 };
+          return                { tier: 'Premium', cost: Math.ceil(v / 25000) * 1000 };
         };
         const bgsTierFor = (v) => {
           if (v < 499)  return { tier: 'Standard',    cost: 25  };
