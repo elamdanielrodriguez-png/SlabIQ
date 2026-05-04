@@ -115,18 +115,22 @@ async function fetchMarketComps(player, year, set, variant, cardNumber) {
   const baseParts = [year, set, player, variant, cardNumber ? `#${cardNumber}` : ''].filter(Boolean);
   const base = baseParts.join(' ');
 
-  // For variants that exist in both standard and oversized 5x7 formats, filter at the eBay API
-  // level to cut oversized listings before they even reach the AI bucketing step.
+  // For variants that exist in both standard and oversized 5x7 formats:
+  // - Skip raw eBay listings entirely — titles never say "standard" so we can't
+  //   reliably separate the cheap oversized version from the real card. The grading
+  //   AI's training-data estimate for raw value is more accurate than eBay here.
+  // - Apply keyword exclusions to PSA/BGS searches (graded titles include company +
+  //   grade number which provides identity, so those are much less contaminated).
   const variantLower = (variant ?? '').toLowerCase();
-  const oversizedFilter = OVERSIZED_PRONE_VARIANTS.some(v => variantLower.includes(v))
-    ? ' -5x7 -"5 x 7" -oversized -jumbo -topper'
-    : '';
+  const isOversizedProne = OVERSIZED_PRONE_VARIANTS.some(v => variantLower.includes(v));
+  const oversizedFilter = isOversizedProne ? ' -5x7 -"5 x 7" -oversized -jumbo -topper' : '';
 
   const [rawList, psaList, bgsList] = await Promise.all([
-    ebayListingSearch(token, `${base}${oversizedFilter}`, 25),
+    isOversizedProne ? Promise.resolve([]) : ebayListingSearch(token, `${base}`, 25),
     ebayListingSearch(token, `${base} PSA${oversizedFilter}`, 25),
     ebayListingSearch(token, `${base} BGS${oversizedFilter}`, 25),
   ]);
+  if (isOversizedProne) console.log(`Oversized-prone variant "${variant}" — skipping raw eBay search, AI estimate will be used for raw value`);
 
   const seen = new Set();
   const unique = [...rawList, ...psaList, ...bgsList].filter(l => {
@@ -153,7 +157,7 @@ A listing is INVALID if ANY of these apply:
 4. Lot or multi-card listing — title mentions: "lot", "x2", "x3", "(2)", "(3)", multiple player names, "bundle", "set break", "complete set", "20 cards", "all", etc.
 5. NOT a standard 2.5x3.5 inch trading card — exclude ANY mention of: "jumbo", "5x7", "5 x 7", "8x10", "blanket", "manu", "manupatch", "manufactured patch", "promo", "magnet", "oversized", "box topper", "topper", "mini", "micro", "stickers", "decal", "poster", "wall art", "bobblehead", "figure", "coin", "patch card" (when it implies oversized). When in doubt about size, EXCLUDE.
 
-   CRITICAL — these specific inserts exist in BOTH standard 2.5×3.5 AND oversized 5×7 formats. Sellers rarely label the size in the title: "Stained Glass", "Downtown", "Color Blast", "Sparkle", "Dynagon", "Light It Up", "Magic Numbers", "Pulsar", "Stargazer". THE OVERSIZED VERSION IS CHEAPER — often 3–10× less than the standard card. USE PRICE CLUSTERING for raw listings: if you see two distinct price groups (e.g. $10–$40 and $100–$300), the HIGHER cluster is the standard 2.5×3.5 card — include ONLY those. The lower cluster is the cheap oversized novelty print — EXCLUDE those. If all raw listings are tightly grouped, include them all. For already-graded (PSA/BGS) listings, include normally — the grade company and number are sufficient identity.
+   CRITICAL — these specific inserts exist in BOTH standard 2.5×3.5 AND oversized 5×7 formats. Sellers rarely label the size in the title: "Stained Glass", "Downtown", "Color Blast", "Sparkle", "Dynagon", "Light It Up", "Magic Numbers", "Pulsar", "Stargazer". Raw listings for these variants have already been excluded before reaching you. For PSA/BGS listings, include normally — the grade company and number are sufficient identity regardless of size.
 6. Sealed product / pack / box, not a single card — "pack", "box", "case", "hot pack", "blaster", "hobby box", "mega", "factory sealed", "wax", "FOTL"
 7. Damaged / altered / fake — "altered", "trimmed", "creased", "crease", "ding", "bent", "torn", "stain", "miscut", "reprint", "custom", "proxy", "replica", "novelty", "art card"
 8. Auto/autograph variant when target is base (or vice versa) — autographs are a different card
