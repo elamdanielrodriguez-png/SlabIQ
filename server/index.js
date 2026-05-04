@@ -120,23 +120,8 @@ async function fetchMarketComps(player, year, set, variant, cardNumber) {
   const baseParts = [year, set, player, variant, cardNumber ? `#${cardNumber}` : ''].filter(Boolean);
   const base = baseParts.join(' ');
 
-  // For variants that exist in both standard and oversized 5x7 formats:
-  // - Skip raw eBay listings entirely — titles never say "standard" so we can't
-  //   reliably separate the cheap oversized version from the real card. The grading
-  //   AI's training-data estimate for raw value is more accurate than eBay here.
-  // - Apply keyword exclusions to PSA/BGS searches (graded titles include company +
-  //   grade number which provides identity, so those are much less contaminated).
   const variantLower = (variant ?? '').toLowerCase();
   const isOversizedProne = OVERSIZED_PRONE_VARIANTS.some(v => variantLower.includes(v));
-  const oversizedFilter = isOversizedProne ? ' -5x7 -"5 x 7" -oversized -jumbo -topper' : '';
-
-  if (isOversizedProne) {
-    // Both standard and oversized versions get graded by PSA/BGS, and sellers rarely
-    // include size in the title. eBay comps for these variants are unreliable at every
-    // tier (raw AND graded). Fall back entirely to the grading AI's training-data estimates.
-    console.log(`Oversized-prone variant "${variant}" — skipping all eBay searches, using AI estimates only`);
-    return null;
-  }
 
   const [rawList, psaList, bgsList] = await Promise.all([
     ebayFindingSearch(`${base}`, 25),
@@ -145,11 +130,20 @@ async function fetchMarketComps(player, year, set, variant, cardNumber) {
   ]);
 
   const seen = new Set();
-  const unique = [...rawList, ...psaList, ...bgsList].filter(l => {
+  let unique = [...rawList, ...psaList, ...bgsList].filter(l => {
     if (seen.has(l.url)) return false;
     seen.add(l.url);
     return true;
   });
+
+  // Oversized-prone variants (Downtown, Stained Glass, etc.) exist in both standard 2.5x3.5
+  // and cheap jumbo 5x7 formats. Sellers rarely label the size. The jumbo version always
+  // sells under $100; the standard insert is always $100+. Drop anything below that floor.
+  if (isOversizedProne) {
+    const before = unique.length;
+    unique = unique.filter(l => l.price >= 100);
+    console.log(`Oversized filter: removed ${before - unique.length} sub-$100 listings (jumbo) for "${variant}"`);
+  }
 
   console.log(`Market comps: pulled ${unique.length} unique sold listings for ${player}`);
   if (unique.length === 0) return null;
@@ -169,7 +163,7 @@ A listing is INVALID if ANY of these apply:
 4. Lot or multi-card listing — title mentions: "lot", "x2", "x3", "(2)", "(3)", multiple player names, "bundle", "set break", "complete set", "20 cards", "all", etc.
 5. NOT a standard 2.5x3.5 inch trading card — exclude ANY mention of: "jumbo", "5x7", "5 x 7", "8x10", "blanket", "manu", "manupatch", "manufactured patch", "promo", "magnet", "oversized", "box topper", "topper", "mini", "micro", "stickers", "decal", "poster", "wall art", "bobblehead", "figure", "coin", "patch card" (when it implies oversized). When in doubt about size, EXCLUDE.
 
-   CRITICAL — these specific inserts exist in BOTH standard 2.5×3.5 AND oversized 5×7 formats. Sellers rarely label the size in the title: "Stained Glass", "Downtown", "Color Blast", "Sparkle", "Dynagon", "Light It Up", "Magic Numbers", "Pulsar", "Stargazer". Raw listings for these variants have already been excluded before reaching you. For PSA/BGS listings, include normally — the grade company and number are sufficient identity regardless of size.
+   CRITICAL — these specific inserts exist in BOTH standard 2.5×3.5 AND oversized 5×7 formats. Sellers rarely label the size in the title: "Stained Glass", "Downtown", "Color Blast", "Sparkle", "Dynagon", "Light It Up", "Magic Numbers", "Pulsar", "Stargazer". Any listing under $100 for these variants has already been removed (jumbo filter). Treat all remaining listings as standard size.
 6. Sealed product / pack / box, not a single card — "pack", "box", "case", "hot pack", "blaster", "hobby box", "mega", "factory sealed", "wax", "FOTL"
 7. Damaged / altered / fake — "altered", "trimmed", "creased", "crease", "ding", "bent", "torn", "stain", "miscut", "reprint", "custom", "proxy", "replica", "novelty", "art card"
 8. Auto/autograph variant when target is base (or vice versa) — autographs are a different card
