@@ -85,7 +85,14 @@ export default function MarketTab({ result }) {
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 22 }}>
           <div>
-            <div style={sectionLabel}>Raw Value</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={sectionLabel}>Raw Value</div>
+              {market?.rawUrl && (
+                <a href={market.rawUrl} target="_blank" rel="noopener noreferrer" style={ebayLinkStyle}>
+                  eBay ↗
+                </a>
+              )}
+            </div>
             <div style={{ color: "#fff", fontSize: 30, fontWeight: 700, letterSpacing: "-1px", marginTop: 4, lineHeight: 1 }}>
               <AnimPrice value={market?.raw} />
             </div>
@@ -111,21 +118,21 @@ export default function MarketTab({ result }) {
           <ValueTable
             heading="PSA"
             rows={[
-              { grade: "PSA 7", value: market?.graded?.psa7, active: psaGrade === 7 },
-              { grade: "PSA 8", value: market?.graded?.psa8, active: psaGrade === 8 },
-              { grade: "PSA 9", value: market?.graded?.psa9, active: psaGrade === 9 },
-              { grade: "PSA 10", value: market?.graded?.psa10, active: psaGrade === 10 },
+              { grade: "PSA 7",  value: market?.graded?.psa7,  url: market?.gradedUrls?.psa7,  active: psaGrade === 7 },
+              { grade: "PSA 8",  value: market?.graded?.psa8,  url: market?.gradedUrls?.psa8,  active: psaGrade === 8 },
+              { grade: "PSA 9",  value: market?.graded?.psa9,  url: market?.gradedUrls?.psa9,  active: psaGrade === 9 },
+              { grade: "PSA 10", value: market?.graded?.psa10, url: market?.gradedUrls?.psa10, active: psaGrade === 10 },
             ]}
           />
           <ValueTable
             heading="BGS"
             rows={[
-              { grade: "BGS 7", value: market?.graded?.bgs7, active: bgsGrade === 7 && !bgsBlackLabel },
-              { grade: "BGS 8", value: market?.graded?.bgs8, active: bgsGrade === 8 && !bgsBlackLabel },
-              { grade: "BGS 9", value: market?.graded?.bgs9, active: bgsGrade === 9 && !bgsBlackLabel },
-              { grade: "9.5 Gem Mint", value: market?.graded?.bgs9_5, active: bgsGrade === 9.5 && !bgsBlackLabel },
-              { grade: "10 Pristine", value: market?.graded?.bgs10, active: bgsGrade === 10 && !bgsBlackLabel, isPristine: true },
-              { grade: "Black Label", value: market?.graded?.bgsBlackLabel, active: bgsBlackLabel, isBlackLabel: true },
+              { grade: "BGS 7",       value: market?.graded?.bgs7,         url: market?.gradedUrls?.bgs7,         active: bgsGrade === 7   && !bgsBlackLabel },
+              { grade: "BGS 8",       value: market?.graded?.bgs8,         url: market?.gradedUrls?.bgs8,         active: bgsGrade === 8   && !bgsBlackLabel },
+              { grade: "BGS 9",       value: market?.graded?.bgs9,         url: market?.gradedUrls?.bgs9,         active: bgsGrade === 9   && !bgsBlackLabel },
+              { grade: "9.5 Gem Mint",value: market?.graded?.bgs9_5,       url: market?.gradedUrls?.bgs9_5,       active: bgsGrade === 9.5 && !bgsBlackLabel },
+              { grade: "10 Pristine", value: market?.graded?.bgs10,        url: market?.gradedUrls?.bgs10,        active: bgsGrade === 10  && !bgsBlackLabel, isPristine: true },
+              { grade: "Black Label", value: market?.graded?.bgsBlackLabel, url: market?.gradedUrls?.bgsBlackLabel, active: bgsBlackLabel, isBlackLabel: true },
             ]}
           />
         </div>
@@ -137,7 +144,7 @@ export default function MarketTab({ result }) {
             {market?.aiAnalysis}
           </p>
           <p style={{ color: "rgba(255,255,255,0.15)", margin: "12px 0 0", fontSize: 11, lineHeight: 1.6 }}>
-            Values are AI estimates based on training data. Verify with recent eBay sold listings.
+            Prices based on recent eBay sold listings. Tap ↗ on any row to view the sale on eBay.
           </p>
         </div>
       </div>
@@ -232,7 +239,12 @@ function ValueTable({ heading, rows }) {
               {row.grade}
               {row.active && <span style={{ fontSize: 9, marginLeft: 4, color: "rgba(255,255,255,0.18)" }}>←</span>}
             </span>
-            <AnimPrice value={row.value} style={{ fontSize: 12, color: valueColor, fontWeight: row.active ? 700 : 400 }} />
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <AnimPrice value={row.value} style={{ fontSize: 12, color: valueColor, fontWeight: row.active ? 700 : 400 }} />
+              {row.url && row.value != null && (
+                <a href={row.url} target="_blank" rel="noopener noreferrer" style={ebayLinkStyle}>↗</a>
+              )}
+            </div>
           </div>
         );
       })}
@@ -254,4 +266,12 @@ const sectionLabel = {
   letterSpacing: "0.08em",
   textTransform: "uppercase",
   color: "rgba(255,255,255,0.28)",
+};
+
+const ebayLinkStyle = {
+  fontSize: 10,
+  color: "rgba(255,255,255,0.22)",
+  textDecoration: "none",
+  letterSpacing: "0.02em",
+  lineHeight: 1,
 };

@@ -171,18 +171,18 @@ A listing is INVALID if ANY of these apply:
 10. Grade unclear from title (just says "graded" with no company/number)
 
 Listings:
-${unique.map((l, i) => `${i + 1}. "${l.title.slice(0, 140)}" — $${l.price.toFixed(2)}`).join('\n')}
+${unique.map((l, i) => `${i + 1}. "${l.title.slice(0, 140)}" — $${l.price.toFixed(2)} [${l.url}]`).join('\n')}
 
-For each tier with at least 1 valid listing, return ALL valid prices sorted ascending. Omit tiers with zero valid listings.
+For each tier with at least 1 valid listing, return ALL valid prices sorted ascending and the URL of one representative listing (closest to median price). Omit tiers with zero valid listings.
 
 Return ONLY this JSON:
 {
-  "raw":           { "prices": [<sorted asc>], "count": <int> },
-  "psa9":          { "prices": [<sorted asc>], "count": <int> },
-  "psa10":         { "prices": [<sorted asc>], "count": <int> },
-  "bgs9_5":        { "prices": [<sorted asc>], "count": <int> },
-  "bgs10":         { "prices": [<sorted asc>], "count": <int> },
-  "bgsBlackLabel": { "prices": [<sorted asc>], "count": <int> },
+  "raw":           { "prices": [<sorted asc>], "count": <int>, "url": "<representative listing URL or null>" },
+  "psa9":          { "prices": [<sorted asc>], "count": <int>, "url": "<representative listing URL or null>" },
+  "psa10":         { "prices": [<sorted asc>], "count": <int>, "url": "<representative listing URL or null>" },
+  "bgs9_5":        { "prices": [<sorted asc>], "count": <int>, "url": "<representative listing URL or null>" },
+  "bgs10":         { "prices": [<sorted asc>], "count": <int>, "url": "<representative listing URL or null>" },
+  "bgsBlackLabel": { "prices": [<sorted asc>], "count": <int>, "url": "<representative listing URL or null>" },
   "totalValid": <int>,
   "totalListings": ${unique.length}
 }`;
@@ -202,6 +202,12 @@ Return ONLY this JSON:
         .filter(([k, v]) => Array.isArray(v?.prices) && v.prices.length > 0)
         .map(([k, v]) => `${k}=[${v.prices.join(',')}](${v.count})`)
         .join(' '));
+    // Extract per-tier URLs for frontend deep-links
+    const urls = {};
+    for (const [k, v] of Object.entries(parsed)) {
+      if (v?.url) urls[k] = v.url;
+    }
+    parsed._urls = urls;
     return parsed;
   } catch (err) {
     console.warn('Market comp parsing failed:', err.message);
@@ -811,6 +817,16 @@ app.post('/api/grade', async (req, res) => {
 
           parsed.market.dataSource = 'eBay sold prices (median − 10%, AI-estimate floor+ceiling)';
           parsed.market.sampleSize = market.totalValid;
+
+          // Attach per-tier eBay listing URLs for frontend deep-links
+          if (market._urls) {
+            if (!parsed.market.gradedUrls) parsed.market.gradedUrls = {};
+            for (const tier of TIERS) {
+              if (market._urls[tier]) parsed.market.gradedUrls[tier] = market._urls[tier];
+            }
+            if (market._urls.raw) parsed.market.rawUrl = market._urls.raw;
+          }
+
           text = JSON.stringify(parsed);
         }
       } catch (e) {
