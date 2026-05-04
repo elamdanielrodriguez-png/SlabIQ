@@ -914,7 +914,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
             <div style={{ display: "flex", justifyContent: "center", gap: 16, marginBottom: 28, position: "relative" }}>
               {[
                 { company: "PSA", grade: "10", sub: "GEM MT" },
-                { company: "BGS", grade: "9.5", sub: "GEM MINT" },
+                { company: "BGS", grade: "10", sub: "PRISTINE" },
               ].map(({ company, grade, sub }) => (
                 <div key={company} style={{
                   background: "rgba(0,0,0,0.5)",
