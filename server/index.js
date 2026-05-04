@@ -647,8 +647,8 @@ RULES:
       if (!existingVariants.some(v => v.includes('downtown'))) {
         candidates.push({ player, year, set, cardNumber, variant: 'Downtown', description: 'Downtown insert — nearly identical to base in photos, confirm from card title/back' });
       }
-      if (!existingVariants.some(v => v.includes('color blast'))) {
-        candidates.push({ player, year, set, cardNumber, variant: 'Color Blast', description: 'Color Blast insert — nearly identical to base in photos, confirm from card title/back' });
+      if (!existingVariants.some(v => v.includes('stained glass'))) {
+        candidates.push({ player, year, set, cardNumber, variant: 'Stained Glass', description: 'Stained Glass insert — nearly identical to base in photos, confirm from card title/back' });
       }
     }
 
