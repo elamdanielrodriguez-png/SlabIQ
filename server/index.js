@@ -173,7 +173,7 @@ A listing is INVALID if ANY of these apply:
 Listings:
 ${unique.map((l, i) => `${i + 1}. "${l.title.slice(0, 140)}" — $${l.price.toFixed(2)} [${l.url}]`).join('\n')}
 
-For each tier with at least 1 valid listing, return ALL valid prices sorted ascending and the URL of one representative listing (closest to median price). Omit tiers with zero valid listings.
+For each tier with at least 1 valid listing, return ALL valid prices sorted ascending and the URL of the most recently sold valid listing for that tier (lowest index number in the list above, since they are sorted newest-first). Omit tiers with zero valid listings.
 
 Return ONLY this JSON:
 {
