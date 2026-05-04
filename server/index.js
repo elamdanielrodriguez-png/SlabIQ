@@ -81,26 +81,32 @@ async function urlToBase64(url) {
   } catch { return null; }
 }
 
-// Fetch active eBay listings for the card across grade tiers, then have Haiku bucket and average them.
-// Note: Browse API returns CURRENT ACTIVE listings, not sold prices. Real sold data would need
-// Marketplace Insights API access (separate eBay approval). Active asking ≈ close proxy for sold.
-async function ebayListingSearch(token, query, limit = 25) {
+// Fetch actual sold eBay prices via the Finding API (findCompletedItems + SoldItemsOnly).
+// No OAuth needed — just EBAY_APP_ID.
+async function ebayFindingSearch(query, limit = 25) {
+  if (!process.env.EBAY_APP_ID) return [];
   const q = encodeURIComponent(query.trim());
   try {
-    const res = await fetchWithTimeout(
-      `https://api.ebay.com/buy/browse/v1/item_summary/search?q=${q}&limit=${limit}&sort=newlyListed`,
-      { headers: { 'Authorization': `Bearer ${token}`, 'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US' } },
-      8000
-    );
+    const url = `https://svcs.ebay.com/services/search/FindingService/v1` +
+      `?OPERATION-NAME=findCompletedItems` +
+      `&SERVICE-VERSION=1.0.0` +
+      `&SECURITY-APPNAME=${process.env.EBAY_APP_ID}` +
+      `&RESPONSE-DATA-FORMAT=JSON` +
+      `&REST-PAYLOAD` +
+      `&keywords=${q}` +
+      `&itemFilter(0).name=SoldItemsOnly` +
+      `&itemFilter(0).value=true` +
+      `&sortOrder=EndTimeSoonest` +
+      `&paginationInput.entriesPerPage=${limit}`;
+    const res = await fetchWithTimeout(url, {}, 8000);
     if (!res.ok) return [];
     const data = await res.json();
-    return (data.itemSummaries ?? [])
-      .map(item => ({
-        title: item.title ?? '',
-        price: parseFloat(item.price?.value ?? 0),
-        url: item.itemWebUrl ?? '',
-      }))
-      .filter(l => l.price > 0 && l.title);
+    const items = data?.findCompletedItemsResponse?.[0]?.searchResult?.[0]?.item ?? [];
+    return items.map(item => ({
+      title: item.title?.[0] ?? '',
+      price: parseFloat(item.sellingStatus?.[0]?.currentPrice?.[0]?.['__value__'] ?? 0),
+      url: item.viewItemURL?.[0] ?? '',
+    })).filter(l => l.price > 0 && l.title);
   } catch (e) {
     return [];
   }
@@ -109,8 +115,7 @@ async function ebayListingSearch(token, query, limit = 25) {
 const OVERSIZED_PRONE_VARIANTS = ['downtown', 'stained glass', 'color blast', 'sparkle', 'dynagon', 'light it up', 'magic numbers', 'pulsar', 'stargazer'];
 
 async function fetchMarketComps(player, year, set, variant, cardNumber) {
-  const token = await getEbayToken();
-  if (!token) return null;
+  if (!process.env.EBAY_APP_ID) return null;
 
   const baseParts = [year, set, player, variant, cardNumber ? `#${cardNumber}` : ''].filter(Boolean);
   const base = baseParts.join(' ');
@@ -134,9 +139,9 @@ async function fetchMarketComps(player, year, set, variant, cardNumber) {
   }
 
   const [rawList, psaList, bgsList] = await Promise.all([
-    ebayListingSearch(token, `${base}`, 25),
-    ebayListingSearch(token, `${base} PSA`, 25),
-    ebayListingSearch(token, `${base} BGS`, 25),
+    ebayFindingSearch(`${base}`, 25),
+    ebayFindingSearch(`${base} PSA`, 25),
+    ebayFindingSearch(`${base} BGS`, 25),
   ]);
 
   const seen = new Set();
@@ -146,12 +151,12 @@ async function fetchMarketComps(player, year, set, variant, cardNumber) {
     return true;
   });
 
-  console.log(`Market comps: pulled ${unique.length} unique active listings for ${player}`);
+  console.log(`Market comps: pulled ${unique.length} unique sold listings for ${player}`);
   if (unique.length === 0) return null;
 
   const prompt = `Target card: ${player}, ${year} ${set}${variant ? ', ' + variant : ''}${cardNumber ? ', #' + cardNumber : ''}.
 
-Below are eBay active listings. Bucket each VALID one into a tier and return its price.
+Below are eBay sold listings. Bucket each VALID one into a tier and return its price.
 
 Tiers: raw (no grade), psa7, psa8, psa9, psa10, bgs7, bgs8, bgs9, bgs9_5, bgs10, bgsBlackLabel (BGS Black Label / BGS Pristine)
 
@@ -810,7 +815,7 @@ app.post('/api/grade', async (req, res) => {
           if (rawPrice) parsed.market.raw = rawPrice;
 
 
-          parsed.market.dataSource = 'eBay (median active − 10%, AI-estimate floor+ceiling)';
+          parsed.market.dataSource = 'eBay sold prices (median − 10%, AI-estimate floor+ceiling)';
           parsed.market.sampleSize = market.totalValid;
           text = JSON.stringify(parsed);
         }
