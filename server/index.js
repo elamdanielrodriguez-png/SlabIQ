@@ -125,12 +125,19 @@ async function fetchMarketComps(player, year, set, variant, cardNumber) {
   const isOversizedProne = OVERSIZED_PRONE_VARIANTS.some(v => variantLower.includes(v));
   const oversizedFilter = isOversizedProne ? ' -5x7 -"5 x 7" -oversized -jumbo -topper' : '';
 
+  if (isOversizedProne) {
+    // Both standard and oversized versions get graded by PSA/BGS, and sellers rarely
+    // include size in the title. eBay comps for these variants are unreliable at every
+    // tier (raw AND graded). Fall back entirely to the grading AI's training-data estimates.
+    console.log(`Oversized-prone variant "${variant}" — skipping all eBay searches, using AI estimates only`);
+    return null;
+  }
+
   const [rawList, psaList, bgsList] = await Promise.all([
-    isOversizedProne ? Promise.resolve([]) : ebayListingSearch(token, `${base}`, 25),
-    ebayListingSearch(token, `${base} PSA${oversizedFilter}`, 25),
-    ebayListingSearch(token, `${base} BGS${oversizedFilter}`, 25),
+    ebayListingSearch(token, `${base}`, 25),
+    ebayListingSearch(token, `${base} PSA`, 25),
+    ebayListingSearch(token, `${base} BGS`, 25),
   ]);
-  if (isOversizedProne) console.log(`Oversized-prone variant "${variant}" — skipping raw eBay search, AI estimate will be used for raw value`);
 
   const seen = new Set();
   const unique = [...rawList, ...psaList, ...bgsList].filter(l => {
