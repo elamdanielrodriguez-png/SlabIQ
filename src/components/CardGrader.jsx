@@ -684,10 +684,10 @@ export default function CardGrader() {
           style={{
             position: "fixed", inset: 0, zIndex: 250, pointerEvents: "all", cursor: "default",
             background: [
-              `radial-gradient(ellipse ${spotlightPos.rx + 30}px ${spotlightPos.ry + 20}px at ${spotlightPos.cx}px ${spotlightPos.cy}px, rgba(255,218,100,0.28) 0%, rgba(255,218,100,0.10) 48%, transparent 70%)`,
-              `radial-gradient(ellipse ${spotlightPos.rx + 80}px ${spotlightPos.ry + 60}px at ${spotlightPos.cx}px ${spotlightPos.cy}px, transparent 0%, transparent 48%, rgba(0,0,0,0.97) 66%)`,
+              `radial-gradient(ellipse ${spotlightPos.rx}px ${spotlightPos.ry}px at ${spotlightPos.cx}px ${spotlightPos.cy}px, rgba(255,218,100,0.82) 0%, rgba(255,218,100,0.45) 40%, transparent 72%)`,
+              `radial-gradient(ellipse ${spotlightPos.rx + 60}px ${spotlightPos.ry + 40}px at ${spotlightPos.cx}px ${spotlightPos.cy}px, rgba(255,200,60,0.22) 0%, transparent 100%)`,
             ].join(", "),
-            animation: "spotlightReveal 3s ease forwards",
+            animation: "spotlightReveal 2.8s ease forwards",
           }}
         />
       )}
