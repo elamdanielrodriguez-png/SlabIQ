@@ -498,18 +498,6 @@ export default function CardGrader() {
     setUserPlan(null);
   };
 
-  const handleManage = async () => {
-    if (!session) return;
-    try {
-      const res = await fetch('/api/portal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      });
-      const data = await res.json();
-      if (data.url) window.location.href = data.url;
-    } catch {}
-  };
-
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
     document.documentElement.scrollTop = 0;
@@ -740,22 +728,20 @@ export default function CardGrader() {
           {/* Auth / usage area */}
           {session ? (
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              {userPlan && (
-                <button
-                  onClick={() => setShowPricing(true)}
-                  style={{
-                    background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
-                    borderRadius: 8, padding: "4px 10px", cursor: "pointer", fontFamily: "inherit",
-                  }}
-                >
-                  <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                    {userPlan.plan === 'free' ? 'Free' : userPlan.plan.replace('_', ' ')}
-                  </span>
-                  <span style={{ color: gradesRemaining() === 0 ? "#ff453a" : "#c9a84c", fontSize: 10, fontWeight: 700, marginLeft: 6 }}>
-                    {gradesUsedDisplay()}/{gradeLimit()}
-                  </span>
-                </button>
-              )}
+              <button
+                onClick={() => setShowPricing(true)}
+                style={{
+                  background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+                  borderRadius: 8, padding: "4px 10px", cursor: "pointer", fontFamily: "inherit",
+                }}
+              >
+                <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                  Tokens
+                </span>
+                <span style={{ color: gradesRemaining() === 0 ? "#ff453a" : "#c9a84c", fontSize: 10, fontWeight: 700, marginLeft: 6 }}>
+                  {gradesRemaining()}
+                </span>
+              </button>
               <button
                 onClick={handleSignOut}
                 style={{ background: "none", border: "none", color: "rgba(255,255,255,0.2)", fontSize: 11, cursor: "pointer", fontFamily: "inherit", padding: "4px 0" }}
@@ -830,8 +816,7 @@ export default function CardGrader() {
         <PricingModal
           onClose={() => setShowPricing(false)}
           session={session}
-          currentPlan={userPlan}
-          onManage={handleManage}
+          tokenBalance={gradesRemaining()}
         />
       )}
 

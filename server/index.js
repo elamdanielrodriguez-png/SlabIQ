@@ -22,12 +22,11 @@ const supabaseAdmin = (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_
 // ── Stripe ───────────────────────────────────────────────────────────────────
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
 
-// ── Plans ────────────────────────────────────────────────────────────────────
-const PLANS = {
-  free:    { name: 'Free',    price: 0,     tokens: 2,   priceId: null },
-  hobby:   { name: 'Hobby',   price: 4.99,  tokens: 20,  priceId: process.env.STRIPE_HOBBY_PRICE_ID },
-  grinder: { name: 'Grinder', price: 9.99,  tokens: 60,  priceId: process.env.STRIPE_GRINDER_PRICE_ID },
-  pro:     { name: 'Pro',     price: 19.99, tokens: 150, priceId: process.env.STRIPE_PRO_PRICE_ID },
+// ── Token packs (one-time purchases) ─────────────────────────────────────────
+const TOKEN_PACKS = {
+  starter: { name: 'Starter Pack', tokens: 20,  cents: 499  },
+  grinder: { name: 'Grinder Pack', tokens: 60,  cents: 999  },
+  pro:     { name: 'Pro Pack',     tokens: 150, cents: 1999 },
 };
 
 // Token cost per grade by model (IQ Core = 1, IQ Ultra = 4)
@@ -69,53 +68,19 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, 
   }
 
   try {
-    switch (event.type) {
-      case 'checkout.session.completed': {
-        const session = event.data.object;
-        const userId = session.metadata?.user_id;
-        const planId = session.metadata?.plan_id;
-        const plan = PLANS[planId];
-        if (userId && plan && supabaseAdmin) {
-          await supabaseAdmin.from('user_plans').upsert({
-            id: userId,
-            plan: planId,
-            grades_used: 0,
-            grade_limit: plan.tokens,
-            stripe_customer_id: session.customer,
-            stripe_subscription_id: session.subscription,
-            period_start: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          });
-          console.log(`Subscription activated: ${userId} → ${planId}`);
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object;
+      const userId = session.metadata?.user_id;
+      const tokens = parseInt(session.metadata?.tokens || '0');
+      if (userId && tokens > 0 && supabaseAdmin) {
+        const planRow = await getUserPlan(userId);
+        if (planRow) {
+          const newLimit = planRow.grade_limit + tokens;
+          await supabaseAdmin.from('user_plans')
+            .update({ grade_limit: newLimit, plan: 'paid', updated_at: new Date().toISOString() })
+            .eq('id', userId);
+          console.log(`Tokens purchased: ${userId} +${tokens} → ${newLimit} total`);
         }
-        break;
-      }
-      case 'invoice.paid': {
-        const invoice = event.data.object;
-        if (invoice.subscription && supabaseAdmin) {
-          const sub = await stripe.subscriptions.retrieve(invoice.subscription);
-          const userId = sub.metadata?.user_id;
-          if (userId) {
-            await supabaseAdmin.from('user_plans')
-              .update({ grades_used: 0, period_start: new Date().toISOString(), updated_at: new Date().toISOString() })
-              .eq('id', userId);
-            console.log(`Monthly grades reset for ${userId}`);
-          }
-        }
-        break;
-      }
-      case 'customer.subscription.deleted': {
-        const sub = event.data.object;
-        const userId = sub.metadata?.user_id;
-        if (userId && supabaseAdmin) {
-          await supabaseAdmin.from('user_plans').update({
-            plan: 'free', grade_limit: 2, grades_used: 0,
-            model: 'claude-sonnet-4-6', stripe_subscription_id: null,
-            updated_at: new Date().toISOString(),
-          }).eq('id', userId);
-          console.log(`Subscription cancelled, reverted to free: ${userId}`);
-        }
-        break;
       }
     }
   } catch (err) {
@@ -670,26 +635,30 @@ app.get('/api/user/plan', async (req, res) => {
   }
 });
 
-// ── Stripe checkout ───────────────────────────────────────────────────────────
+// ── Stripe checkout (one-time token purchase) ─────────────────────────────────
 app.post('/api/checkout', async (req, res) => {
   if (!stripe) return res.status(503).json({ error: 'Payments not configured yet' });
   const user = await getUser(req);
-  if (!user) return res.status(401).json({ error: 'Sign in to subscribe' });
-  const { planId } = req.body;
-  const plan = PLANS[planId];
-  if (!plan || plan.price === 0 || !plan.priceId) {
-    return res.status(400).json({ error: 'Invalid plan' });
-  }
+  if (!user) return res.status(401).json({ error: 'Sign in to buy tokens' });
+  const { packId } = req.body;
+  const pack = TOKEN_PACKS[packId];
+  if (!pack) return res.status(400).json({ error: 'Invalid token pack' });
   try {
     const session = await stripe.checkout.sessions.create({
-      mode: 'subscription',
+      mode: 'payment',
       payment_method_types: ['card'],
-      line_items: [{ price: plan.priceId, quantity: 1 }],
+      line_items: [{
+        price_data: {
+          currency: 'usd',
+          unit_amount: pack.cents,
+          product_data: { name: pack.name, description: `${pack.tokens} grading tokens` },
+        },
+        quantity: 1,
+      }],
       success_url: `${APP_URL}?checkout=success`,
       cancel_url: `${APP_URL}?checkout=canceled`,
       client_reference_id: user.id,
-      metadata: { user_id: user.id, plan_id: planId },
-      subscription_data: { metadata: { user_id: user.id, plan_id: planId } },
+      metadata: { user_id: user.id, pack_id: packId, tokens: String(pack.tokens) },
     });
     res.json({ url: session.url });
   } catch (err) {
@@ -698,25 +667,6 @@ app.post('/api/checkout', async (req, res) => {
   }
 });
 
-// ── Stripe billing portal ─────────────────────────────────────────────────────
-app.post('/api/portal', async (req, res) => {
-  if (!stripe) return res.status(503).json({ error: 'Payments not configured yet' });
-  const user = await getUser(req);
-  if (!user) return res.status(401).json({ error: 'Not authenticated' });
-  if (!supabaseAdmin) return res.status(503).json({ error: 'Auth not configured' });
-  try {
-    const plan = await getUserPlan(user.id);
-    if (!plan?.stripe_customer_id) return res.status(400).json({ error: 'No subscription found' });
-    const portalSession = await stripe.billingPortal.sessions.create({
-      customer: plan.stripe_customer_id,
-      return_url: APP_URL,
-    });
-    res.json({ url: portalSession.url });
-  } catch (err) {
-    console.error('Portal error:', err.message);
-    res.status(500).json({ error: 'Failed to open billing portal' });
-  }
-});
 
 app.post('/api/search', async (req, res) => {
   const { images, query } = req.body;
@@ -868,17 +818,6 @@ app.post('/api/grade', async (req, res) => {
     if (planRow.plan === 'free') gradingModel = 'claude-sonnet-4-6';
 
     tokenCost = TOKEN_COST[gradingModel] ?? 1;
-
-    // Lazy monthly reset (belt-and-suspenders alongside the invoice.paid webhook)
-    if (planRow.plan !== 'free') {
-      const msSincePeriod = Date.now() - new Date(planRow.period_start).getTime();
-      if (msSincePeriod > 30 * 24 * 60 * 60 * 1000) {
-        await supabaseAdmin.from('user_plans')
-          .update({ grades_used: 0, period_start: new Date().toISOString() })
-          .eq('id', user.id);
-        planRow.grades_used = 0;
-      }
-    }
 
     if (planRow.grades_used + tokenCost > planRow.grade_limit) {
       return res.status(403).json({
