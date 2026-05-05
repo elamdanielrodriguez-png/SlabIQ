@@ -58,12 +58,12 @@ export default function PricingModal({ onClose, session, tokenBalance = 0 }) {
 
         {/* Token cost explainer */}
         <div style={{
-          background: "rgba(201,168,76,0.06)", border: "1px solid rgba(201,168,76,0.15)",
+          background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)",
           borderRadius: 10, padding: "10px 14px", marginBottom: 16,
           textAlign: "center",
         }}>
-          <div style={{ color: "#c9a84c", fontSize: 12, fontWeight: 700, marginBottom: 2 }}>IQ Ultra</div>
-          <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 11 }}>1 token / grade · powered by Claude Opus</div>
+          <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 12, fontWeight: 600, marginBottom: 2 }}>1 token · 1 grade</div>
+          <div style={{ color: "rgba(255,255,255,0.25)", fontSize: 11 }}>Spots microscopic flaws not visible to the naked eye</div>
         </div>
 
         {/* Packs */}
