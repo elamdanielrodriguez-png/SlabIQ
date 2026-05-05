@@ -20,6 +20,12 @@ import GradeTab from "./GradeTab";
 import MarketTab from "./MarketTab";
 import SubmitTab from "./SubmitTab";
 import HistoryPanel from "./HistoryPanel";
+import AuthModal from "./AuthModal";
+import PricingModal from "./PricingModal";
+import { supabase } from "../lib/supabase";
+
+const FREE_GRADE_KEY = 'slabiq_free_grades_used';
+const FREE_GRADE_LIMIT = 2;
 
 function LoadingOverlay({ message }) {
   if (!message) return null;
@@ -426,6 +432,83 @@ export default function CardGrader() {
   const [spotlightActive, setSpotlightActive] = useState(false);
   const [spotlightPos, setSpotlightPos] = useState(null);
 
+  // ── Auth + subscription state ──────────────────────────────────────────────
+  const [session, setSession] = useState(null);
+  const [userPlan, setUserPlan] = useState(null);
+  const [showAuth, setShowAuth] = useState(false);
+  const [showPricing, setShowPricing] = useState(false);
+  const [freeGradesUsed, setFreeGradesUsed] = useState(
+    () => parseInt(localStorage.getItem(FREE_GRADE_KEY) || '0')
+  );
+
+  useEffect(() => {
+    // Load session on mount
+    supabase.auth.getSession().then(({ data: { session: s } }) => {
+      setSession(s);
+      if (s) loadUserPlan(s.access_token);
+    });
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s);
+      if (s) loadUserPlan(s.access_token);
+      else setUserPlan(null);
+    });
+    // Check for post-checkout success
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('checkout') === 'success') {
+      window.history.replaceState({}, '', '/');
+      setShowPricing(false);
+    }
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const loadUserPlan = async (token) => {
+    try {
+      const res = await fetch('/api/user/plan', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUserPlan(data.plan);
+      }
+    } catch {}
+  };
+
+  const authHeaders = () => session ? { Authorization: `Bearer ${session.access_token}` } : {};
+
+  const gradesRemaining = () => {
+    if (session && userPlan) return Math.max(0, userPlan.grade_limit - userPlan.grades_used);
+    return Math.max(0, FREE_GRADE_LIMIT - freeGradesUsed);
+  };
+
+  const gradeLimit = () => {
+    if (session && userPlan) return userPlan.grade_limit;
+    return FREE_GRADE_LIMIT;
+  };
+
+  const gradesUsedDisplay = () => {
+    if (session && userPlan) return userPlan.grades_used;
+    return freeGradesUsed;
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    setSession(null);
+    setUserPlan(null);
+  };
+
+  const handleManage = async () => {
+    if (!session) return;
+    try {
+      const res = await fetch('/api/portal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      });
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+    } catch {}
+  };
+
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
     document.documentElement.scrollTop = 0;
@@ -514,6 +597,11 @@ export default function CardGrader() {
 
   const identifyCard = async () => {
     if (!images.length) return;
+    // Gate on free grade limit before even identifying
+    if (!session && freeGradesUsed >= FREE_GRADE_LIMIT) {
+      setShowPricing(true);
+      return;
+    }
     setLoading(true);
     setLoadingMessage("Identifying card…");
     setError(null);
@@ -522,7 +610,7 @@ export default function CardGrader() {
     try {
       const res = await fetch("/api/identify", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ images: images.map((i) => i.imageData) }),
       });
       const data = await res.json();
@@ -575,7 +663,7 @@ export default function CardGrader() {
 
       const res = await fetch("/api/grade", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({
           images: images.map((i) => i.imageData),
           confirmedCard: { player, year, set, variant, cardNumber },
@@ -583,6 +671,7 @@ export default function CardGrader() {
         }),
       });
       const data = await res.json();
+      if (data.code === 'GRADE_LIMIT_REACHED') { setShowPricing(true); return; }
       if (data.error) throw new Error(data.error);
       const parsed = extractJSON(data.content?.[0]?.text || "");
       if (!parsed) {
@@ -593,6 +682,14 @@ export default function CardGrader() {
         saveGrading(parsed);
         setToast(true);
         setSpotlightActive(true);
+        // Track usage
+        if (session) {
+          loadUserPlan(session.access_token);
+        } else {
+          const next = freeGradesUsed + 1;
+          localStorage.setItem(FREE_GRADE_KEY, next);
+          setFreeGradesUsed(next);
+        }
       }
     } catch (err) {
       setError(err.message || "API error. Please try again.");
@@ -637,10 +734,45 @@ export default function CardGrader() {
               PSA · BGS · BETA
             </span>
           </div>
-          {result && activeTab !== "history" && (
-            <span style={{ fontSize: 12, color: "rgba(255,255,255,0.28)", fontWeight: 400, letterSpacing: "-0.1px" }}>
-              {result.player}
-            </span>
+
+          {/* Auth / usage area */}
+          {session ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {userPlan && (
+                <button
+                  onClick={() => setShowPricing(true)}
+                  style={{
+                    background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+                    borderRadius: 8, padding: "4px 10px", cursor: "pointer", fontFamily: "inherit",
+                  }}
+                >
+                  <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                    {userPlan.plan === 'free' ? 'Free' : userPlan.plan.replace('_', ' ')}
+                  </span>
+                  <span style={{ color: gradesRemaining() === 0 ? "#ff453a" : "#c9a84c", fontSize: 10, fontWeight: 700, marginLeft: 6 }}>
+                    {gradesUsedDisplay()}/{gradeLimit()}
+                  </span>
+                </button>
+              )}
+              <button
+                onClick={handleSignOut}
+                style={{ background: "none", border: "none", color: "rgba(255,255,255,0.2)", fontSize: 11, cursor: "pointer", fontFamily: "inherit", padding: "4px 0" }}
+              >
+                Sign Out
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowAuth(true)}
+              style={{
+                background: "rgba(201,168,76,0.12)", border: "1px solid rgba(201,168,76,0.3)",
+                borderRadius: 8, padding: "5px 12px",
+                color: "#c9a84c", fontSize: 12, fontWeight: 600,
+                cursor: "pointer", fontFamily: "inherit", letterSpacing: "-0.1px",
+              }}
+            >
+              Sign In
+            </button>
           )}
         </div>
       </header>
@@ -662,6 +794,11 @@ export default function CardGrader() {
               onConfirmCandidate={(card) => gradeCards(card)}
               onSearch={searchCards}
               onUpdateCentering={updateImageCentering}
+              gradesUsed={gradesUsedDisplay()}
+              gradesTotal={gradeLimit()}
+              isLoggedIn={!!session}
+              planName={userPlan?.plan ?? 'free'}
+              onUpgrade={() => setShowPricing(true)}
             />
           )}
           {activeTab === "market" && result && <MarketTab result={result} />}
@@ -677,6 +814,22 @@ export default function CardGrader() {
           )}
         </div>
       </main>
+
+      {/* Auth + Pricing modals */}
+      {showAuth && (
+        <AuthModal
+          onClose={() => setShowAuth(false)}
+          onAuth={(s) => { setSession(s); setShowAuth(false); if (s) loadUserPlan(s.access_token); }}
+        />
+      )}
+      {showPricing && (
+        <PricingModal
+          onClose={() => setShowPricing(false)}
+          session={session}
+          currentPlan={userPlan}
+          onManage={handleManage}
+        />
+      )}
 
       {spotlightActive && spotlightPos && (
         <div

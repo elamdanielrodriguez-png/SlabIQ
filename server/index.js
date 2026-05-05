@@ -2,6 +2,8 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import Anthropic from '@anthropic-ai/sdk';
+import Stripe from 'stripe';
+import { createClient } from '@supabase/supabase-js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { existsSync } from 'fs';
@@ -10,6 +12,119 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const APP_URL = process.env.APP_URL || 'http://localhost:5173';
+
+// ── Supabase admin (service key — bypasses RLS) ──────────────────────────────
+const supabaseAdmin = (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY)
+  ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
+  : null;
+
+// ── Stripe ───────────────────────────────────────────────────────────────────
+const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
+
+// ── Plans ────────────────────────────────────────────────────────────────────
+const PLANS = {
+  free:          { name: 'Free',          price: 0,      grades: 2,   model: 'claude-sonnet-4-6', tier: 'standard', priceId: null },
+  hobby:         { name: 'Hobby',         price: 4.99,   grades: 20,  model: 'claude-sonnet-4-6', tier: 'standard', priceId: process.env.STRIPE_HOBBY_PRICE_ID },
+  grinder:       { name: 'Grinder',       price: 9.99,   grades: 60,  model: 'claude-sonnet-4-6', tier: 'standard', priceId: process.env.STRIPE_GRINDER_PRICE_ID },
+  pro:           { name: 'Pro',           price: 19.99,  grades: 150, model: 'claude-sonnet-4-6', tier: 'standard', priceId: process.env.STRIPE_PRO_PRICE_ID },
+  elite_hobby:   { name: 'Elite Hobby',   price: 24.99,  grades: 20,  model: 'claude-opus-4-7',  tier: 'elite',    priceId: process.env.STRIPE_ELITE_HOBBY_PRICE_ID },
+  elite_grinder: { name: 'Elite Grinder', price: 49.99,  grades: 60,  model: 'claude-opus-4-7',  tier: 'elite',    priceId: process.env.STRIPE_ELITE_GRINDER_PRICE_ID },
+  elite_pro:     { name: 'Elite Pro',     price: 99.99,  grades: 100, model: 'claude-opus-4-7',  tier: 'elite',    priceId: process.env.STRIPE_ELITE_PRO_PRICE_ID },
+};
+
+// ── Auth helper ───────────────────────────────────────────────────────────────
+async function getUser(req) {
+  if (!supabaseAdmin) return null;
+  const token = req.headers.authorization?.replace('Bearer ', '').trim();
+  if (!token) return null;
+  try {
+    const { data: { user } } = await supabaseAdmin.auth.getUser(token);
+    return user ?? null;
+  } catch { return null; }
+}
+
+// ── Get or create user plan row ───────────────────────────────────────────────
+async function getUserPlan(userId) {
+  const { data } = await supabaseAdmin.from('user_plans').select('*').eq('id', userId).maybeSingle();
+  if (data) return data;
+  // First-time user — create free plan
+  const { data: created } = await supabaseAdmin
+    .from('user_plans')
+    .insert({ id: userId, plan: 'free', grades_used: 0, grade_limit: 2, model: 'claude-sonnet-4-6' })
+    .select().single();
+  return created;
+}
+
+// ── Stripe webhook — must be registered BEFORE express.json() ────────────────
+app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  if (!stripe) return res.status(503).json({ error: 'Payments not configured' });
+  const sig = req.headers['stripe-signature'];
+  let event;
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+  } catch (err) {
+    console.warn('Webhook signature failed:', err.message);
+    return res.status(400).json({ error: err.message });
+  }
+
+  try {
+    switch (event.type) {
+      case 'checkout.session.completed': {
+        const session = event.data.object;
+        const userId = session.metadata?.user_id;
+        const planId = session.metadata?.plan_id;
+        const plan = PLANS[planId];
+        if (userId && plan && supabaseAdmin) {
+          await supabaseAdmin.from('user_plans').upsert({
+            id: userId,
+            plan: planId,
+            grades_used: 0,
+            grade_limit: plan.grades,
+            model: plan.model,
+            stripe_customer_id: session.customer,
+            stripe_subscription_id: session.subscription,
+            period_start: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+          console.log(`Subscription activated: ${userId} → ${planId}`);
+        }
+        break;
+      }
+      case 'invoice.paid': {
+        const invoice = event.data.object;
+        if (invoice.subscription && supabaseAdmin) {
+          const sub = await stripe.subscriptions.retrieve(invoice.subscription);
+          const userId = sub.metadata?.user_id;
+          if (userId) {
+            await supabaseAdmin.from('user_plans')
+              .update({ grades_used: 0, period_start: new Date().toISOString(), updated_at: new Date().toISOString() })
+              .eq('id', userId);
+            console.log(`Monthly grades reset for ${userId}`);
+          }
+        }
+        break;
+      }
+      case 'customer.subscription.deleted': {
+        const sub = event.data.object;
+        const userId = sub.metadata?.user_id;
+        if (userId && supabaseAdmin) {
+          await supabaseAdmin.from('user_plans').update({
+            plan: 'free', grade_limit: 2, grades_used: 0,
+            model: 'claude-sonnet-4-6', stripe_subscription_id: null,
+            updated_at: new Date().toISOString(),
+          }).eq('id', userId);
+          console.log(`Subscription cancelled, reverted to free: ${userId}`);
+        }
+        break;
+      }
+    }
+  } catch (err) {
+    console.error('Webhook handler error:', err.message);
+  }
+
+  res.json({ received: true });
+});
 
 app.use(express.json({ limit: '50mb' }));
 app.use(cors({ origin: true }));
@@ -543,6 +658,67 @@ function sanitizeGradingResponse(rawText, measuredCenterings) {
   return JSON.stringify(parsed);
 }
 
+// ── User plan endpoint ────────────────────────────────────────────────────────
+app.get('/api/user/plan', async (req, res) => {
+  const user = await getUser(req);
+  if (!user) return res.status(401).json({ error: 'Not authenticated' });
+  if (!supabaseAdmin) return res.status(503).json({ error: 'Auth not configured' });
+  try {
+    const plan = await getUserPlan(user.id);
+    res.json({ plan });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Stripe checkout ───────────────────────────────────────────────────────────
+app.post('/api/checkout', async (req, res) => {
+  if (!stripe) return res.status(503).json({ error: 'Payments not configured yet' });
+  const user = await getUser(req);
+  if (!user) return res.status(401).json({ error: 'Sign in to subscribe' });
+  const { planId } = req.body;
+  const plan = PLANS[planId];
+  if (!plan || plan.price === 0 || !plan.priceId) {
+    return res.status(400).json({ error: 'Invalid plan' });
+  }
+  try {
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      payment_method_types: ['card'],
+      line_items: [{ price: plan.priceId, quantity: 1 }],
+      success_url: `${APP_URL}?checkout=success`,
+      cancel_url: `${APP_URL}?checkout=canceled`,
+      client_reference_id: user.id,
+      metadata: { user_id: user.id, plan_id: planId },
+      subscription_data: { metadata: { user_id: user.id, plan_id: planId } },
+    });
+    res.json({ url: session.url });
+  } catch (err) {
+    console.error('Checkout error:', err.message);
+    res.status(500).json({ error: 'Failed to create checkout session' });
+  }
+});
+
+// ── Stripe billing portal ─────────────────────────────────────────────────────
+app.post('/api/portal', async (req, res) => {
+  if (!stripe) return res.status(503).json({ error: 'Payments not configured yet' });
+  const user = await getUser(req);
+  if (!user) return res.status(401).json({ error: 'Not authenticated' });
+  if (!supabaseAdmin) return res.status(503).json({ error: 'Auth not configured' });
+  try {
+    const plan = await getUserPlan(user.id);
+    if (!plan?.stripe_customer_id) return res.status(400).json({ error: 'No subscription found' });
+    const portalSession = await stripe.billingPortal.sessions.create({
+      customer: plan.stripe_customer_id,
+      return_url: APP_URL,
+    });
+    res.json({ url: portalSession.url });
+  } catch (err) {
+    console.error('Portal error:', err.message);
+    res.status(500).json({ error: 'Failed to open billing portal' });
+  }
+});
+
 app.post('/api/search', async (req, res) => {
   const { images, query } = req.body;
   if (!query?.trim()) return res.status(400).json({ error: 'Query is required' });
@@ -675,6 +851,36 @@ RULES:
 app.post('/api/grade', async (req, res) => {
   const { images, imageData, mediaType = 'image/jpeg', confirmedCard, zoneCrops } = req.body;
 
+  // ── Auth + plan check ──────────────────────────────────────────────────────
+  let gradingModel = 'claude-sonnet-4-6';
+  let planRow = null;
+  const user = await getUser(req);
+  if (user && supabaseAdmin) {
+    planRow = await getUserPlan(user.id);
+    if (!planRow) return res.status(500).json({ error: 'Could not load user plan' });
+
+    // Lazy monthly reset (belt-and-suspenders alongside the invoice.paid webhook)
+    if (planRow.plan !== 'free') {
+      const msSincePeriod = Date.now() - new Date(planRow.period_start).getTime();
+      if (msSincePeriod > 30 * 24 * 60 * 60 * 1000) {
+        await supabaseAdmin.from('user_plans')
+          .update({ grades_used: 0, period_start: new Date().toISOString() })
+          .eq('id', user.id);
+        planRow.grades_used = 0;
+      }
+    }
+
+    if (planRow.grades_used >= planRow.grade_limit) {
+      return res.status(403).json({
+        error: 'You\'ve used all your grades for this period.',
+        code: 'GRADE_LIMIT_REACHED',
+        plan: planRow.plan,
+        limit: planRow.grade_limit,
+      });
+    }
+    gradingModel = planRow.model || 'claude-sonnet-4-6';
+  }
+
   const imageList = images || (imageData ? [imageData] : null);
 
   if (!imageList || imageList.length === 0) {
@@ -733,7 +939,7 @@ app.post('/api/grade', async (req, res) => {
     ];
 
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: gradingModel,
       max_tokens: 4000,
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content }],
@@ -903,6 +1109,14 @@ app.post('/api/grade', async (req, res) => {
       console.log('stop_reason:', message.stop_reason);
       console.log('===================');
     } catch (e) { console.log('debug parse error:', e.message); }
+
+    // Increment usage for authenticated users
+    if (user && planRow && supabaseAdmin) {
+      await supabaseAdmin.from('user_plans')
+        .update({ grades_used: planRow.grades_used + 1, updated_at: new Date().toISOString() })
+        .eq('id', user.id);
+      console.log(`Usage: ${user.id} → ${planRow.grades_used + 1}/${planRow.grade_limit} (${planRow.plan}, ${gradingModel})`);
+    }
 
     res.json({ content: [{ type: 'text', text }] });
   } catch (err) {

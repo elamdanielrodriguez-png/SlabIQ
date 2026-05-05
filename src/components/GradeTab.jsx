@@ -809,7 +809,7 @@ function computeCentering(cm) {
 const ROLE_LABEL = { front: 'Front', back: 'Back', detail: 'Detail' };
 const ROLE_COLOR = { front: '#c9a84c', back: '#0a84ff', detail: 'rgba(255,255,255,0.28)' };
 
-export default function GradeTab({ images, result, candidates, loading, error, onAddImages, onRemoveImage, onSetRole, onGrade, onConfirmCandidate, onSearch, onUpdateCentering }) {
+export default function GradeTab({ images, result, candidates, loading, error, onAddImages, onRemoveImage, onSetRole, onGrade, onConfirmCandidate, onSearch, onUpdateCentering, gradesUsed = 0, gradesTotal = 2, isLoggedIn = false, planName = 'free', onUpgrade }) {
   const [cameraOpen, setCameraOpen] = useState(false);
   const [gradePressed, setGradePressed] = useState(false);
   const fileInputRef = useRef(null);
@@ -1004,6 +1004,31 @@ export default function GradeTab({ images, result, candidates, loading, error, o
           onClose={() => setCameraOpen(false)}
         />
       )}
+
+      {/* Grade usage indicator */}
+      {images.length > 0 && !result && (() => {
+        const remaining = gradesTotal - gradesUsed;
+        const pct = Math.min(100, (gradesUsed / gradesTotal) * 100);
+        const isOut = remaining <= 0;
+        const isLow = remaining === 1 && gradesTotal > 1;
+        return (
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ flex: 1, height: 3, background: "rgba(255,255,255,0.06)", borderRadius: 99, overflow: "hidden" }}>
+              <div style={{
+                width: `${pct}%`, height: "100%", borderRadius: 99,
+                background: isOut ? "#ff453a" : isLow ? "#ffd60a" : "#c9a84c",
+                transition: "width 0.4s ease",
+              }} />
+            </div>
+            <span style={{ color: isOut ? "#ff453a" : "rgba(255,255,255,0.25)", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap" }}>
+              {isOut
+                ? <button onClick={onUpgrade} style={{ background: "none", border: "none", color: "#ff453a", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", padding: 0 }}>Upgrade for more ↗</button>
+                : `${gradesUsed}/${gradesTotal} grades${!isLoggedIn ? " · free" : ""}`
+              }
+            </span>
+          </div>
+        );
+      })()}
 
       {/* Grade button */}
       {images.length > 0 && (
