@@ -440,7 +440,7 @@ export default function CardGrader() {
   const [freeGradesUsed, setFreeGradesUsed] = useState(
     () => parseInt(localStorage.getItem(FREE_GRADE_KEY) || '0')
   );
-  const [selectedModel, setSelectedModel] = useState('claude-sonnet-4-6');
+  const [selectedModel, setSelectedModel] = useState('claude-opus-4-7');
 
   useEffect(() => {
     // Load session on mount

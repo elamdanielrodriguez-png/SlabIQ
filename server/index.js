@@ -24,13 +24,13 @@ const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SEC
 
 // ── Token packs (one-time purchases) ─────────────────────────────────────────
 const TOKEN_PACKS = {
-  starter: { name: 'Starter Pack', tokens: 20,  cents: 499  },
-  grinder: { name: 'Grinder Pack', tokens: 60,  cents: 999  },
-  pro:     { name: 'Pro Pack',     tokens: 150, cents: 1999 },
+  starter: { name: 'Starter Pack', tokens: 10, cents: 499  },
+  grinder: { name: 'Grinder Pack', tokens: 25, cents: 999  },
+  pro:     { name: 'Pro Pack',     tokens: 60, cents: 1999 },
 };
 
-// Token cost per grade by model (IQ Core = 1, IQ Ultra = 4)
-const TOKEN_COST = { 'claude-sonnet-4-6': 1, 'claude-opus-4-7': 4 };
+// Token cost per grade — all paid grades use Opus (1 token each); Sonnet reserved for anonymous free grades
+const TOKEN_COST = { 'claude-sonnet-4-6': 1, 'claude-opus-4-7': 1 };
 
 // ── Auth helper ───────────────────────────────────────────────────────────────
 async function getUser(req) {
@@ -806,17 +806,12 @@ app.post('/api/grade', async (req, res) => {
   let tokenCost = 1;
   const user = await getUser(req);
 
-  // Determine requested model; free/anon users always get Core
-  const requestedModel = req.body.gradingModel;
-  if (requestedModel === 'claude-opus-4-7') gradingModel = 'claude-opus-4-7';
-
   if (user && supabaseAdmin) {
     planRow = await getUserPlan(user.id);
     if (!planRow) return res.status(500).json({ error: 'Could not load user plan' });
 
-    // Free plan: Core only
-    if (planRow.plan === 'free') gradingModel = 'claude-sonnet-4-6';
-
+    // All paid grades use Opus for best accuracy
+    gradingModel = 'claude-opus-4-7';
     tokenCost = TOKEN_COST[gradingModel] ?? 1;
 
     if (planRow.grades_used + tokenCost > planRow.grade_limit) {

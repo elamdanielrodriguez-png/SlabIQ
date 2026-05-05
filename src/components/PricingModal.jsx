@@ -1,9 +1,9 @@
 import { useState } from "react";
 
 export const TOKEN_PACKS = [
-  { id: "starter", name: "Starter",  tokens: 20,  price: 4.99  },
-  { id: "grinder", name: "Grinder",  tokens: 60,  price: 9.99,  savePct: 33 },
-  { id: "pro",     name: "Pro",      tokens: 150, price: 19.99, savePct: 47 },
+  { id: "starter", name: "Starter",  tokens: 10, price: 4.99  },
+  { id: "grinder", name: "Grinder",  tokens: 25, price: 9.99,  savePct: 20 },
+  { id: "pro",     name: "Pro",      tokens: 60, price: 19.99, savePct: 33 },
 ];
 
 export default function PricingModal({ onClose, session, tokenBalance = 0 }) {
@@ -58,19 +58,12 @@ export default function PricingModal({ onClose, session, tokenBalance = 0 }) {
 
         {/* Token cost explainer */}
         <div style={{
-          background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
+          background: "rgba(201,168,76,0.06)", border: "1px solid rgba(201,168,76,0.15)",
           borderRadius: 10, padding: "10px 14px", marginBottom: 16,
-          display: "flex", gap: 24, justifyContent: "center",
+          textAlign: "center",
         }}>
-          {[
-            { label: "IQ Core",  cost: "1 token / grade" },
-            { label: "IQ Ultra", cost: "4 tokens / grade · 5× more powerful", gold: true },
-          ].map(({ label, cost, gold }) => (
-            <div key={label} style={{ textAlign: "center" }}>
-              <div style={{ color: gold ? "#c9a84c" : "rgba(255,255,255,0.5)", fontSize: 12, fontWeight: 700, marginBottom: 2 }}>{label}</div>
-              <div style={{ color: "rgba(255,255,255,0.25)", fontSize: 11 }}>{cost}</div>
-            </div>
-          ))}
+          <div style={{ color: "#c9a84c", fontSize: 12, fontWeight: 700, marginBottom: 2 }}>IQ Ultra</div>
+          <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 11 }}>1 token / grade · powered by Claude Opus</div>
         </div>
 
         {/* Packs */}

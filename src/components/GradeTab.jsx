@@ -1005,12 +1005,12 @@ export default function GradeTab({ images, result, candidates, loading, error, o
         />
       )}
 
-      {/* Model toggle — paid logged-in users only */}
+      {/* Model toggle — kept for future use
       {images.length > 0 && !result && isLoggedIn && planName !== 'free' && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
           {[
             { model: "claude-sonnet-4-6", label: "IQ Core",  cost: "1 token / grade" },
-            { model: "claude-opus-4-7",   label: "IQ Ultra", cost: "4 tokens / grade · 5× more powerful" },
+            { model: "claude-opus-4-7",   label: "IQ Ultra", cost: "1 token / grade" },
           ].map(({ model, label, cost }) => {
             const active = selectedModel === model;
             return (
@@ -1029,11 +1029,11 @@ export default function GradeTab({ images, result, candidates, loading, error, o
             );
           })}
         </div>
-      )}
+      )} */}
 
       {/* Token usage indicator */}
       {images.length > 0 && !result && (() => {
-        const tokenCost = selectedModel === 'claude-opus-4-7' ? 4 : 1;
+        const tokenCost = 1;
         const tokensLeft = gradesTotal - gradesUsed;
         const gradesLeft = Math.floor(tokensLeft / tokenCost);
         const pct = Math.min(100, (gradesUsed / gradesTotal) * 100);
