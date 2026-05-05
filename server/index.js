@@ -963,9 +963,16 @@ app.post('/api/grade', async (req, res) => {
             const p = realPrice(market[tier], aiTierEstimate);
             if (p) parsed.market.graded[tier] = p;
           }
-          const aiRaw = Number(parsed.market.raw) || 0;
-          const rawPrice = realPrice(market.raw, aiRaw);
-          if (rawPrice) parsed.market.raw = rawPrice;
+          // For oversized-prone variants skip raw eBay comps entirely —
+          // sellers rarely label size so raw listings are unreliable.
+          // PSA/BGS comps are always standard size (graders reject 5x7s).
+          const variantForRaw = (confirmedCard.variant ?? '').toLowerCase();
+          const skipRawComps = OVERSIZED_PRONE_VARIANTS.some(v => variantForRaw.includes(v));
+          if (!skipRawComps) {
+            const aiRaw = Number(parsed.market.raw) || 0;
+            const rawPrice = realPrice(market.raw, aiRaw);
+            if (rawPrice) parsed.market.raw = rawPrice;
+          }
 
           // Hard $100 floor for oversized-prone variants — AI estimates can be poisoned by 5x7 jumbo sales
           const variantForFloor = (confirmedCard.variant ?? '').toLowerCase();
