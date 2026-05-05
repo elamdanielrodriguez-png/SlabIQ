@@ -781,11 +781,10 @@ RULES:
     if (first && parseInt(first.year) >= 2017) {
       const existingVariants = candidates.map(c => (c.variant ?? '').toLowerCase());
       const { player, year, set, cardNumber } = first;
+      // Downtown looks nearly identical to base in photos — always offer it as an option.
+      // Stained Glass has a visually distinctive design; only offer it if AI didn't already identify it.
       if (!existingVariants.some(v => v.includes('downtown'))) {
-        candidates.push({ player, year, set, cardNumber, variant: 'Downtown', description: 'Downtown insert — nearly identical to base in photos, confirm from card title/back' });
-      }
-      if (!existingVariants.some(v => v.includes('stained glass'))) {
-        candidates.push({ player, year, set, cardNumber, variant: 'Stained Glass', description: 'Stained Glass insert — nearly identical to base in photos, confirm from card title/back' });
+        candidates.push({ player, year, set, cardNumber, variant: 'Downtown', description: 'Downtown insert — nearly identical to base in photos, confirm from card back' });
       }
     }
 
@@ -963,6 +962,12 @@ app.post('/api/grade', async (req, res) => {
           const rawPrice = realPrice(market.raw, aiRaw);
           if (rawPrice) parsed.market.raw = rawPrice;
 
+          // Hard $100 floor for oversized-prone variants — AI estimates can be poisoned by 5x7 jumbo sales
+          const variantForFloor = (confirmedCard.variant ?? '').toLowerCase();
+          const isOversizedProne = OVERSIZED_PRONE_VARIANTS.some(v => variantForFloor.includes(v));
+          if (isOversizedProne && parsed.market?.raw && parsed.market.raw < 100) {
+            delete parsed.market.raw;
+          }
 
           parsed.market.dataSource = 'eBay sold prices (median − 10%, AI-estimate floor+ceiling)';
           parsed.market.sampleSize = market.totalValid;
