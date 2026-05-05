@@ -202,10 +202,12 @@ async function fetchMarketComps(player, year, set, variant, cardNumber) {
   const variantLower = (variant ?? '').toLowerCase();
   const isOversizedProne = OVERSIZED_PRONE_VARIANTS.some(v => variantLower.includes(v));
 
+  // For oversized-prone variants, exclude known 5x7 jumbo keywords at the query level
+  const sizeExclusion = isOversizedProne ? ' -5x7 -"5 x 7" -jumbo -oversized -"box topper"' : '';
   const [rawList, psaList, bgsList] = await Promise.all([
-    ebayFindingSearch(`${base}`, 25),
-    ebayFindingSearch(`${base} PSA`, 25),
-    ebayFindingSearch(`${base} BGS`, 25),
+    ebayFindingSearch(`${base}${sizeExclusion}`, 25),
+    ebayFindingSearch(`${base} PSA${sizeExclusion}`, 25),
+    ebayFindingSearch(`${base} BGS${sizeExclusion}`, 25),
   ]);
 
   const seen = new Set();
@@ -220,7 +222,7 @@ async function fetchMarketComps(player, year, set, variant, cardNumber) {
   // sells under $100; the standard insert is always $100+. Drop anything below that floor.
   if (isOversizedProne) {
     const before = unique.length;
-    unique = unique.filter(l => l.price >= 150);
+    unique = unique.filter(l => l.price >= 100);
     console.log(`Oversized filter: removed ${before - unique.length} sub-$100 listings (jumbo) for "${variant}"`);
   }
 
@@ -385,7 +387,7 @@ CENTERING — provide a visual estimate of the front centering subgrade in bgs.c
   7.5 or lower = very off
 This is an INITIAL estimate. The user may override it after grading.
 
-OVERSIZED INSERT PRICING RULE: Downtown, Stained Glass, Color Blast, Sparkle, and similar inserts exist in BOTH standard 2.5×3.5 AND cheap oversized 5×7 formats. The 5×7 version sells for under $150. The standard version ALWAYS sells for $150+. If grading one of these variants, raw value MUST be $150 or higher — never estimate below that.
+OVERSIZED INSERT PRICING RULE: Downtown, Stained Glass, Color Blast, Sparkle, and similar inserts exist in BOTH standard 2.5×3.5 AND oversized 5×7 formats. The eBay search has already excluded 5×7 jumbo listings — treat all remaining raw comps as standard size.
 
 Market ratios: PSA10=100% | PSA9=20-40% | BGS BL=200-1000% | BGS10=100-150% | BGS9.5=50-75% | BGS9=40-60%
 Submission threshold: net profit ≥ $30 AND ROI ≥ 25%
@@ -967,7 +969,7 @@ app.post('/api/grade', async (req, res) => {
           // Hard $100 floor for oversized-prone variants — AI estimates can be poisoned by 5x7 jumbo sales
           const variantForFloor = (confirmedCard.variant ?? '').toLowerCase();
           const isOversizedProne = OVERSIZED_PRONE_VARIANTS.some(v => variantForFloor.includes(v));
-          if (isOversizedProne && parsed.market?.raw && parsed.market.raw < 150) {
+          if (isOversizedProne && parsed.market?.raw && parsed.market.raw < 100) {
             delete parsed.market.raw;
           }
 
@@ -996,7 +998,7 @@ app.post('/api/grade', async (req, res) => {
         const variantLower = confirmedCard.variant.toLowerCase();
         if (OVERSIZED_PRONE_VARIANTS.some(v => variantLower.includes(v))) {
           const parsed = JSON.parse(text);
-          if (parsed.market?.raw && Number(parsed.market.raw) < 150) {
+          if (parsed.market?.raw && Number(parsed.market.raw) < 100) {
             delete parsed.market.raw;
             text = JSON.stringify(parsed);
           }
