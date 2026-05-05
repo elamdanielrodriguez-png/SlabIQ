@@ -1,40 +1,24 @@
 import { useState } from "react";
 
-export const PLANS = {
-  standard: [
-    { id: "free",    name: "Free",    price: 0,     grades: 2,   desc: "Try it out" },
-    { id: "hobby",   name: "Hobby",   price: 4.99,  grades: 20,  desc: "Casual collectors" },
-    { id: "grinder", name: "Grinder", price: 9.99,  grades: 60,  desc: "Active flippers",  savePct: 33 },
-    { id: "pro",     name: "Pro",     price: 19.99, grades: 150, desc: "Heavy volume",      savePct: 47 },
-  ],
-  elite: [
-    { id: "elite_hobby",   name: "Hobby",   price: 24.99,  grades: 20,  desc: "Casual collectors" },
-    { id: "elite_grinder", name: "Grinder", price: 49.99,  grades: 60,  desc: "Active flippers",  savePct: 33 },
-    { id: "elite_pro",     name: "Pro",     price: 99.99,  grades: 150, desc: "Heavy volume",      savePct: 47 },
-  ],
-};
+export const PLANS = [
+  { id: "free",    name: "Free",    price: 0,     tokens: 2,   desc: "Try it out" },
+  { id: "hobby",   name: "Hobby",   price: 4.99,  tokens: 20,  desc: "Casual collectors" },
+  { id: "grinder", name: "Grinder", price: 9.99,  tokens: 60,  desc: "Active flippers",  savePct: 33 },
+  { id: "pro",     name: "Pro",     price: 19.99, tokens: 150, desc: "Heavy volume",      savePct: 47 },
+];
 
 export default function PricingModal({ onClose, session, currentPlan, onManage }) {
-  const [tier, setTier] = useState("standard");
   const [loading, setLoading] = useState(null);
   const [error, setError] = useState(null);
 
-  const plans = PLANS[tier];
-
   const subscribe = async (planId) => {
-    if (!session) {
-      setError("Sign in first to subscribe.");
-      return;
-    }
+    if (!session) { setError("Sign in first to subscribe."); return; }
     setLoading(planId);
     setError(null);
     try {
       const res = await fetch("/api/checkout", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({ planId }),
       });
       const data = await res.json();
@@ -47,14 +31,13 @@ export default function PricingModal({ onClose, session, currentPlan, onManage }
   };
 
   const isCurrent = (planId) => currentPlan?.plan === planId;
-  const isElite = tier === "elite";
 
   return (
     <div style={overlay} onClick={onClose}>
       <div style={sheet} onClick={e => e.stopPropagation()}>
 
         {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 22 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
           <div>
             <div style={{ color: "#fff", fontSize: 20, fontWeight: 700, letterSpacing: "-0.5px" }}>Choose a Plan</div>
             <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 13, marginTop: 3 }}>
@@ -64,63 +47,37 @@ export default function PricingModal({ onClose, session, currentPlan, onManage }
           <button onClick={onClose} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.3)", fontSize: 24, cursor: "pointer", padding: 0, lineHeight: 1 }}>×</button>
         </div>
 
-        {/* Tier toggle */}
+        {/* Token cost explainer */}
         <div style={{
-          display: "grid", gridTemplateColumns: "1fr 1fr",
-          background: "rgba(255,255,255,0.05)",
-          borderRadius: 12, padding: 3, marginBottom: 20,
+          background: "rgba(255,255,255,0.03)",
+          border: "1px solid rgba(255,255,255,0.07)",
+          borderRadius: 10, padding: "10px 14px", marginBottom: 16,
+          display: "flex", gap: 16, justifyContent: "center",
         }}>
           {[
-            { key: "standard", label: "Standard", sub: "IQ Core" },
-            { key: "elite",    label: "Elite",    sub: "IQ Ultra" },
-          ].map(({ key, label, sub }) => (
-            <button
-              key={key}
-              onClick={() => setTier(key)}
-              style={{
-                padding: "10px 0",
-                borderRadius: 10,
-                border: "none",
-                background: tier === key ? "rgba(255,255,255,0.1)" : "transparent",
-                cursor: "pointer",
-                fontFamily: "inherit",
-                transition: "background 0.15s",
-              }}
-            >
-              <div style={{ color: tier === key ? "#fff" : "rgba(255,255,255,0.4)", fontSize: 14, fontWeight: 600, letterSpacing: "-0.2px" }}>{label}</div>
-              <div style={{ color: tier === key ? "#c9a84c" : "rgba(255,255,255,0.2)", fontSize: 10, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginTop: 2 }}>{sub}</div>
-            </button>
+            { label: "IQ Core", cost: "1 token / grade", color: "rgba(255,255,255,0.5)" },
+            { label: "IQ Ultra", cost: "4 tokens / grade", color: "#c9a84c" },
+          ].map(({ label, cost, color }) => (
+            <div key={label} style={{ textAlign: "center" }}>
+              <div style={{ color, fontSize: 12, fontWeight: 700, marginBottom: 2 }}>{label}</div>
+              <div style={{ color: "rgba(255,255,255,0.25)", fontSize: 11 }}>{cost}</div>
+            </div>
           ))}
         </div>
 
-        {isElite && (
-          <div style={{
-            background: "rgba(201,168,76,0.07)",
-            border: "1px solid rgba(201,168,76,0.2)",
-            borderRadius: 10, padding: "10px 14px", marginBottom: 16,
-            color: "rgba(255,255,255,0.5)", fontSize: 12, lineHeight: 1.55,
-          }}>
-            <span style={{ color: "#c9a84c", fontWeight: 600 }}>IQ Ultra</span> — deeper zone analysis, more accurate defect detection for high-value cards. ~5× more powerful than IQ Core.
-          </div>
-        )}
-
         {/* Plan cards */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: "50vh", overflowY: "auto" }}>
-          {plans.map((plan) => {
+          {PLANS.map((plan) => {
             const current = isCurrent(plan.id);
             const isFree = plan.price === 0;
+            const perToken = isFree ? null : (plan.price / plan.tokens).toFixed(2);
             return (
               <div key={plan.id} style={{
                 background: current ? "rgba(201,168,76,0.06)" : "rgba(255,255,255,0.03)",
                 border: `1px solid ${current ? "rgba(201,168,76,0.35)" : "rgba(255,255,255,0.07)"}`,
-                borderRadius: 14,
-                padding: "14px 16px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 12,
+                borderRadius: 14, padding: "14px 16px",
+                display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
               }}>
-                {/* Info */}
                 <div style={{ flex: 1 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
                     <span style={{ color: current ? "#c9a84c" : "#fff", fontSize: 15, fontWeight: 700, letterSpacing: "-0.3px" }}>
@@ -138,20 +95,17 @@ export default function PricingModal({ onClose, session, currentPlan, onManage }
                         background: "rgba(48,209,88,0.12)", border: "1px solid rgba(48,209,88,0.25)",
                         borderRadius: 4, padding: "1px 7px",
                         color: "#30d158", fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase",
-                      }}>{plan.savePct}% off/grade</span>
+                      }}>{plan.savePct}% off</span>
                     )}
                   </div>
                   <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 12 }}>
-                    {plan.grades} grade{plan.grades !== 1 ? "s" : ""}{isFree ? "" : "/mo"} · {plan.desc}
-                    {!isFree && (
-                      <span style={{ color: "rgba(255,255,255,0.22)", marginLeft: 4 }}>
-                        · ${(plan.price / plan.grades).toFixed(2)}/grade
-                      </span>
+                    {plan.tokens} token{plan.tokens !== 1 ? "s" : ""}{isFree ? "" : "/mo"} · {plan.desc}
+                    {perToken && (
+                      <span style={{ color: "rgba(255,255,255,0.2)", marginLeft: 4 }}>· ${perToken}/token</span>
                     )}
                   </div>
                 </div>
 
-                {/* Price + CTA */}
                 <div style={{ textAlign: "right", flexShrink: 0 }}>
                   <div style={{ color: "#fff", fontSize: 17, fontWeight: 700, letterSpacing: "-0.5px", lineHeight: 1, marginBottom: 8 }}>
                     {isFree ? "Free" : `$${plan.price}`}
@@ -210,25 +164,16 @@ const sheet = {
 
 const subBtn = {
   padding: "7px 14px",
-  background: "#c9a84c",
-  color: "#000",
-  fontWeight: 700,
-  fontSize: 12,
-  border: "none",
-  borderRadius: 8,
-  cursor: "pointer",
-  fontFamily: "inherit",
+  background: "#c9a84c", color: "#000",
+  fontWeight: 700, fontSize: 12, border: "none",
+  borderRadius: 8, cursor: "pointer", fontFamily: "inherit",
   letterSpacing: "-0.1px",
 };
 
 const manageBtn = {
   padding: "7px 14px",
-  background: "rgba(255,255,255,0.07)",
-  color: "rgba(255,255,255,0.5)",
-  fontWeight: 600,
-  fontSize: 12,
+  background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.5)",
+  fontWeight: 600, fontSize: 12,
   border: "1px solid rgba(255,255,255,0.1)",
-  borderRadius: 8,
-  cursor: "pointer",
-  fontFamily: "inherit",
+  borderRadius: 8, cursor: "pointer", fontFamily: "inherit",
 };

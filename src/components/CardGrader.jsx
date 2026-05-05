@@ -440,6 +440,7 @@ export default function CardGrader() {
   const [freeGradesUsed, setFreeGradesUsed] = useState(
     () => parseInt(localStorage.getItem(FREE_GRADE_KEY) || '0')
   );
+  const [selectedModel, setSelectedModel] = useState('claude-sonnet-4-6');
 
   useEffect(() => {
     // Load session on mount
@@ -668,6 +669,7 @@ export default function CardGrader() {
           images: images.map((i) => i.imageData),
           confirmedCard: { player, year, set, variant, cardNumber },
           zoneCrops,
+          gradingModel: selectedModel,
         }),
       });
       const data = await res.json();
@@ -799,6 +801,8 @@ export default function CardGrader() {
               isLoggedIn={!!session}
               planName={userPlan?.plan ?? 'free'}
               onUpgrade={() => setShowPricing(true)}
+              selectedModel={selectedModel}
+              onSelectModel={setSelectedModel}
             />
           )}
           {activeTab === "market" && result && <MarketTab result={result} />}

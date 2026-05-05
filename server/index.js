@@ -24,14 +24,14 @@ const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SEC
 
 // ── Plans ────────────────────────────────────────────────────────────────────
 const PLANS = {
-  free:          { name: 'Free',          price: 0,      grades: 2,   model: 'claude-sonnet-4-6', tier: 'standard', priceId: null },
-  hobby:         { name: 'Hobby',         price: 4.99,   grades: 20,  model: 'claude-sonnet-4-6', tier: 'standard', priceId: process.env.STRIPE_HOBBY_PRICE_ID },
-  grinder:       { name: 'Grinder',       price: 9.99,   grades: 60,  model: 'claude-sonnet-4-6', tier: 'standard', priceId: process.env.STRIPE_GRINDER_PRICE_ID },
-  pro:           { name: 'Pro',           price: 19.99,  grades: 150, model: 'claude-sonnet-4-6', tier: 'standard', priceId: process.env.STRIPE_PRO_PRICE_ID },
-  elite_hobby:   { name: 'Elite Hobby',   price: 24.99,  grades: 20,  model: 'claude-opus-4-7',  tier: 'elite',    priceId: process.env.STRIPE_ELITE_HOBBY_PRICE_ID },
-  elite_grinder: { name: 'Elite Grinder', price: 49.99,  grades: 60,  model: 'claude-opus-4-7',  tier: 'elite',    priceId: process.env.STRIPE_ELITE_GRINDER_PRICE_ID },
-  elite_pro:     { name: 'Elite Pro',     price: 99.99,  grades: 150, model: 'claude-opus-4-7',  tier: 'elite',    priceId: process.env.STRIPE_ELITE_PRO_PRICE_ID },
+  free:    { name: 'Free',    price: 0,     tokens: 2,   priceId: null },
+  hobby:   { name: 'Hobby',   price: 4.99,  tokens: 20,  priceId: process.env.STRIPE_HOBBY_PRICE_ID },
+  grinder: { name: 'Grinder', price: 9.99,  tokens: 60,  priceId: process.env.STRIPE_GRINDER_PRICE_ID },
+  pro:     { name: 'Pro',     price: 19.99, tokens: 150, priceId: process.env.STRIPE_PRO_PRICE_ID },
 };
+
+// Token cost per grade by model (IQ Core = 1, IQ Ultra = 4)
+const TOKEN_COST = { 'claude-sonnet-4-6': 1, 'claude-opus-4-7': 4 };
 
 // ── Auth helper ───────────────────────────────────────────────────────────────
 async function getUser(req) {
@@ -80,8 +80,7 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, 
             id: userId,
             plan: planId,
             grades_used: 0,
-            grade_limit: plan.grades,
-            model: plan.model,
+            grade_limit: plan.tokens,
             stripe_customer_id: session.customer,
             stripe_subscription_id: session.subscription,
             period_start: new Date().toISOString(),
@@ -854,10 +853,21 @@ app.post('/api/grade', async (req, res) => {
   // ── Auth + plan check ──────────────────────────────────────────────────────
   let gradingModel = 'claude-sonnet-4-6';
   let planRow = null;
+  let tokenCost = 1;
   const user = await getUser(req);
+
+  // Determine requested model; free/anon users always get Core
+  const requestedModel = req.body.gradingModel;
+  if (requestedModel === 'claude-opus-4-7') gradingModel = 'claude-opus-4-7';
+
   if (user && supabaseAdmin) {
     planRow = await getUserPlan(user.id);
     if (!planRow) return res.status(500).json({ error: 'Could not load user plan' });
+
+    // Free plan: Core only
+    if (planRow.plan === 'free') gradingModel = 'claude-sonnet-4-6';
+
+    tokenCost = TOKEN_COST[gradingModel] ?? 1;
 
     // Lazy monthly reset (belt-and-suspenders alongside the invoice.paid webhook)
     if (planRow.plan !== 'free') {
@@ -870,15 +880,14 @@ app.post('/api/grade', async (req, res) => {
       }
     }
 
-    if (planRow.grades_used >= planRow.grade_limit) {
+    if (planRow.grades_used + tokenCost > planRow.grade_limit) {
       return res.status(403).json({
-        error: 'You\'ve used all your grades for this period.',
+        error: 'You\'ve used all your tokens for this period.',
         code: 'GRADE_LIMIT_REACHED',
         plan: planRow.plan,
         limit: planRow.grade_limit,
       });
     }
-    gradingModel = planRow.model || 'claude-sonnet-4-6';
   }
 
   const imageList = images || (imageData ? [imageData] : null);
@@ -1110,12 +1119,12 @@ app.post('/api/grade', async (req, res) => {
       console.log('===================');
     } catch (e) { console.log('debug parse error:', e.message); }
 
-    // Increment usage for authenticated users
+    // Deduct tokens for authenticated users
     if (user && planRow && supabaseAdmin) {
       await supabaseAdmin.from('user_plans')
-        .update({ grades_used: planRow.grades_used + 1, updated_at: new Date().toISOString() })
+        .update({ grades_used: planRow.grades_used + tokenCost, updated_at: new Date().toISOString() })
         .eq('id', user.id);
-      console.log(`Usage: ${user.id} → ${planRow.grades_used + 1}/${planRow.grade_limit} (${planRow.plan}, ${gradingModel})`);
+      console.log(`Tokens: ${user.id} → ${planRow.grades_used + tokenCost}/${planRow.grade_limit} (${planRow.plan}, ${gradingModel}, -${tokenCost})`);
     }
 
     res.json({ content: [{ type: 'text', text }] });

@@ -809,7 +809,7 @@ function computeCentering(cm) {
 const ROLE_LABEL = { front: 'Front', back: 'Back', detail: 'Detail' };
 const ROLE_COLOR = { front: '#c9a84c', back: '#0a84ff', detail: 'rgba(255,255,255,0.28)' };
 
-export default function GradeTab({ images, result, candidates, loading, error, onAddImages, onRemoveImage, onSetRole, onGrade, onConfirmCandidate, onSearch, onUpdateCentering, gradesUsed = 0, gradesTotal = 2, isLoggedIn = false, planName = 'free', onUpgrade }) {
+export default function GradeTab({ images, result, candidates, loading, error, onAddImages, onRemoveImage, onSetRole, onGrade, onConfirmCandidate, onSearch, onUpdateCentering, gradesUsed = 0, gradesTotal = 2, isLoggedIn = false, planName = 'free', onUpgrade, selectedModel = 'claude-sonnet-4-6', onSelectModel }) {
   const [cameraOpen, setCameraOpen] = useState(false);
   const [gradePressed, setGradePressed] = useState(false);
   const fileInputRef = useRef(null);
@@ -1005,12 +1005,40 @@ export default function GradeTab({ images, result, candidates, loading, error, o
         />
       )}
 
-      {/* Grade usage indicator */}
+      {/* Model toggle — paid logged-in users only */}
+      {images.length > 0 && !result && isLoggedIn && planName !== 'free' && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+          {[
+            { model: "claude-sonnet-4-6", label: "IQ Core",  cost: "1 token / grade" },
+            { model: "claude-opus-4-7",   label: "IQ Ultra", cost: "4 tokens / grade" },
+          ].map(({ model, label, cost }) => {
+            const active = selectedModel === model;
+            return (
+              <button
+                key={model}
+                onClick={() => onSelectModel?.(model)}
+                style={{
+                  padding: "10px 0", borderRadius: 10, border: `1px solid ${active ? "rgba(201,168,76,0.4)" : "rgba(255,255,255,0.07)"}`,
+                  background: active ? "rgba(201,168,76,0.08)" : "rgba(255,255,255,0.02)",
+                  cursor: "pointer", fontFamily: "inherit", textAlign: "center",
+                }}
+              >
+                <div style={{ color: active ? "#c9a84c" : "rgba(255,255,255,0.45)", fontSize: 13, fontWeight: 600 }}>{label}</div>
+                <div style={{ color: active ? "rgba(201,168,76,0.55)" : "rgba(255,255,255,0.18)", fontSize: 10, marginTop: 2 }}>{cost}</div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Token usage indicator */}
       {images.length > 0 && !result && (() => {
-        const remaining = gradesTotal - gradesUsed;
+        const tokenCost = selectedModel === 'claude-opus-4-7' ? 4 : 1;
+        const tokensLeft = gradesTotal - gradesUsed;
+        const gradesLeft = Math.floor(tokensLeft / tokenCost);
         const pct = Math.min(100, (gradesUsed / gradesTotal) * 100);
-        const isOut = remaining <= 0;
-        const isLow = remaining === 1 && gradesTotal > 1;
+        const isOut = tokensLeft < tokenCost;
+        const isLow = tokensLeft > 0 && tokensLeft < tokenCost * 2;
         return (
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{ flex: 1, height: 3, background: "rgba(255,255,255,0.06)", borderRadius: 99, overflow: "hidden" }}>
@@ -1023,7 +1051,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
             <span style={{ color: isOut ? "#ff453a" : "rgba(255,255,255,0.25)", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap" }}>
               {isOut
                 ? <button onClick={onUpgrade} style={{ background: "none", border: "none", color: "#ff453a", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", padding: 0 }}>Upgrade for more ↗</button>
-                : `${gradesUsed}/${gradesTotal} grades${!isLoggedIn ? " · free" : ""}`
+                : `${tokensLeft} token${tokensLeft !== 1 ? "s" : ""} · ${gradesLeft} grade${gradesLeft !== 1 ? "s" : ""}${!isLoggedIn ? " · free" : ""}`
               }
             </span>
           </div>
