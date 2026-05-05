@@ -220,7 +220,7 @@ async function fetchMarketComps(player, year, set, variant, cardNumber) {
   // sells under $100; the standard insert is always $100+. Drop anything below that floor.
   if (isOversizedProne) {
     const before = unique.length;
-    unique = unique.filter(l => l.price >= 100);
+    unique = unique.filter(l => l.price >= 150);
     console.log(`Oversized filter: removed ${before - unique.length} sub-$100 listings (jumbo) for "${variant}"`);
   }
 
@@ -385,7 +385,7 @@ CENTERING — provide a visual estimate of the front centering subgrade in bgs.c
   7.5 or lower = very off
 This is an INITIAL estimate. The user may override it after grading.
 
-OVERSIZED INSERT PRICING RULE: Downtown, Stained Glass, Color Blast, Sparkle, and similar inserts exist in BOTH standard 2.5×3.5 AND cheap oversized 5×7 formats. The 5×7 version sells for under $20. The standard version ALWAYS sells for $100+. If grading one of these variants, raw value MUST be $100 or higher — never estimate below that.
+OVERSIZED INSERT PRICING RULE: Downtown, Stained Glass, Color Blast, Sparkle, and similar inserts exist in BOTH standard 2.5×3.5 AND cheap oversized 5×7 formats. The 5×7 version sells for under $150. The standard version ALWAYS sells for $150+. If grading one of these variants, raw value MUST be $150 or higher — never estimate below that.
 
 Market ratios: PSA10=100% | PSA9=20-40% | BGS BL=200-1000% | BGS10=100-150% | BGS9.5=50-75% | BGS9=40-60%
 Submission threshold: net profit ≥ $30 AND ROI ≥ 25%
@@ -967,7 +967,7 @@ app.post('/api/grade', async (req, res) => {
           // Hard $100 floor for oversized-prone variants — AI estimates can be poisoned by 5x7 jumbo sales
           const variantForFloor = (confirmedCard.variant ?? '').toLowerCase();
           const isOversizedProne = OVERSIZED_PRONE_VARIANTS.some(v => variantForFloor.includes(v));
-          if (isOversizedProne && parsed.market?.raw && parsed.market.raw < 100) {
+          if (isOversizedProne && parsed.market?.raw && parsed.market.raw < 150) {
             delete parsed.market.raw;
           }
 
@@ -996,7 +996,7 @@ app.post('/api/grade', async (req, res) => {
         const variantLower = confirmedCard.variant.toLowerCase();
         if (OVERSIZED_PRONE_VARIANTS.some(v => variantLower.includes(v))) {
           const parsed = JSON.parse(text);
-          if (parsed.market?.raw && Number(parsed.market.raw) < 100) {
+          if (parsed.market?.raw && Number(parsed.market.raw) < 150) {
             delete parsed.market.raw;
             text = JSON.stringify(parsed);
           }
