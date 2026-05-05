@@ -1010,7 +1010,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
           {[
             { model: "claude-sonnet-4-6", label: "IQ Core",  cost: "1 token / grade" },
-            { model: "claude-opus-4-7",   label: "IQ Ultra", cost: "4 tokens / grade" },
+            { model: "claude-opus-4-7",   label: "IQ Ultra", cost: "4 tokens / grade · 5× more powerful" },
           ].map(({ model, label, cost }) => {
             const active = selectedModel === model;
             return (

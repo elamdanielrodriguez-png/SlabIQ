@@ -64,7 +64,7 @@ export default function PricingModal({ onClose, session, tokenBalance = 0 }) {
         }}>
           {[
             { label: "IQ Core",  cost: "1 token / grade" },
-            { label: "IQ Ultra", cost: "4 tokens / grade", gold: true },
+            { label: "IQ Ultra", cost: "4 tokens / grade · 5× more powerful", gold: true },
           ].map(({ label, cost, gold }) => (
             <div key={label} style={{ textAlign: "center" }}>
               <div style={{ color: gold ? "#c9a84c" : "rgba(255,255,255,0.5)", fontSize: 12, fontWeight: 700, marginBottom: 2 }}>{label}</div>
