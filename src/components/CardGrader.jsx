@@ -744,7 +744,7 @@ export default function CardGrader() {
                   Tokens
                 </span>
                 <span style={{ color: gradesRemaining() === 0 ? "#ff453a" : "#c9a84c", fontSize: 10, fontWeight: 700, marginLeft: 6 }}>
-                  {gradesRemaining()}
+                  {userPlan ? Math.max(0, userPlan.grade_limit - userPlan.grades_used) : gradesRemaining()}
                 </span>
               </button>
               <button
