@@ -10,7 +10,7 @@ export const PLANS = {
   elite: [
     { id: "elite_hobby",   name: "Hobby",   price: 24.99,  grades: 20,  desc: "Casual collectors" },
     { id: "elite_grinder", name: "Grinder", price: 49.99,  grades: 60,  desc: "Active flippers",  savePct: 33 },
-    { id: "elite_pro",     name: "Pro",     price: 99.99,  grades: 100, desc: "Heavy volume",      savePct: 20 },
+    { id: "elite_pro",     name: "Pro",     price: 99.99,  grades: 150, desc: "Heavy volume",      savePct: 47 },
   ],
 };
 

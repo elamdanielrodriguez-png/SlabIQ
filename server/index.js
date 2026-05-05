@@ -30,7 +30,7 @@ const PLANS = {
   pro:           { name: 'Pro',           price: 19.99,  grades: 150, model: 'claude-sonnet-4-6', tier: 'standard', priceId: process.env.STRIPE_PRO_PRICE_ID },
   elite_hobby:   { name: 'Elite Hobby',   price: 24.99,  grades: 20,  model: 'claude-opus-4-7',  tier: 'elite',    priceId: process.env.STRIPE_ELITE_HOBBY_PRICE_ID },
   elite_grinder: { name: 'Elite Grinder', price: 49.99,  grades: 60,  model: 'claude-opus-4-7',  tier: 'elite',    priceId: process.env.STRIPE_ELITE_GRINDER_PRICE_ID },
-  elite_pro:     { name: 'Elite Pro',     price: 99.99,  grades: 100, model: 'claude-opus-4-7',  tier: 'elite',    priceId: process.env.STRIPE_ELITE_PRO_PRICE_ID },
+  elite_pro:     { name: 'Elite Pro',     price: 99.99,  grades: 150, model: 'claude-opus-4-7',  tier: 'elite',    priceId: process.env.STRIPE_ELITE_PRO_PRICE_ID },
 };
 
 // ── Auth helper ───────────────────────────────────────────────────────────────
