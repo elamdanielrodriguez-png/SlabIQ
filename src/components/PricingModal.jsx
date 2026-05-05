@@ -4,13 +4,13 @@ export const PLANS = {
   standard: [
     { id: "free",    name: "Free",    price: 0,     grades: 2,   desc: "Try it out" },
     { id: "hobby",   name: "Hobby",   price: 4.99,  grades: 20,  desc: "Casual collectors" },
-    { id: "grinder", name: "Grinder", price: 9.99,  grades: 60,  desc: "Active flippers" },
-    { id: "pro",     name: "Pro",     price: 19.99, grades: 150, desc: "Heavy volume" },
+    { id: "grinder", name: "Grinder", price: 9.99,  grades: 60,  desc: "Active flippers",  savePct: 33 },
+    { id: "pro",     name: "Pro",     price: 19.99, grades: 150, desc: "Heavy volume",      savePct: 47 },
   ],
   elite: [
     { id: "elite_hobby",   name: "Hobby",   price: 24.99,  grades: 20,  desc: "Casual collectors" },
-    { id: "elite_grinder", name: "Grinder", price: 49.99,  grades: 60,  desc: "Active flippers" },
-    { id: "elite_pro",     name: "Pro",     price: 99.99,  grades: 100, desc: "Heavy volume" },
+    { id: "elite_grinder", name: "Grinder", price: 49.99,  grades: 60,  desc: "Active flippers",  savePct: 33 },
+    { id: "elite_pro",     name: "Pro",     price: 99.99,  grades: 100, desc: "Heavy volume",      savePct: 20 },
   ],
 };
 
@@ -133,9 +133,21 @@ export default function PricingModal({ onClose, session, currentPlan, onManage }
                         color: "#c9a84c", fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase",
                       }}>current</span>
                     )}
+                    {plan.savePct && (
+                      <span style={{
+                        background: "rgba(48,209,88,0.12)", border: "1px solid rgba(48,209,88,0.25)",
+                        borderRadius: 4, padding: "1px 7px",
+                        color: "#30d158", fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase",
+                      }}>{plan.savePct}% off/grade</span>
+                    )}
                   </div>
                   <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 12 }}>
                     {plan.grades} grade{plan.grades !== 1 ? "s" : ""}{isFree ? "" : "/mo"} · {plan.desc}
+                    {!isFree && (
+                      <span style={{ color: "rgba(255,255,255,0.22)", marginLeft: 4 }}>
+                        · ${(plan.price / plan.grades).toFixed(2)}/grade
+                      </span>
+                    )}
                   </div>
                 </div>
 
