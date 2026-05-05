@@ -50,7 +50,7 @@ async function getUserPlan(userId) {
   // First-time user — create free plan
   const { data: created } = await supabaseAdmin
     .from('user_plans')
-    .insert({ id: userId, plan: 'free', grades_used: 0, grade_limit: 2, model: 'claude-sonnet-4-6' })
+    .insert({ id: userId, plan: 'free', grades_used: 0, grade_limit: 0, model: 'claude-sonnet-4-6' })
     .select().single();
   return created;
 }
