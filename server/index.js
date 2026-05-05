@@ -162,7 +162,7 @@ async function urlToBase64(url) {
 
 // Fetch actual sold eBay prices via the Finding API (findCompletedItems + SoldItemsOnly).
 // No OAuth needed — just EBAY_APP_ID.
-async function ebayFindingSearch(query, limit = 25) {
+async function ebayFindingSearch(query, limit = 25, searchDescription = false) {
   if (!process.env.EBAY_APP_ID) return [];
   const q = encodeURIComponent(query.trim());
   try {
@@ -173,6 +173,7 @@ async function ebayFindingSearch(query, limit = 25) {
       `&RESPONSE-DATA-FORMAT=JSON` +
       `&REST-PAYLOAD` +
       `&keywords=${q}` +
+      `&descriptionSearch=${searchDescription}` +
       `&itemFilter(0).name=SoldItemsOnly` +
       `&itemFilter(0).value=true` +
       `&sortOrder=EndTimeSoonest` +
@@ -202,12 +203,12 @@ async function fetchMarketComps(player, year, set, variant, cardNumber) {
   const variantLower = (variant ?? '').toLowerCase();
   const isOversizedProne = OVERSIZED_PRONE_VARIANTS.some(v => variantLower.includes(v));
 
-  // For oversized-prone variants, exclude known 5x7 jumbo keywords at the query level
+  // For oversized-prone variants, exclude 5x7 jumbo keywords in both title AND description
   const sizeExclusion = isOversizedProne ? ' -5x7 -"5 x 7" -jumbo -oversized -"box topper"' : '';
   const [rawList, psaList, bgsList] = await Promise.all([
-    ebayFindingSearch(`${base}${sizeExclusion}`, 25),
-    ebayFindingSearch(`${base} PSA${sizeExclusion}`, 25),
-    ebayFindingSearch(`${base} BGS${sizeExclusion}`, 25),
+    ebayFindingSearch(`${base}${sizeExclusion}`, 25, isOversizedProne),
+    ebayFindingSearch(`${base} PSA${sizeExclusion}`, 25, isOversizedProne),
+    ebayFindingSearch(`${base} BGS${sizeExclusion}`, 25, isOversizedProne),
   ]);
 
   const seen = new Set();
