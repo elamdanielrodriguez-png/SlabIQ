@@ -24,9 +24,9 @@ const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SEC
 
 // ── Token packs (one-time purchases) ─────────────────────────────────────────
 const TOKEN_PACKS = {
-  starter: { name: 'Starter Pack', tokens: 10, cents: 499  },
-  grinder: { name: 'Grinder Pack', tokens: 25, cents: 999  },
-  pro:     { name: 'Pro Pack',     tokens: 60, cents: 1999 },
+  starter: { name: 'Starter Pack', tokens: 5,  cents: 499  },
+  grinder: { name: 'Grinder Pack', tokens: 15, cents: 999  },
+  pro:     { name: 'Pro Pack',     tokens: 40, cents: 1999 },
 };
 
 // Token cost per grade — all paid grades use Opus (1 token each); Sonnet reserved for anonymous free grades
@@ -801,7 +801,7 @@ app.post('/api/grade', async (req, res) => {
   const { images, imageData, mediaType = 'image/jpeg', confirmedCard, zoneCrops } = req.body;
 
   // ── Auth + plan check ──────────────────────────────────────────────────────
-  let gradingModel = 'claude-sonnet-4-6';
+  let gradingModel = 'claude-opus-4-7';
   let planRow = null;
   let tokenCost = 1;
   const user = await getUser(req);
