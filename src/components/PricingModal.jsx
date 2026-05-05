@@ -71,8 +71,8 @@ export default function PricingModal({ onClose, session, currentPlan, onManage }
           borderRadius: 12, padding: 3, marginBottom: 20,
         }}>
           {[
-            { key: "standard", label: "Standard", sub: "Claude Sonnet" },
-            { key: "elite",    label: "Elite",    sub: "Claude Opus" },
+            { key: "standard", label: "Standard", sub: "IQ Core" },
+            { key: "elite",    label: "Elite",    sub: "IQ Ultra" },
           ].map(({ key, label, sub }) => (
             <button
               key={key}
@@ -100,7 +100,7 @@ export default function PricingModal({ onClose, session, currentPlan, onManage }
             borderRadius: 10, padding: "10px 14px", marginBottom: 16,
             color: "rgba(255,255,255,0.5)", fontSize: 12, lineHeight: 1.55,
           }}>
-            <span style={{ color: "#c9a84c", fontWeight: 600 }}>Claude Opus</span> — deeper zone analysis, more accurate defect detection for high-value cards. ~5× more powerful than Sonnet.
+            <span style={{ color: "#c9a84c", fontWeight: 600 }}>IQ Ultra</span> — deeper zone analysis, more accurate defect detection for high-value cards. ~5× more powerful than IQ Core.
           </div>
         )}
 
