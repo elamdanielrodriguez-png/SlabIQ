@@ -17,15 +17,22 @@ function CameraCapture({ onCapture, onClose }) {
       .then(s => {
         if (!active) { s.getTracks().forEach(t => t.stop()); return; }
         streamRef.current = s;
-        if (videoRef.current) {
-          videoRef.current.srcObject = s;
-          videoRef.current.onloadedmetadata = () => setReady(true);
-        }
+        const video = videoRef.current;
+        if (!video) return;
+        video.srcObject = s;
+        const onCanPlay = () => {
+          if (!active) return;
+          video.play().catch(() => {});
+          setReady(true);
+        };
+        video.addEventListener('canplay', onCanPlay, { once: true });
+        if (video.readyState >= 3) onCanPlay();
       })
       .catch(err => setError(err.message || "Camera unavailable. Check permissions."));
     return () => {
       active = false;
-      if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+      if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
+      if (videoRef.current) { videoRef.current.srcObject = null; }
     };
   }, []);
 
@@ -82,7 +89,7 @@ function CameraCapture({ onCapture, onClose }) {
         Align card inside the rectangle
       </div>
 
-      <div ref={containerRef} style={{ flex: 1, position: "relative", overflow: "hidden" }}>
+      <div ref={containerRef} style={{ flex: 1, position: "relative", overflow: "hidden", minHeight: 0 }}>
         <video
           ref={videoRef}
           autoPlay playsInline muted
