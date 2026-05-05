@@ -463,7 +463,7 @@ export default function CardGrader() {
     return () => subscription.unsubscribe();
   }, []);
 
-  const loadUserPlan = async (token) => {
+  const loadUserPlan = async (token, attempt = 0) => {
     try {
       const res = await fetch('/api/user/plan', {
         headers: { Authorization: `Bearer ${token}` },
@@ -471,8 +471,12 @@ export default function CardGrader() {
       if (res.ok) {
         const data = await res.json();
         setUserPlan(data.plan);
+      } else if (attempt < 3) {
+        setTimeout(() => loadUserPlan(token, attempt + 1), 1500 * (attempt + 1));
       }
-    } catch {}
+    } catch {
+      if (attempt < 3) setTimeout(() => loadUserPlan(token, attempt + 1), 1500 * (attempt + 1));
+    }
   };
 
   const authHeaders = () => session ? { Authorization: `Bearer ${session.access_token}` } : {};
