@@ -477,9 +477,12 @@ export default function CardGrader() {
 
   const authHeaders = () => session ? { Authorization: `Bearer ${session.access_token}` } : {};
 
+  const deviceFreeLeft = () => Math.max(0, FREE_GRADE_LIMIT - freeGradesUsed);
+
   const gradesRemaining = () => {
+    if (deviceFreeLeft() > 0) return deviceFreeLeft();
     if (session && userPlan) return Math.max(0, userPlan.grade_limit - userPlan.grades_used);
-    return Math.max(0, FREE_GRADE_LIMIT - freeGradesUsed);
+    return 0;
   };
 
   const gradeLimit = () => {
@@ -586,8 +589,8 @@ export default function CardGrader() {
 
   const identifyCard = async () => {
     if (!images.length) return;
-    // Gate on free grade limit before even identifying
-    if (!session && freeGradesUsed >= FREE_GRADE_LIMIT) {
+    // Block if no device free grades AND no account tokens
+    if (deviceFreeLeft() === 0 && (!session || gradesRemaining() === 0)) {
       setShowPricing(true);
       return;
     }
@@ -650,9 +653,11 @@ export default function CardGrader() {
 
       setLoadingMessage("Fetching market data…");
 
+      const usingDeviceFree = deviceFreeLeft() > 0;
       const res = await fetch("/api/grade", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
+        // Device free grades bypass account token check — send no auth so server treats as anon
+        headers: { "Content-Type": "application/json", ...(usingDeviceFree ? {} : authHeaders()) },
         body: JSON.stringify({
           images: images.map((i) => i.imageData),
           confirmedCard: { player, year, set, variant, cardNumber },
@@ -673,12 +678,12 @@ export default function CardGrader() {
         setToast(true);
         setSpotlightActive(true);
         // Track usage
-        if (session) {
-          loadUserPlan(session.access_token);
-        } else {
+        if (usingDeviceFree) {
           const next = freeGradesUsed + 1;
           localStorage.setItem(FREE_GRADE_KEY, next);
           setFreeGradesUsed(next);
+        } else if (session) {
+          loadUserPlan(session.access_token);
         }
       }
     } catch (err) {
