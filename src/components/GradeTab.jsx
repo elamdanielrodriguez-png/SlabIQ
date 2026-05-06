@@ -834,6 +834,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
       {/* Upload area */}
       <div style={images.length > 0 ? card : heroUploadCard}>
         {images.length > 0 ? (
+          <>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "flex-start" }}>
             {images.map((img, idx) => {
               const role = img.role ?? 'detail';
@@ -903,6 +904,13 @@ export default function GradeTab({ images, result, candidates, loading, error, o
               </>
             )}
           </div>
+          {images.length >= 2 && !result && (
+            <div style={{ marginTop: 10, padding: "8px 12px", background: "rgba(201,168,76,0.05)", border: "1px solid rgba(201,168,76,0.12)", borderRadius: 10 }}>
+              <span style={{ color: "rgba(201,168,76,0.8)", fontWeight: 600, fontSize: 12 }}>Surface tip · </span>
+              <span style={{ color: "rgba(255,255,255,0.3)", fontSize: 12, lineHeight: 1.5 }}>Add a 3rd photo with your flashlight held at 45° to the card — that's exactly how PSA checks surface scratches.</span>
+            </div>
+          )}
+          </>
         ) : (
           <div
             onDrop={handleDrop}
