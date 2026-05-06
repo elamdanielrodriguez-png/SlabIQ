@@ -873,8 +873,14 @@ app.post('/api/grade', async (req, res) => {
       console.log(`Zone crops sent: ${zoneImages.filter(c => c.type === 'image').length}/8`);
     }
 
+    const variantLowerForPrompt = (confirmedCard?.variant ?? '').toLowerCase();
+    const isOversizedProneCard = OVERSIZED_PRONE_VARIANTS.some(v => variantLowerForPrompt.includes(v));
+    const oversizedNote = isOversizedProneCard
+      ? ` CRITICAL — this is the STANDARD 2.5×3.5 inch trading card, NOT the oversized 5×7 version. These variants exist in both sizes; the 5×7 sells for a fraction of the price. All market values must reflect the standard size only. PSA also grades the oversized version — do not anchor on any graded or raw prices you associate with the cheap oversized format.`
+      : '';
+
     const confirmedPrefix = confirmedCard?.player
-      ? `CONFIRMED CARD IDENTITY (selected by the user — do not second-guess this): ${confirmedCard.player}, ${confirmedCard.year} ${confirmedCard.set}, ${confirmedCard.variant || 'Base'}${confirmedCard.cardNumber ? `, #${confirmedCard.cardNumber}` : ''}. Set needsClarification to false and candidates to []. Provide complete grading and market data for exactly this card.\n\n`
+      ? `CONFIRMED CARD IDENTITY (selected by the user — do not second-guess this): ${confirmedCard.player}, ${confirmedCard.year} ${confirmedCard.set}, ${confirmedCard.variant || 'Base'}${confirmedCard.cardNumber ? `, #${confirmedCard.cardNumber}` : ''}.${oversizedNote} Set needsClarification to false and candidates to []. Provide complete grading and market data for exactly this card.\n\n`
       : '';
 
     const content = [
