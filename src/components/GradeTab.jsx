@@ -948,12 +948,12 @@ export default function GradeTab({ images, result, candidates, loading, error, o
 
             {/* Headline */}
             <div style={{ color: "#fff", fontSize: 26, fontWeight: 800, letterSpacing: "-0.8px", lineHeight: 1.15, marginBottom: 10, position: "relative" }}>
-              Grade Your Cards<br />with AI
+              Know If It's a 10<br />Before You Submit
             </div>
 
             {/* Subtitle */}
             <div style={{ color: "rgba(255,255,255,0.38)", fontSize: 13, letterSpacing: "-0.1px", lineHeight: 1.7, margin: "0 auto 28px", maxWidth: 270, position: "relative" }}>
-              Cross-checks every zone against real PSA 10 copies. Spots actual defects — never mistakes prizm, foil, or holo for damage.
+              Compares your card against real PSA 10 graded copies. Catches microscopic surface scratches — the flaws that cost you a gem mint.
             </div>
 
             {/* CTA buttons */}
@@ -988,10 +988,10 @@ export default function GradeTab({ images, result, candidates, loading, error, o
       {images.length === 0 && !result && !candidates && !loading && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
           {[
-            { title: "Real PSA 10 Refs",   desc: "Every zone cross-checked against actual graded copies — not AI guesses" },
-            { title: "No False Defects",   desc: "Prizm, foil, and holo patterns are never confused with damage"          },
-            { title: "True Defect Scan",   desc: "Corner-by-corner analysis that finds flaws other AI graders miss"       },
-            { title: "Market + ROI",       desc: "Live eBay comps and submission dollar math per grade tier"              },
+            { title: "Graded Against Real 10s",    desc: "Pulls actual PSA 10 sold listings from eBay and inspects every corner, edge, and surface against them" },
+            { title: "Catches What You Can't See", desc: "Microscopic scratches that cost you a gem mint — spotted the same way PSA graders check surface"       },
+            { title: "Never Fakes a Flaw",         desc: "Prizm, foil, chrome, and holo patterns are never confused with real surface damage"                    },
+            { title: "Exact ROI Before You Decide", desc: "Live eBay prices, expected grade, and dollar profit at every PSA and BGS tier"                       },
           ].map(({ title, desc }, i) => (
             <div key={title} className={`result-card-${i}`} style={{
               background: "rgba(255,255,255,0.03)",
