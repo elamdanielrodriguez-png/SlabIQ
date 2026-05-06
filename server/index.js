@@ -306,7 +306,7 @@ async function fetchEbayReferenceImages(player, year, set, variant) {
 
     const [rawUrls, gradedUrls] = await Promise.all([
       ebaySearch(token, `${base} raw ungraded`, 2, true),
-      ebaySearch(token, `${base} PSA 10`, 4),
+      ebaySearch(token, `${base} PSA 10`, 3),
     ]);
 
     const [rawImages, gradedImages] = await Promise.all([
