@@ -2,7 +2,7 @@ import { useState } from "react";
 
 export const TOKEN_PACKS = [
   { id: "starter", name: "Starter",  tokens: 10, price: 4.99  },
-  { id: "grinder", name: "Grinder",  tokens: 30, price: 9.99,  savePct: 33 },
+  { id: "grinder", name: "Grinder",  tokens: 25, price: 9.99,  savePct: 25 },
   { id: "pro",     name: "Pro",      tokens: 75, price: 19.99, savePct: 47 },
 ];
 

@@ -25,7 +25,7 @@ const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SEC
 // ── Token packs (one-time purchases) ─────────────────────────────────────────
 const TOKEN_PACKS = {
   starter: { name: 'Starter Pack', tokens: 10, cents: 499  },
-  grinder: { name: 'Grinder Pack', tokens: 30, cents: 999  },
+  grinder: { name: 'Grinder Pack', tokens: 25, cents: 999  },
   pro:     { name: 'Pro Pack',     tokens: 75, cents: 1999 },
 };
 
