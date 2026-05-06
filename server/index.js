@@ -963,22 +963,25 @@ app.post('/api/grade', async (req, res) => {
             const p = realPrice(market[tier], aiTierEstimate);
             if (p) parsed.market.graded[tier] = p;
           }
-          // For oversized-prone variants skip raw eBay comps entirely —
-          // sellers rarely label size so raw listings are unreliable.
-          // PSA/BGS comps are always standard size (graders reject 5x7s).
           const variantForRaw = (confirmedCard.variant ?? '').toLowerCase();
-          const skipRawComps = OVERSIZED_PRONE_VARIANTS.some(v => variantForRaw.includes(v));
-          if (!skipRawComps) {
+          const isOversizedProne = OVERSIZED_PRONE_VARIANTS.some(v => variantForRaw.includes(v));
+
+          if (isOversizedProne) {
+            // Raw eBay listings for these variants are unreliable (5x7 oversized cards).
+            // Graded comps are always standard size. Derive raw mathematically from PSA prices.
+            // Raw typically trades at ~35% of PSA 10, ~75% of PSA 9, ~90% of PSA 8.
+            const psa10 = Number(parsed.market.graded?.psa10) || 0;
+            const psa9  = Number(parsed.market.graded?.psa9)  || 0;
+            const psa8  = Number(parsed.market.graded?.psa8)  || 0;
+            if      (psa10 > 0) parsed.market.raw = Math.round(psa10 * 0.35);
+            else if (psa9  > 0) parsed.market.raw = Math.round(psa9  * 0.75);
+            else if (psa8  > 0) parsed.market.raw = Math.round(psa8  * 0.90);
+            // If no graded comps at all, leave AI estimate but enforce $100 floor
+            else if (parsed.market?.raw && Number(parsed.market.raw) < 100) delete parsed.market.raw;
+          } else {
             const aiRaw = Number(parsed.market.raw) || 0;
             const rawPrice = realPrice(market.raw, aiRaw);
             if (rawPrice) parsed.market.raw = rawPrice;
-          }
-
-          // Hard $100 floor for oversized-prone variants — AI estimates can be poisoned by 5x7 jumbo sales
-          const variantForFloor = (confirmedCard.variant ?? '').toLowerCase();
-          const isOversizedProne = OVERSIZED_PRONE_VARIANTS.some(v => variantForFloor.includes(v));
-          if (isOversizedProne && parsed.market?.raw && parsed.market.raw < 100) {
-            delete parsed.market.raw;
           }
 
           parsed.market.dataSource = 'eBay sold prices (median − 10%, AI-estimate floor+ceiling)';
@@ -1000,16 +1003,20 @@ app.post('/api/grade', async (req, res) => {
       }
     }
 
-    // Hard $100 floor for oversized-prone variants — always applied, even with no eBay data
+    // For oversized-prone variants with no eBay data, derive raw from AI's own graded estimates
     if (confirmedCard?.variant) {
       try {
         const variantLower = confirmedCard.variant.toLowerCase();
         if (OVERSIZED_PRONE_VARIANTS.some(v => variantLower.includes(v))) {
           const parsed = JSON.parse(text);
-          if (parsed.market?.raw && Number(parsed.market.raw) < 100) {
-            delete parsed.market.raw;
-            text = JSON.stringify(parsed);
-          }
+          const psa10 = Number(parsed.market?.graded?.psa10) || 0;
+          const psa9  = Number(parsed.market?.graded?.psa9)  || 0;
+          const psa8  = Number(parsed.market?.graded?.psa8)  || 0;
+          if      (psa10 > 0) parsed.market.raw = Math.round(psa10 * 0.35);
+          else if (psa9  > 0) parsed.market.raw = Math.round(psa9  * 0.75);
+          else if (psa8  > 0) parsed.market.raw = Math.round(psa8  * 0.90);
+          else if (parsed.market?.raw && Number(parsed.market.raw) < 100) delete parsed.market.raw;
+          text = JSON.stringify(parsed);
         }
       } catch {}
     }
