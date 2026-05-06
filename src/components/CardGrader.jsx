@@ -441,6 +441,7 @@ export default function CardGrader() {
     () => parseInt(localStorage.getItem(FREE_GRADE_KEY) || '0')
   );
   const [selectedModel, setSelectedModel] = useState('claude-opus-4-7');
+  const [purchaseSuccess, setPurchaseSuccess] = useState(null); // null | 'polling' | 'confirmed'
 
   useEffect(() => {
     // Load session on mount
@@ -459,9 +460,39 @@ export default function CardGrader() {
     if (params.get('checkout') === 'success') {
       window.history.replaceState({}, '', '/');
       setShowPricing(false);
+      setPurchaseSuccess('polling');
     }
     return () => subscription.unsubscribe();
   }, []);
+
+  // Poll for updated token balance after Stripe redirect — webhook can lag 2-5s
+  useEffect(() => {
+    if (purchaseSuccess !== 'polling' || !session) return;
+    const initialLimit = userPlan?.grade_limit ?? 0;
+    let attempts = 0;
+    const id = setInterval(async () => {
+      attempts++;
+      try {
+        const res = await fetch('/api/user/plan', { headers: { Authorization: `Bearer ${session.access_token}` } });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.plan.grade_limit > initialLimit) {
+            setUserPlan(data.plan);
+            setPurchaseSuccess('confirmed');
+            clearInterval(id);
+            setTimeout(() => setPurchaseSuccess(null), 4000);
+            return;
+          }
+        }
+      } catch {}
+      if (attempts >= 10) {
+        clearInterval(id);
+        setPurchaseSuccess('confirmed');
+        setTimeout(() => setPurchaseSuccess(null), 4000);
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  }, [purchaseSuccess, session]);
 
   const loadUserPlan = async (token, attempt = 0) => {
     try {
@@ -842,6 +873,32 @@ export default function CardGrader() {
           }}
         />
       )}
+      {/* Post-purchase confirmation banner */}
+      {purchaseSuccess && (
+        <div style={{
+          position: "fixed", top: 52, left: 0, right: 0, zIndex: 400,
+          background: purchaseSuccess === 'confirmed' ? "rgba(48,209,88,0.12)" : "rgba(201,168,76,0.08)",
+          borderBottom: `1px solid ${purchaseSuccess === 'confirmed' ? "rgba(48,209,88,0.25)" : "rgba(201,168,76,0.2)"}`,
+          padding: "10px 20px",
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+          backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+        }}>
+          {purchaseSuccess === 'polling' ? (
+            <>
+              <div style={{ width: 12, height: 12, borderRadius: "50%", border: "2px solid #c9a84c", borderTopColor: "transparent", animation: "slabiq-spin 0.7s linear infinite" }} />
+              <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 13, fontWeight: 500 }}>Confirming payment…</span>
+            </>
+          ) : (
+            <>
+              <svg width="14" height="11" viewBox="0 0 14 11" fill="none"><path d="M1 5.5L5 9.5L13 1.5" stroke="#30d158" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              <span style={{ color: "#30d158", fontSize: 13, fontWeight: 600 }}>
+                Payment confirmed —{userPlan ? ` ${Math.max(0, userPlan.grade_limit - userPlan.grades_used)} tokens` : " tokens"} added to your account
+              </span>
+            </>
+          )}
+        </div>
+      )}
+
       <LoadingOverlay message={loadingMessage} />
       {toast && <Toast onDone={() => setToast(false)} />}
 
