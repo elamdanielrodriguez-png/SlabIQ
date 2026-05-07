@@ -555,7 +555,10 @@ function sanitizeGradingResponse(rawText, measuredCenterings) {
     const surfaceSevs = (Array.isArray(parsed.surfaceFlaws) ? parsed.surfaceFlaws : [])
       .map(f => f?.severity).filter(Boolean);
 
-    console.log(`Zones reported: ${zones.length}/8 — corners flagged ${cornerSevs.length}(${cornerSevs.join(',')}), edges flagged ${edgeSevs.length}(${edgeSevs.join(',')}), surface flaws ${surfaceSevs.length}(${surfaceSevs.join(',')})`);
+    const allSevs = [...cornerSevs, ...edgeSevs, ...surfaceSevs];
+    const totalObvious = allSevs.filter(s => s === 'obvious').length;
+    const totalVisible = allSevs.filter(s => s === 'visible').length;
+    console.log(`Zones reported: ${zones.length}/8 — corners flagged ${cornerSevs.length}(${cornerSevs.join(',')}), edges flagged ${edgeSevs.length}(${edgeSevs.join(',')}), surface flaws ${surfaceSevs.length}(${surfaceSevs.join(',')}) — totalObvious=${totalObvious} totalVisible=${totalVisible}`);
 
     if (parsed.bgs) {
       console.log(`AI grades: corners=${parsed.bgs.corners} edges=${parsed.bgs.edges} surface=${parsed.bgs.surface}`);
@@ -564,6 +567,11 @@ function sanitizeGradingResponse(rawText, measuredCenterings) {
       parsed.bgs.surface = categoryGrade(surfaceSevs);
       console.log(`Computed:  corners=${parsed.bgs.corners} edges=${parsed.bgs.edges} surface=${parsed.bgs.surface}`);
     }
+
+    // Hard cap on PSA grade based on total obvious flaws across all zones.
+    // Prevents averaging masking widespread catastrophic damage (e.g. PSA 2 vintage).
+    parsed._totalObvious = totalObvious;
+    parsed._totalVisible = totalVisible;
   }
 
   // Strip the legacy centeringMeasured field
@@ -586,11 +594,20 @@ function sanitizeGradingResponse(rawText, measuredCenterings) {
       parsed.bgs.overall = Math.min(rounded, lowest + 0.5);
       parsed.bgs.isBlackLabel = subs.length === 4 && subs.every(v => v === 10.0);
 
-      // PSA: straight round of average (user-specified rule)
-      const psaGrade = Math.max(1, Math.min(10, Math.round(avg)));
+      // PSA: straight round of average, then apply hard cap based on total obvious flaws
+      let psaGrade = Math.max(1, Math.min(10, Math.round(avg)));
+      const totalObvious = parsed._totalObvious ?? 0;
+      const totalVisible = parsed._totalVisible ?? 0;
+      if      (totalObvious >= 8) psaGrade = Math.min(psaGrade, 1);
+      else if (totalObvious >= 6) psaGrade = Math.min(psaGrade, 2);
+      else if (totalObvious >= 4) psaGrade = Math.min(psaGrade, 3);
+      else if (totalObvious >= 2 && totalVisible >= 3) psaGrade = Math.min(psaGrade, 4);
+      else if (totalObvious >= 2) psaGrade = Math.min(psaGrade, 5);
+      delete parsed._totalObvious; delete parsed._totalVisible;
+
       const PSA_LABELS = { 10: 'GEM MT', 9: 'MINT', 8: 'NM-MT', 7: 'NM', 6: 'EX-MT', 5: 'EX', 4: 'VG-EX', 3: 'VG', 2: 'GOOD', 1: 'PR' };
       if (!parsed.psa) parsed.psa = {};
-      console.log(`Subgrades [${subs.join(',')}] avg=${avg.toFixed(2)} → BGS ${parsed.bgs.overall}, PSA ${psaGrade}`);
+      console.log(`Subgrades [${subs.join(',')}] avg=${avg.toFixed(2)} totalObvious=${totalObvious} → BGS ${parsed.bgs.overall}, PSA ${psaGrade}`);
       parsed.psa.grade = psaGrade;
       parsed.psa.label = PSA_LABELS[psaGrade] || '';
 
@@ -887,14 +904,16 @@ app.post('/api/grade', async (req, res) => {
     const cardYear = parseInt(confirmedCard?.year) || 0;
     const isVintage = cardYear > 0 && cardYear < 1980;
     const vintageNote = isVintage
-      ? ` VINTAGE GRADING RULES (pre-1980 card — PSA grades these extremely strictly):
-  - ANY crease anywhere on the card = PSA 4 or below. Multiple creases = PSA 1-3.
-  - Heavily rounded corners (tips worn to a curve) = corner severity "obvious", grade PSA 2-5.
-  - Paper yellowing, foxing, or staining = surface severity "obvious".
-  - Heavy edge wear, chips, or fraying = edge severity "obvious".
-  - Do NOT compare these to modern card standards. A vintage card that "looks okay" to modern eyes is usually PSA 3-6.
-  - Report EVERY sign of aging, wear, and handling — they are ALL confirmed flaws on vintage cards.
-  - The PSA 10 reference may not exist or may be low quality — use your knowledge of the card's known condition issues.`
+      ? ` VINTAGE GRADING RULES (pre-1980 card — apply these without exception):
+  - Do NOT rely on the PSA 10 reference for this card. Grade each zone independently based on physical condition.
+  - ANY crease = automatic PSA 4 or below. Multiple or deep creases = PSA 1-2. Flag as "obvious" severity.
+  - Rounded corner tips (worn to a curve, no sharp point) = severity "obvious" on EVERY affected corner. Most vintage cards have all 4 corners rounded.
+  - Edge chips, fraying, rough texture = severity "obvious" on every affected edge.
+  - Paper yellowing, toning, foxing, staining, or soiling = surface severity "obvious".
+  - Wrinkles or surface creases = surface severity "obvious".
+  - DO NOT mark zones as "matches" just because you cannot see a flaw clearly — vintage card photos rarely capture all damage. If the corner looks at all rounded or soft, mark it "differs" with severity "obvious".
+  - For a heavily worn card, it is correct and expected to flag ALL 4 corners and ALL 4 edges as "differs" with severity "obvious". That is PSA 1-3 territory and perfectly valid.
+  - NEVER grade a visibly worn vintage card higher than PSA 6. Most worn vintage cards are PSA 1-4.`
       : '';
 
     const confirmedPrefix = confirmedCard?.player
