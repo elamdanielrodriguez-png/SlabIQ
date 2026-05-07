@@ -469,12 +469,17 @@ Return ONLY raw JSON. If card identity uncertain: needsClarification:true with c
 function categoryGrade(severities) {
   if (severities.length === 0) return 10.0;
   const n = severities.length;
-  const worst = severities.includes('obvious') ? 'obvious'
-              : severities.includes('visible')  ? 'visible'
+  const obviousCount = severities.filter(s => s === 'obvious').length;
+  const worst = obviousCount > 0 ? 'obvious'
+              : severities.includes('visible') ? 'visible'
               : 'microscopic';
   if (worst === 'microscopic') return n >= 2 ? 9.0 : 9.5;
-  if (worst === 'visible')     return n >= 2 ? 8.0 : 8.5;
-  return n >= 2 ? 7.0 : 7.5; // obvious
+  if (worst === 'visible')     return n >= 3 ? 7.5 : n >= 2 ? 8.0 : 8.5;
+  // obvious — scale down hard based on count
+  if (obviousCount >= 4) return 2.0;
+  if (obviousCount >= 3) return 3.5;
+  if (obviousCount >= 2) return 5.0;
+  return 7.0;
 }
 
 function computeSubgradesFromVerifications(verifications) {
@@ -879,8 +884,21 @@ app.post('/api/grade', async (req, res) => {
       ? ` CRITICAL — this is the STANDARD 2.5×3.5 inch trading card, NOT the oversized 5×7 version. These variants exist in both sizes; the 5×7 sells for a fraction of the price. All market values must reflect the standard size only. PSA also grades the oversized version — do not anchor on any graded or raw prices you associate with the cheap oversized format.`
       : '';
 
+    const cardYear = parseInt(confirmedCard?.year) || 0;
+    const isVintage = cardYear > 0 && cardYear < 1980;
+    const vintageNote = isVintage
+      ? ` VINTAGE GRADING RULES (pre-1980 card — PSA grades these extremely strictly):
+  - ANY crease anywhere on the card = PSA 4 or below. Multiple creases = PSA 1-3.
+  - Heavily rounded corners (tips worn to a curve) = corner severity "obvious", grade PSA 2-5.
+  - Paper yellowing, foxing, or staining = surface severity "obvious".
+  - Heavy edge wear, chips, or fraying = edge severity "obvious".
+  - Do NOT compare these to modern card standards. A vintage card that "looks okay" to modern eyes is usually PSA 3-6.
+  - Report EVERY sign of aging, wear, and handling — they are ALL confirmed flaws on vintage cards.
+  - The PSA 10 reference may not exist or may be low quality — use your knowledge of the card's known condition issues.`
+      : '';
+
     const confirmedPrefix = confirmedCard?.player
-      ? `CONFIRMED CARD IDENTITY (selected by the user — do not second-guess this): ${confirmedCard.player}, ${confirmedCard.year} ${confirmedCard.set}, ${confirmedCard.variant || 'Base'}${confirmedCard.cardNumber ? `, #${confirmedCard.cardNumber}` : ''}.${oversizedNote} Set needsClarification to false and candidates to []. Provide complete grading and market data for exactly this card.\n\n`
+      ? `CONFIRMED CARD IDENTITY (selected by the user — do not second-guess this): ${confirmedCard.player}, ${confirmedCard.year} ${confirmedCard.set}, ${confirmedCard.variant || 'Base'}${confirmedCard.cardNumber ? `, #${confirmedCard.cardNumber}` : ''}.${oversizedNote}${vintageNote} Set needsClarification to false and candidates to []. Provide complete grading and market data for exactly this card.\n\n`
       : '';
 
     const content = [
