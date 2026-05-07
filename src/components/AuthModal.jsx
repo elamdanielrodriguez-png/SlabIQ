@@ -100,7 +100,7 @@ export default function AuthModal({ onClose, onAuth }) {
               {mode === "signin" ? "Sign In" : "Create Account"}
             </div>
             <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 13, marginTop: 3 }}>
-              {mode === "signin" ? "Welcome back to SlabIQ" : "Start grading smarter"}
+              {mode === "signin" ? "Welcome back to CardGradeOrNot" : "Start grading smarter"}
             </div>
           </div>
           <button onClick={onClose} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.3)", fontSize: 24, cursor: "pointer", padding: 0, lineHeight: 1 }}>×</button>

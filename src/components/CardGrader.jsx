@@ -758,7 +758,7 @@ export default function CardGrader() {
         }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
             <span style={{ fontSize: 17, fontWeight: 700, letterSpacing: "-0.4px", color: "#fff" }}>
-              SlabIQ
+              CardGradeOrNot
             </span>
             <span style={{ fontSize: 11, fontWeight: 500, color: "#c9a84c", letterSpacing: "0.06em" }}>
               PSA · BGS · BETA

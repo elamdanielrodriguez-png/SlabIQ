@@ -324,7 +324,7 @@ async function fetchEbayReferenceImages(player, year, set, variant) {
   }
 }
 
-const SYSTEM_PROMPT = `You are SlabIQ, a PSA/BGS-calibrated sports card grader. Your only job is to find real physical flaws on the card. The grading software computes the final subgrades from your findings — your numbers for corners/edges/surface are ignored.
+const SYSTEM_PROMPT = `You are CardGradeOrNot, a PSA/BGS-calibrated sports card grader. Your only job is to find real physical flaws on the card. The grading software computes the final subgrades from your findings — your numbers for corners/edges/surface are ignored.
 
 WHAT YOU MUST DO:
   Scan every zone of the card exhaustively.
@@ -1121,5 +1121,5 @@ if (existsSync(distPath)) {
 }
 
 app.listen(PORT, () => {
-  console.log(`SlabIQ server running on http://localhost:${PORT}`);
+  console.log(`CardGradeOrNot server running on http://localhost:${PORT}`);
 });

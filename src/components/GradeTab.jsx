@@ -1400,18 +1400,18 @@ export default function GradeTab({ images, result, candidates, loading, error, o
             onClick={async () => {
               try {
                 const blob = await generateShareImage(result);
-                const file = new File([blob], 'slabiq-grade.png', { type: 'image/png' });
+                const file = new File([blob], 'cgon-grade.png', { type: 'image/png' });
                 if (navigator.share && navigator.canShare?.({ files: [file] })) {
                   await navigator.share({
                     files: [file],
                     title: `${result.player} — PSA ${result.psa?.grade}`,
-                    text: `Just graded my ${[result.year, result.player, result.variant].filter(Boolean).join(' ')} on SlabIQ — PSA ${result.psa?.grade} / BGS ${result.bgs?.overall}`,
+                    text: `Just graded my ${[result.year, result.player, result.variant].filter(Boolean).join(' ')} on CardGradeOrNot — PSA ${result.psa?.grade} / BGS ${result.bgs?.overall}`,
                   });
                 } else {
                   const url = URL.createObjectURL(blob);
                   const a = document.createElement('a');
                   a.href = url;
-                  a.download = `slabiq-${(result.player || 'grade').replace(/\s+/g, '-')}.png`;
+                  a.download = `cgon-${(result.player || 'grade').replace(/\s+/g, '-')}.png`;
                   a.click();
                   URL.revokeObjectURL(url);
                 }
@@ -1459,7 +1459,7 @@ async function generateShareImage(result) {
   ctx.textAlign = 'center';
   ctx.fillStyle = '#fff';
   ctx.font = '700 20px system-ui, Arial, sans-serif';
-  ctx.fillText('SlabIQ', S/2, 52);
+  ctx.fillText('CardGradeOrNot', S/2, 52);
   ctx.fillStyle = '#c9a84c';
   ctx.font = '500 10px system-ui, Arial, sans-serif';
   ctx.fillText('PSA  ·  BGS  ·  AI GRADER', S/2, 70);
@@ -1510,7 +1510,7 @@ async function generateShareImage(result) {
 
   ctx.fillStyle = 'rgba(255,255,255,0.13)';
   ctx.font = '400 11px system-ui, Arial, sans-serif';
-  ctx.fillText('slabiq-eb92.onrender.com', S/2, S - 22);
+  ctx.fillText('cardgradeornot.com', S/2, S - 22);
 
   return new Promise(res => canvas.toBlob(res, 'image/png'));
 }
