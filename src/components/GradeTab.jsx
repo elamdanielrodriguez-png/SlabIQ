@@ -1510,7 +1510,7 @@ async function generateShareImage(result) {
 
   ctx.fillStyle = 'rgba(255,255,255,0.13)';
   ctx.font = '400 11px system-ui, Arial, sans-serif';
-  ctx.fillText('cardgradeornot.com', S/2, S - 22);
+  ctx.fillText('CardGradeOrNot.com', S/2, S - 22);
 
   return new Promise(res => canvas.toBlob(res, 'image/png'));
 }
