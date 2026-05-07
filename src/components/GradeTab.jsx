@@ -1394,10 +1394,125 @@ export default function GradeTab({ images, result, candidates, loading, error, o
               {cleanCenteringText(result.verdict, cm)}
             </p>
           </div>
+
+          {/* Share */}
+          <button
+            onClick={async () => {
+              try {
+                const blob = await generateShareImage(result);
+                const file = new File([blob], 'slabiq-grade.png', { type: 'image/png' });
+                if (navigator.share && navigator.canShare?.({ files: [file] })) {
+                  await navigator.share({
+                    files: [file],
+                    title: `${result.player} — PSA ${result.psa?.grade}`,
+                    text: `Just graded my ${[result.year, result.player, result.variant].filter(Boolean).join(' ')} on SlabIQ — PSA ${result.psa?.grade} / BGS ${result.bgs?.overall}`,
+                  });
+                } else {
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `slabiq-${(result.player || 'grade').replace(/\s+/g, '-')}.png`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }
+              } catch (e) {
+                if (e.name !== 'AbortError') console.warn('Share failed:', e);
+              }
+            }}
+            style={{
+              width: '100%', padding: '13px 0',
+              background: 'rgba(201,168,76,0.08)',
+              border: '1px solid rgba(201,168,76,0.25)',
+              borderRadius: 14,
+              color: '#c9a84c', fontSize: 14, fontWeight: 600,
+              cursor: 'pointer', fontFamily: 'inherit',
+              letterSpacing: '-0.1px',
+            }}
+          >
+            Share Grade
+          </button>
         </>
       )}
     </div>
   );
+}
+
+async function generateShareImage(result) {
+  const S = 600;
+  const canvas = document.createElement('canvas');
+  canvas.width = S; canvas.height = S;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, S, S);
+
+  const grd = ctx.createRadialGradient(S/2, 0, 0, S/2, 0, S * 0.7);
+  grd.addColorStop(0, 'rgba(201,168,76,0.2)');
+  grd.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, 0, S, S);
+
+  ctx.strokeStyle = 'rgba(201,168,76,0.25)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(0.5, 0.5, S-1, S-1);
+
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#fff';
+  ctx.font = '700 20px system-ui, Arial, sans-serif';
+  ctx.fillText('SlabIQ', S/2, 52);
+  ctx.fillStyle = '#c9a84c';
+  ctx.font = '500 10px system-ui, Arial, sans-serif';
+  ctx.fillText('PSA  ·  BGS  ·  AI GRADER', S/2, 70);
+
+  ctx.fillStyle = '#fff';
+  ctx.font = '700 26px system-ui, Arial, sans-serif';
+  ctx.fillText(result.player || 'Unknown', S/2, 148);
+  ctx.fillStyle = 'rgba(255,255,255,0.38)';
+  ctx.font = '400 14px system-ui, Arial, sans-serif';
+  ctx.fillText([result.year, result.set, result.variant].filter(Boolean).join('  ·  '), S/2, 172);
+
+  const rule = (y) => { ctx.strokeStyle = 'rgba(255,255,255,0.07)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(60, y); ctx.lineTo(S-60, y); ctx.stroke(); };
+  rule(200);
+
+  const psaGrade = result.psa?.grade;
+  ctx.fillStyle = 'rgba(255,255,255,0.22)';
+  ctx.font = '600 11px system-ui, Arial, sans-serif';
+  ctx.fillText('PSA', S/4, 238);
+  ctx.fillStyle = psaGrade >= 10 ? '#c9a84c' : psaGrade >= 9 ? '#f0f0f0' : 'rgba(255,255,255,0.65)';
+  ctx.font = '800 100px system-ui, Arial, sans-serif';
+  ctx.fillText(psaGrade ?? '—', S/4, 356);
+  ctx.fillStyle = 'rgba(255,255,255,0.28)';
+  ctx.font = '600 11px system-ui, Arial, sans-serif';
+  ctx.fillText(result.psa?.label ?? '', S/4, 376);
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(S/2, 216); ctx.lineTo(S/2, 392); ctx.stroke();
+
+  const bgsGrade = result.bgs?.overall;
+  ctx.fillStyle = 'rgba(255,255,255,0.22)';
+  ctx.font = '600 11px system-ui, Arial, sans-serif';
+  ctx.fillText('BGS', S*3/4, 238);
+  ctx.fillStyle = bgsGrade >= 10 ? '#c9a84c' : bgsGrade >= 9 ? '#f0f0f0' : 'rgba(255,255,255,0.65)';
+  ctx.font = '800 100px system-ui, Arial, sans-serif';
+  ctx.fillText(bgsGrade != null ? Number(bgsGrade).toFixed(1) : '—', S*3/4, 356);
+  ctx.fillStyle = 'rgba(255,255,255,0.28)';
+  ctx.font = '600 11px system-ui, Arial, sans-serif';
+  ctx.fillText(result.bgs?.isBlackLabel ? 'BLACK LABEL' : bgsGrade >= 9.5 ? 'GEM MINT' : bgsGrade >= 9 ? 'MINT' : bgsGrade >= 8 ? 'NM-MT' : '', S*3/4, 376);
+
+  rule(406);
+
+  if (result.market?.raw) {
+    ctx.fillStyle = 'rgba(255,255,255,0.18)';
+    ctx.font = '400 12px system-ui, Arial, sans-serif';
+    ctx.fillText(`Raw value  $${result.market.raw}`, S/2, 432);
+  }
+
+  ctx.fillStyle = 'rgba(255,255,255,0.13)';
+  ctx.font = '400 11px system-ui, Arial, sans-serif';
+  ctx.fillText('slabiq-eb92.onrender.com', S/2, S - 22);
+
+  return new Promise(res => canvas.toBlob(res, 'image/png'));
 }
 
 function gradeColor(g, blackLabel) {
