@@ -952,12 +952,18 @@ export default function GradeTab({ images, result, candidates, loading, error, o
             </div>
 
             {/* Subtitle */}
-            <div style={{ color: "rgba(255,255,255,0.38)", fontSize: 13, letterSpacing: "-0.1px", lineHeight: 1.7, margin: "0 auto 28px", maxWidth: 270, position: "relative" }}>
+            <div style={{ color: "rgba(255,255,255,0.38)", fontSize: 13, letterSpacing: "-0.1px", lineHeight: 1.7, margin: "0 auto 16px", maxWidth: 270, position: "relative" }}>
               Compares your card against real PSA 10 graded copies. Catches microscopic surface scratches — the flaws that cost you a gem mint.
             </div>
 
+            {/* Cost comparison */}
+            <div style={{ position: "relative", marginBottom: 20 }}>
+              <span style={{ color: "rgba(255,255,255,0.22)", fontSize: 12 }}>PSA charges $75 to find out. </span>
+              <span style={{ color: "#c9a84c", fontSize: 12, fontWeight: 600 }}>We charge $0.40.</span>
+            </div>
+
             {/* CTA buttons */}
-            <div style={{ display: "flex", gap: 10, position: "relative" }}>
+            <div style={{ display: "flex", gap: 10, position: "relative", marginBottom: 14 }}>
               <button
                 onClick={() => setCameraOpen(true)}
                 style={{
@@ -979,6 +985,11 @@ export default function GradeTab({ images, result, candidates, loading, error, o
                   cursor: "pointer", fontFamily: "inherit",
                 }}
               >Upload Photo</button>
+            </div>
+
+            {/* Free trial nudge */}
+            <div style={{ position: "relative", color: "rgba(255,255,255,0.28)", fontSize: 12 }}>
+              2 free grades — no account required
             </div>
           </div>
         )}
