@@ -784,7 +784,7 @@ export default function CardGrader() {
           {session ? (
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <button
-                onClick={() => setShowPricing(true)}
+                onClick={() => { setShowPricing(true); posthog.capture('pricing_opened'); }}
                 style={{
                   background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
                   borderRadius: 8, padding: "4px 10px", cursor: "pointer", fontFamily: "inherit",
@@ -900,7 +900,7 @@ export default function CardGrader() {
           onAuth={(s) => { setSession(s); setShowAuth(false); if (s) loadUserPlan(s.access_token); }}
         />
       )}
-      {showPricing && posthog.capture('pricing_opened') === undefined && (
+      {showPricing && (
         <PricingModal
           onClose={() => setShowPricing(false)}
           session={session}
