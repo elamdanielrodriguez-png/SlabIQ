@@ -754,7 +754,7 @@ export default function CardGrader() {
       <header style={{
         position: "sticky",
         top: 0,
-        zIndex: 100,
+        zIndex: 600,
         background: "rgba(0,0,0,0.72)",
         backdropFilter: "saturate(180%) blur(20px)",
         WebkitBackdropFilter: "saturate(180%) blur(20px)",
@@ -912,7 +912,7 @@ export default function CardGrader() {
         <div
           onAnimationEnd={() => { setSpotlightActive(false); setSpotlightPos(null); }}
           style={{
-            position: "fixed", inset: 0, zIndex: 250, pointerEvents: "all", cursor: "default",
+            position: "fixed", inset: 0, zIndex: 90, pointerEvents: "none",
             background: [
               `radial-gradient(ellipse ${spotlightPos.rx}px ${spotlightPos.ry}px at ${spotlightPos.cx}px ${spotlightPos.cy}px, rgba(255,218,100,0.82) 0%, rgba(255,218,100,0.45) 40%, transparent 72%)`,
               `radial-gradient(ellipse ${spotlightPos.rx + 60}px ${spotlightPos.ry + 40}px at ${spotlightPos.cx}px ${spotlightPos.cy}px, rgba(255,200,60,0.22) 0%, transparent 100%)`,
