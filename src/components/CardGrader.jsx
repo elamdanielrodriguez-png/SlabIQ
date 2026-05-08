@@ -767,7 +767,10 @@ export default function CardGrader() {
           alignItems: "center",
           justifyContent: "space-between",
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div
+            onClick={() => setActiveTab("grade")}
+            style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}
+          >
             <Logo size={34} />
             <div style={{ display: "flex", alignItems: "baseline", gap: 0 }}>
               <span style={{ fontSize: 17, fontWeight: 800, letterSpacing: "-0.5px", color: "#fff" }}>CardGrade</span>
