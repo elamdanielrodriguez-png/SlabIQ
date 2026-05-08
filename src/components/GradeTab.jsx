@@ -1001,18 +1001,17 @@ export default function GradeTab({ images, result, candidates, loading, error, o
       {images.length === 0 && !result && !candidates && !loading && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
           {[
-            { icon: "🔍", title: "Graded Against Real 10s",     desc: "Every zone compared to actual PSA 10 sold listings" },
-            { icon: "🧬", title: "Catches What You Can't See",  desc: "Microscopic scratches spotted before you pay $75"   },
-            { icon: "✓",  title: "Never Fakes a Flaw",          desc: "Prizm & holo patterns never mistaken for damage"    },
-            { icon: "💰", title: "Exact ROI Before You Decide", desc: "Live eBay prices + dollar profit at every grade"    },
-          ].map(({ icon, title, desc }, i) => (
+            { title: "Graded Against Real 10s",     desc: "Every zone compared to actual PSA 10 sold listings" },
+            { title: "Catches What You Can't See",  desc: "Microscopic scratches spotted before you pay $33"   },
+            { title: "Never Fakes a Flaw",          desc: "Prizm & holo patterns never mistaken for damage"    },
+            { title: "Exact ROI Before You Decide", desc: "Live eBay prices + dollar profit at every grade"    },
+          ].map(({ title, desc }, i) => (
             <div key={title} className={`result-card-${i}`} style={{
               background: "rgba(255,255,255,0.03)",
               border: "1px solid rgba(255,255,255,0.06)",
               borderRadius: 16,
               padding: "14px 12px",
             }}>
-              <div style={{ fontSize: 18, marginBottom: 6 }}>{icon}</div>
               <div style={{ color: "rgba(255,255,255,0.72)", fontSize: 12, fontWeight: 700, letterSpacing: "-0.2px", marginBottom: 4 }}>{title}</div>
               <div style={{ color: "rgba(255,255,255,0.28)", fontSize: 11, lineHeight: 1.5 }}>{desc}</div>
             </div>
