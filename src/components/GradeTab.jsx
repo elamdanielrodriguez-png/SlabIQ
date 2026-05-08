@@ -1084,18 +1084,18 @@ export default function GradeTab({ images, result, candidates, loading, error, o
               </div>
               <div>
                 <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 3 }}>PSA 8</div>
-                <div style={{ color: "#4fc3f7", fontSize: 16, fontWeight: 700 }}>$42</div>
+                <div style={{ color: "#4fc3f7", fontSize: 16, fontWeight: 700 }}>$48</div>
               </div>
               <div>
                 <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 3 }}>PSA 10</div>
-                <div style={{ color: "#c9a84c", fontSize: 16, fontWeight: 700 }}>$95</div>
+                <div style={{ color: "#c9a84c", fontSize: 16, fontWeight: 700 }}>$220</div>
               </div>
               <div style={{
                 background: "rgba(255,69,58,0.1)", border: "1px solid rgba(255,69,58,0.25)",
                 borderRadius: 8, padding: "6px 10px", textAlign: "center",
               }}>
                 <div style={{ color: "#ff453a", fontSize: 10, fontWeight: 700 }}>Don't Submit</div>
-                <div style={{ color: "rgba(255,255,255,0.25)", fontSize: 9, marginTop: 1 }}>–$9 ROI</div>
+                <div style={{ color: "rgba(255,255,255,0.25)", fontSize: 9, marginTop: 1 }}>–$3 ROI</div>
               </div>
             </div>
 
