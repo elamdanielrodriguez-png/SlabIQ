@@ -219,12 +219,16 @@ async function fetchMarketComps(player, year, set, variant, cardNumber) {
   });
 
   // Oversized-prone variants (Downtown, Stained Glass, etc.) exist in both standard 2.5x3.5
-  // and cheap jumbo 5x7 formats. Sellers rarely label the size. The jumbo version always
-  // sells under $100; the standard insert is always $100+. Drop anything below that floor.
+  // and cheap jumbo 5x7 formats. Sellers rarely label the size.
+  // Raw jumbo: typically $10-40. Standard raw: $80-200+. Use $100 floor for raw.
+  // Graded (PSA/BGS) jumbo 10: typically $50-180. Standard graded 10: $200-1000+. Use $200 floor for graded.
   if (isOversizedProne) {
     const before = unique.length;
-    unique = unique.filter(l => l.price >= 100);
-    console.log(`Oversized filter: removed ${before - unique.length} sub-$100 listings (jumbo) for "${variant}"`);
+    unique = unique.filter(l => {
+      const isGraded = /\b(PSA|BGS|SGC|CGC)\b/i.test(l.title);
+      return isGraded ? l.price >= 200 : l.price >= 100;
+    });
+    console.log(`Oversized filter: removed ${before - unique.length} listings below floor for "${variant}"`);
   }
 
   console.log(`Market comps: pulled ${unique.length} unique sold listings for ${player}`);
@@ -245,7 +249,7 @@ A listing is INVALID if ANY of these apply:
 4. Lot or multi-card listing — title mentions: "lot", "x2", "x3", "(2)", "(3)", multiple player names, "bundle", "set break", "complete set", "20 cards", "all", etc.
 5. NOT a standard 2.5x3.5 inch trading card — exclude ANY mention of: "jumbo", "5x7", "5 x 7", "8x10", "blanket", "manu", "manupatch", "manufactured patch", "promo", "magnet", "oversized", "box topper", "topper", "mini", "micro", "stickers", "decal", "poster", "wall art", "bobblehead", "figure", "coin", "patch card" (when it implies oversized). When in doubt about size, EXCLUDE.
 
-   CRITICAL — these specific inserts exist in BOTH standard 2.5×3.5 AND oversized 5×7 formats. Sellers rarely label the size in the title: "Stained Glass", "Downtown", "Color Blast", "Sparkle", "Dynagon", "Light It Up", "Magic Numbers", "Pulsar", "Stargazer". Any listing under $100 for these variants has already been removed (jumbo filter). Treat all remaining listings as standard size.
+   CRITICAL — these specific inserts exist in BOTH standard 2.5×3.5 AND oversized 5×7 formats. Sellers rarely label the size in the title: "Stained Glass", "Downtown", "Color Blast", "Sparkle", "Dynagon", "Light It Up", "Magic Numbers", "Pulsar", "Stargazer". Oversized PSA/BGS 5×7 slabs typically sell for $50–180; standard 2.5×3.5 graded copies sell for $200+. Any graded listing under $200 for these variants is almost certainly the worthless oversized slab — EXCLUDE it from ALL graded tiers. Raw oversized sell under $100 and have been pre-filtered. Treat all remaining raw listings as standard size.
 6. Sealed product / pack / box, not a single card — "pack", "box", "case", "hot pack", "blaster", "hobby box", "mega", "factory sealed", "wax", "FOTL"
 7. Damaged / altered / fake — "altered", "trimmed", "creased", "crease", "ding", "bent", "torn", "stain", "miscut", "reprint", "custom", "proxy", "replica", "novelty", "art card"
 8. Auto/autograph variant when target is base (or vice versa) — autographs are a different card
@@ -388,7 +392,7 @@ CENTERING — provide a visual estimate of the front centering subgrade in bgs.c
   7.5 or lower = very off
 This is an INITIAL estimate. The user may override it after grading.
 
-OVERSIZED INSERT PRICING RULE: Downtown, Stained Glass, Color Blast, Sparkle, and similar inserts exist in BOTH standard 2.5×3.5 AND oversized 5×7 formats. The eBay search has already excluded 5×7 jumbo listings — treat all remaining raw comps as standard size.
+OVERSIZED INSERT PRICING RULE: Downtown, Stained Glass, Color Blast, Sparkle, and similar inserts exist in BOTH standard 2.5×3.5 AND oversized 5×7 formats. The 5×7 version is a cheap product that sells raw for $5-30 and PSA 10 for $50-150. The standard 2.5×3.5 version is the valuable collectible. ALL market values you provide must reflect the STANDARD 2.5×3.5 size only. NEVER quote 5×7 oversized prices. When in doubt, your raw estimate should be at least $80 for a premium standard insert.
 
 Market ratios: PSA10=100% | PSA9=20-40% | BGS BL=200-1000% | BGS10=100-150% | BGS9.5=50-75% | BGS9=40-60%
 Submission threshold: net profit ≥ $30 AND ROI ≥ 25%
@@ -1011,13 +1015,13 @@ app.post('/api/grade', async (req, res) => {
 
           if (isOversizedProne) {
             // Raw eBay listings for these variants are unreliable (5x7 oversized cards).
-            // Graded comps are always standard size. Derive raw mathematically from PSA prices.
-            // Raw typically trades at ~35% of PSA 10, ~75% of PSA 9, ~90% of PSA 8.
+            // Graded comps (post-$200 floor) are standard-size only. Derive raw mathematically.
+            // Standard-size raw trades at ~45% of PSA 10, ~80% of PSA 9, ~90% of PSA 8.
             const psa10 = Number(parsed.market.graded?.psa10) || 0;
             const psa9  = Number(parsed.market.graded?.psa9)  || 0;
             const psa8  = Number(parsed.market.graded?.psa8)  || 0;
-            if      (psa10 > 0) parsed.market.raw = Math.round(psa10 * 0.35);
-            else if (psa9  > 0) parsed.market.raw = Math.round(psa9  * 0.75);
+            if      (psa10 > 0) parsed.market.raw = Math.round(psa10 * 0.45);
+            else if (psa9  > 0) parsed.market.raw = Math.round(psa9  * 0.80);
             else if (psa8  > 0) parsed.market.raw = Math.round(psa8  * 0.90);
             // If no graded comps at all, leave AI estimate but enforce $100 floor
             else if (parsed.market?.raw && Number(parsed.market.raw) < 100) delete parsed.market.raw;
@@ -1055,8 +1059,8 @@ app.post('/api/grade', async (req, res) => {
           const psa10 = Number(parsed.market?.graded?.psa10) || 0;
           const psa9  = Number(parsed.market?.graded?.psa9)  || 0;
           const psa8  = Number(parsed.market?.graded?.psa8)  || 0;
-          if      (psa10 > 0) parsed.market.raw = Math.round(psa10 * 0.35);
-          else if (psa9  > 0) parsed.market.raw = Math.round(psa9  * 0.75);
+          if      (psa10 > 0) parsed.market.raw = Math.round(psa10 * 0.45);
+          else if (psa9  > 0) parsed.market.raw = Math.round(psa9  * 0.80);
           else if (psa8  > 0) parsed.market.raw = Math.round(psa8  * 0.90);
           else if (parsed.market?.raw && Number(parsed.market.raw) < 100) delete parsed.market.raw;
           text = JSON.stringify(parsed);
