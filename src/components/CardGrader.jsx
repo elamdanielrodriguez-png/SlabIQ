@@ -23,6 +23,7 @@ import SubmitTab from "./SubmitTab";
 import HistoryPanel from "./HistoryPanel";
 import AuthModal from "./AuthModal";
 import PricingModal from "./PricingModal";
+import Logo from "./Logo";
 import { supabase } from "../lib/supabase";
 
 const FREE_GRADE_KEY = 'cgon_free_grades_used';
@@ -766,16 +767,8 @@ export default function CardGrader() {
           alignItems: "center",
           justifyContent: "space-between",
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-            {/* Card + grade stamp icon */}
-            <svg width="26" height="26" viewBox="0 0 26 26" fill="none" style={{ flexShrink: 0 }}>
-              <rect x="2" y="2" width="16" height="22" rx="2.5" stroke="#c9a84c" strokeWidth="1.6" fill="none" opacity="0.9"/>
-              <rect x="5" y="5" width="10" height="6" rx="1.2" fill="#c9a84c" opacity="0.2"/>
-              <line x1="5" y1="14.5" x2="15" y2="14.5" stroke="#c9a84c" strokeWidth="1" opacity="0.35"/>
-              <line x1="5" y1="17.5" x2="11" y2="17.5" stroke="#c9a84c" strokeWidth="1" opacity="0.22"/>
-              <circle cx="19.5" cy="19.5" r="5.5" fill="#111" stroke="#c9a84c" strokeWidth="1.4"/>
-              <text x="19.5" y="23" textAnchor="middle" fill="#c9a84c" fontSize="5.5" fontWeight="800" fontFamily="system-ui">10</text>
-            </svg>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <Logo size={34} />
             <div style={{ display: "flex", alignItems: "baseline", gap: 0 }}>
               <span style={{ fontSize: 17, fontWeight: 800, letterSpacing: "-0.5px", color: "#fff" }}>CardGrade</span>
               <span style={{ fontSize: 17, fontWeight: 800, letterSpacing: "-0.5px", color: "#c9a84c" }}>OrNot</span>
