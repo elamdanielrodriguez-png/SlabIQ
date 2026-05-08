@@ -958,20 +958,26 @@ app.post('/api/grade', async (req, res) => {
     }
 
     // Decide whether to use eBay comps or trust AI estimate.
-    // Vintage (pre-1980) eBay data is too noisy — flooded with reprints/customs/lots,
-    // and real comps go through major auction houses. Trust AI for vintage only.
-    // For modern (incl. high-value parallels), eBay scrape gives much better data than AI training.
+    // Vintage (pre-1980): eBay flooded with reprints/customs/lots — trust AI.
+    // Oversized-prone variants (Downtown, Stained Glass, etc.): eBay can't distinguish
+    //   standard 2.5x3.5 from cheap 5x7 by title alone. Both sizes trade above any
+    //   price floor we can set for Mahomes-level cards. Trust AI which knows the market
+    //   and receives an explicit standard-size instruction.
     let skipEbay = false;
     let skipReason = '';
     try {
       const preParsed = JSON.parse(text);
       const yearNum = parseInt(confirmedCard?.year, 10) || 0;
+      const variantLowerSkip = (confirmedCard?.variant ?? '').toLowerCase();
       if (yearNum > 0 && yearNum < 1980) { skipEbay = true; skipReason = 'vintage'; }
+      if (!skipEbay && OVERSIZED_PRONE_VARIANTS.some(v => variantLowerSkip.includes(v))) {
+        skipEbay = true; skipReason = 'oversized-prone variant';
+      }
       if (skipEbay) {
         if (!preParsed.market) preParsed.market = {};
-        preParsed.market.dataSource = `AI estimate (${skipReason} card — eBay too noisy)`;
+        preParsed.market.dataSource = `AI estimate (${skipReason} — eBay size contamination)`;
         text = JSON.stringify(preParsed);
-        console.log(`Market: skipping eBay scrape (${skipReason}: year=${yearNum})`);
+        console.log(`Market: skipping eBay scrape (${skipReason})`);
       }
     } catch {}
 
@@ -1050,7 +1056,8 @@ app.post('/api/grade', async (req, res) => {
       }
     }
 
-    // For oversized-prone variants with no eBay data, derive raw from AI's own graded estimates
+    // For oversized-prone variants, eBay is skipped — derive raw from AI's graded estimates.
+    // Standard-size inserts trade at ~55% of PSA 10, ~85% of PSA 9, ~92% of PSA 8.
     if (confirmedCard?.variant) {
       try {
         const variantLower = confirmedCard.variant.toLowerCase();
@@ -1059,9 +1066,9 @@ app.post('/api/grade', async (req, res) => {
           const psa10 = Number(parsed.market?.graded?.psa10) || 0;
           const psa9  = Number(parsed.market?.graded?.psa9)  || 0;
           const psa8  = Number(parsed.market?.graded?.psa8)  || 0;
-          if      (psa10 > 0) parsed.market.raw = Math.round(psa10 * 0.45);
-          else if (psa9  > 0) parsed.market.raw = Math.round(psa9  * 0.80);
-          else if (psa8  > 0) parsed.market.raw = Math.round(psa8  * 0.90);
+          if      (psa10 > 0) parsed.market.raw = Math.round(psa10 * 0.55);
+          else if (psa9  > 0) parsed.market.raw = Math.round(psa9  * 0.85);
+          else if (psa8  > 0) parsed.market.raw = Math.round(psa8  * 0.92);
           else if (parsed.market?.raw && Number(parsed.market.raw) < 100) delete parsed.market.raw;
           text = JSON.stringify(parsed);
         }
