@@ -16,6 +16,7 @@
 const VERSION = "3.0.0";
 
 import { useState, useEffect } from "react";
+import { posthog } from "../main";
 import GradeTab from "./GradeTab";
 import MarketTab from "./MarketTab";
 import SubmitTab from "./SubmitTab";
@@ -452,8 +453,13 @@ export default function CardGrader() {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
-      if (s) loadUserPlan(s.access_token);
-      else setUserPlan(null);
+      if (s) {
+        loadUserPlan(s.access_token);
+        posthog.identify(s.user.id, { email: s.user.email });
+      } else {
+        setUserPlan(null);
+        posthog.reset();
+      }
     });
     // Check for post-checkout success
     const params = new URLSearchParams(window.location.search);
@@ -461,6 +467,7 @@ export default function CardGrader() {
       window.history.replaceState({}, '', '/');
       setShowPricing(false);
       setPurchaseSuccess('polling');
+      posthog.capture('purchase_completed');
     }
     return () => subscription.unsubscribe();
   }, []);
@@ -627,8 +634,10 @@ export default function CardGrader() {
     // Block if no device free grades AND no account tokens
     if (deviceFreeLeft() === 0 && (!session || gradesRemaining() === 0)) {
       setShowPricing(true);
+      posthog.capture('paywall_hit');
       return;
     }
+    posthog.capture('grade_started');
     setLoading(true);
     setLoadingMessage("Identifying card…");
     setError(null);
@@ -710,6 +719,7 @@ export default function CardGrader() {
         setResult(parsed);
         setCandidates(null);
         saveGrading(parsed);
+        posthog.capture('grade_completed', { psa_grade: parsed.psa?.grade, player: parsed.player, year: parsed.year, set: parsed.set });
         setToast(true);
         setSpotlightActive(true);
         // Track usage
@@ -852,7 +862,7 @@ export default function CardGrader() {
           onAuth={(s) => { setSession(s); setShowAuth(false); if (s) loadUserPlan(s.access_token); }}
         />
       )}
-      {showPricing && (
+      {showPricing && posthog.capture('pricing_opened') === undefined && (
         <PricingModal
           onClose={() => setShowPricing(false)}
           session={session}
