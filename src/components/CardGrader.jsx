@@ -924,7 +924,7 @@ export default function CardGrader() {
       {/* Post-purchase confirmation banner */}
       {purchaseSuccess && (
         <div style={{
-          position: "fixed", top: 52, left: 0, right: 0, zIndex: 400,
+          position: "fixed", top: 52, left: 0, right: 0, zIndex: 595,
           background: purchaseSuccess === 'confirmed' ? "rgba(48,209,88,0.12)" : "rgba(201,168,76,0.08)",
           borderBottom: `1px solid ${purchaseSuccess === 'confirmed' ? "rgba(48,209,88,0.25)" : "rgba(201,168,76,0.2)"}`,
           padding: "10px 20px",
@@ -942,6 +942,7 @@ export default function CardGrader() {
               <span style={{ color: "#30d158", fontSize: 13, fontWeight: 600 }}>
                 Payment confirmed —{userPlan ? ` ${Math.max(0, userPlan.grade_limit - userPlan.grades_used)} tokens` : " tokens"} added to your account
               </span>
+              <button onClick={() => setPurchaseSuccess(null)} style={{ marginLeft: 8, background: "none", border: "none", color: "rgba(255,255,255,0.3)", fontSize: 16, cursor: "pointer", padding: 0, lineHeight: 1 }}>×</button>
             </>
           )}
         </div>
