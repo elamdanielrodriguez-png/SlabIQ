@@ -1077,8 +1077,8 @@ export default function GradeTab({ images, result, candidates, loading, error, o
         );
       })()}
 
-      {/* Grade button */}
-      {images.length > 0 && (
+      {/* Grade button — hide once candidates are showing or grading is done */}
+      {images.length > 0 && !result && !(candidates?.length > 0) && (
         <button
           onClick={onGrade}
           disabled={loading}
