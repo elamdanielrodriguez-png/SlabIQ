@@ -1079,8 +1079,12 @@ export default function GradeTab({ images, result, candidates, loading, error, o
             {/* Market row */}
             <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
-                <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 3 }}>Raw Value</div>
+                <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 3 }}>Raw</div>
                 <div style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>$18</div>
+              </div>
+              <div>
+                <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 3 }}>PSA Cost</div>
+                <div style={{ color: "#ff453a", fontSize: 16, fontWeight: 700 }}>$33</div>
               </div>
               <div>
                 <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 3 }}>PSA 8</div>
@@ -1090,13 +1094,13 @@ export default function GradeTab({ images, result, candidates, loading, error, o
                 <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 3 }}>PSA 10</div>
                 <div style={{ color: "#c9a84c", fontSize: 16, fontWeight: 700 }}>$220</div>
               </div>
-              <div style={{
-                background: "rgba(255,69,58,0.1)", border: "1px solid rgba(255,69,58,0.25)",
-                borderRadius: 8, padding: "6px 10px", textAlign: "center",
-              }}>
-                <div style={{ color: "#ff453a", fontSize: 10, fontWeight: 700 }}>Don't Submit</div>
-                <div style={{ color: "rgba(255,255,255,0.25)", fontSize: 9, marginTop: 1 }}>–$3 ROI</div>
-              </div>
+            </div>
+            <div style={{
+              background: "rgba(255,69,58,0.08)", border: "1px solid rgba(255,69,58,0.2)",
+              borderRadius: 10, padding: "8px 12px", display: "flex", justifyContent: "space-between", alignItems: "center",
+            }}>
+              <span style={{ color: "#ff453a", fontSize: 12, fontWeight: 700 }}>Don't Submit</span>
+              <span style={{ color: "rgba(255,255,255,0.3)", fontSize: 11 }}>$48 return − $18 raw − $33 PSA = <span style={{ color: "#ff453a", fontWeight: 600 }}>−$3</span></span>
             </div>
 
           </div>
