@@ -25,7 +25,7 @@ import AuthModal from "./AuthModal";
 import PricingModal from "./PricingModal";
 import { supabase } from "../lib/supabase";
 
-const FREE_GRADE_KEY = 'slabiq_free_grades_used';
+const FREE_GRADE_KEY = 'cgon_free_grades_used';
 const FREE_GRADE_LIMIT = 2;
 
 function LoadingOverlay({ message }) {
@@ -69,7 +69,7 @@ function LoadingOverlayInner({ isIdentify }) {
       gap: 32,
     }}>
       <div style={{ position: "relative", width: 72, height: 72 }}>
-        <svg width="72" height="72" style={{ display: "block" }} className="slabiq-spin">
+        <svg width="72" height="72" style={{ display: "block" }} className="cgon-spin">
           <circle cx="36" cy="36" r="30" fill="none" stroke="rgba(201,168,76,0.12)" strokeWidth="3" />
           <circle cx="36" cy="36" r="30" fill="none" stroke="#c9a84c" strokeWidth="3"
             strokeDasharray="58 130" strokeLinecap="round" transform="rotate(-90 36 36)" />
@@ -141,7 +141,7 @@ function Toast({ onDone }) {
     return () => clearTimeout(t);
   }, []);
   return (
-    <div className="slabiq-toast" style={{
+    <div className="cgon-toast" style={{
       position: "fixed", bottom: 108, left: "50%",
       transform: "translateX(-50%)",
       background: "rgba(28,28,30,0.98)",
@@ -565,7 +565,7 @@ export default function CardGrader() {
 
   const saveGrading = (parsed) => {
     try {
-      const existing = JSON.parse(localStorage.getItem('slabiq_history') || '[]');
+      const existing = JSON.parse(localStorage.getItem('cgon_history') || '[]');
       const entry = {
         id: Date.now().toString(),
         savedAt: new Date().toISOString(),
@@ -579,7 +579,7 @@ export default function CardGrader() {
         raw_value: parsed.market?.raw ?? null,
         result: parsed,
       };
-      localStorage.setItem('slabiq_history', JSON.stringify([entry, ...existing].slice(0, 50)));
+      localStorage.setItem('cgon_history', JSON.stringify([entry, ...existing].slice(0, 50)));
     } catch (e) {
       console.warn('Failed to save grading:', e.message);
     }
@@ -766,12 +766,22 @@ export default function CardGrader() {
           alignItems: "center",
           justifyContent: "space-between",
         }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-            <span style={{ fontSize: 17, fontWeight: 700, letterSpacing: "-0.4px", color: "#fff" }}>
-              CardGradeOrNot
-            </span>
-            <span style={{ fontSize: 11, fontWeight: 500, color: "#c9a84c", letterSpacing: "0.06em" }}>
-              PSA · BGS · BETA
+          <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+            {/* Card + grade stamp icon */}
+            <svg width="26" height="26" viewBox="0 0 26 26" fill="none" style={{ flexShrink: 0 }}>
+              <rect x="2" y="2" width="16" height="22" rx="2.5" stroke="#c9a84c" strokeWidth="1.6" fill="none" opacity="0.9"/>
+              <rect x="5" y="5" width="10" height="6" rx="1.2" fill="#c9a84c" opacity="0.2"/>
+              <line x1="5" y1="14.5" x2="15" y2="14.5" stroke="#c9a84c" strokeWidth="1" opacity="0.35"/>
+              <line x1="5" y1="17.5" x2="11" y2="17.5" stroke="#c9a84c" strokeWidth="1" opacity="0.22"/>
+              <circle cx="19.5" cy="19.5" r="5.5" fill="#111" stroke="#c9a84c" strokeWidth="1.4"/>
+              <text x="19.5" y="23" textAnchor="middle" fill="#c9a84c" fontSize="5.5" fontWeight="800" fontFamily="system-ui">10</text>
+            </svg>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 0 }}>
+              <span style={{ fontSize: 17, fontWeight: 800, letterSpacing: "-0.5px", color: "#fff" }}>CardGrade</span>
+              <span style={{ fontSize: 17, fontWeight: 800, letterSpacing: "-0.5px", color: "#c9a84c" }}>OrNot</span>
+            </div>
+            <span style={{ fontSize: 9, fontWeight: 700, color: "rgba(201,168,76,0.5)", letterSpacing: "0.12em", textTransform: "uppercase", marginLeft: 2, alignSelf: "center" }}>
+              BETA
             </span>
           </div>
 
@@ -895,7 +905,7 @@ export default function CardGrader() {
         }}>
           {purchaseSuccess === 'polling' ? (
             <>
-              <div style={{ width: 12, height: 12, borderRadius: "50%", border: "2px solid #c9a84c", borderTopColor: "transparent", animation: "slabiq-spin 0.7s linear infinite" }} />
+              <div style={{ width: 12, height: 12, borderRadius: "50%", border: "2px solid #c9a84c", borderTopColor: "transparent", animation: "cgonSpin 0.7s linear infinite" }} />
               <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 13, fontWeight: 500 }}>Confirming payment…</span>
             </>
           ) : (

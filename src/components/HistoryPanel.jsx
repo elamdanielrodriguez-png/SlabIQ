@@ -2,14 +2,14 @@ import { useState } from 'react'
 
 export default function HistoryPanel({ onRestore }) {
   const [gradings, setGradings] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('slabiq_history') || '[]'); }
+    try { return JSON.parse(localStorage.getItem('cgon_history') || '[]'); }
     catch { return []; }
   });
 
   const deleteGrading = (id) => {
     const updated = gradings.filter(g => g.id !== id);
     setGradings(updated);
-    localStorage.setItem('slabiq_history', JSON.stringify(updated));
+    localStorage.setItem('cgon_history', JSON.stringify(updated));
   };
 
   if (gradings.length === 0) {
