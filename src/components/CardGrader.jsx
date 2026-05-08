@@ -776,9 +776,6 @@ export default function CardGrader() {
               <span style={{ fontSize: 17, fontWeight: 800, letterSpacing: "-0.5px", color: "#fff" }}>CardGrade</span>
               <span style={{ fontSize: 17, fontWeight: 800, letterSpacing: "-0.5px", color: "#c9a84c" }}>OrNot</span>
             </div>
-            <span style={{ fontSize: 9, fontWeight: 700, color: "rgba(201,168,76,0.5)", letterSpacing: "0.12em", textTransform: "uppercase", marginLeft: 2, alignSelf: "center" }}>
-              BETA
-            </span>
           </div>
 
           {/* Auth / usage area */}

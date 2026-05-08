@@ -1019,6 +1019,90 @@ export default function GradeTab({ images, result, candidates, loading, error, o
         </div>
       )}
 
+      {/* Sample grade result — shown only on empty state */}
+      {images.length === 0 && !result && !candidates && !loading && (
+        <div style={{ marginTop: 8, opacity: 0.9 }}>
+          {/* Label */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.06)" }} />
+            <span style={{ color: "rgba(255,255,255,0.2)", fontSize: 10, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase" }}>Sample Grade</span>
+            <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.06)" }} />
+          </div>
+
+          {/* Grade card */}
+          <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 20, padding: "20px 16px", display: "flex", flexDirection: "column", gap: 16 }}>
+
+            {/* Card identity */}
+            <div style={{ textAlign: "center" }}>
+              <div style={{ color: "rgba(255,255,255,0.55)", fontSize: 13, fontWeight: 600, letterSpacing: "-0.2px" }}>Patrick Mahomes</div>
+              <div style={{ color: "rgba(255,255,255,0.25)", fontSize: 11, marginTop: 2 }}>2020 Panini Prizm · Base</div>
+            </div>
+
+            {/* PSA / BGS grades */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1px 1fr" }}>
+              {[
+                { label: "PSA", grade: "8", sub: "NM-MT", color: "#4fc3f7" },
+                { label: "BGS", grade: "8.5", sub: "NM-MT+", color: "#4fc3f7" },
+              ].map(({ label, grade, sub, color }, i) => (
+                <div key={label} style={{ textAlign: "center", padding: i === 0 ? "0 20px 0 0" : "0 0 0 20px" }}>
+                  <div style={{ color: "rgba(255,255,255,0.25)", fontSize: 10, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 8 }}>{label}</div>
+                  <div style={{ fontSize: 52, fontWeight: 800, letterSpacing: "-2px", lineHeight: 1, color, textShadow: `0 0 28px ${color}55` }}>{grade}</div>
+                  <div style={{ color: "rgba(255,255,255,0.25)", fontSize: 10, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginTop: 6 }}>{sub}</div>
+                </div>
+              ))}
+              <div style={{ background: "rgba(255,255,255,0.06)" }} />
+            </div>
+
+            {/* Subgrades */}
+            <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 14, display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6, textAlign: "center" }}>
+              {[
+                { label: "Centering", value: "9.0" },
+                { label: "Corners",   value: "8.5" },
+                { label: "Edges",     value: "8.5" },
+                { label: "Surface",   value: "9.0" },
+              ].map(({ label, value }) => (
+                <div key={label}>
+                  <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>{label}</div>
+                  <div style={{ color: "#fff", fontSize: 16, fontWeight: 700, letterSpacing: "-0.5px" }}>{value}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Verdict */}
+            <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 14 }}>
+              <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 9, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 6 }}>Verdict</div>
+              <div style={{ color: "rgba(255,255,255,0.45)", fontSize: 12, lineHeight: 1.6 }}>
+                Visible whitening on corner-TR and corner-BL. Edge-right shows a faint chip not present on the PSA 10 reference. Surface is clean. Strong candidate for PSA 8 — not gem mint.
+              </div>
+            </div>
+
+            {/* Market row */}
+            <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 3 }}>Raw Value</div>
+                <div style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>$18</div>
+              </div>
+              <div>
+                <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 3 }}>PSA 8</div>
+                <div style={{ color: "#4fc3f7", fontSize: 16, fontWeight: 700 }}>$42</div>
+              </div>
+              <div>
+                <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 3 }}>PSA 10</div>
+                <div style={{ color: "#c9a84c", fontSize: 16, fontWeight: 700 }}>$95</div>
+              </div>
+              <div style={{
+                background: "rgba(255,69,58,0.1)", border: "1px solid rgba(255,69,58,0.25)",
+                borderRadius: 8, padding: "6px 10px", textAlign: "center",
+              }}>
+                <div style={{ color: "#ff453a", fontSize: 10, fontWeight: 700 }}>Don't Submit</div>
+                <div style={{ color: "rgba(255,255,255,0.25)", fontSize: 9, marginTop: 1 }}>–$9 ROI</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
       {cameraOpen && (
         <CameraCapture
           onCapture={(file) => { onAddImages([file]); setCameraOpen(false); }}
