@@ -396,7 +396,7 @@ OVERSIZED INSERT PRICING RULE: Downtown, Stained Glass, Color Blast, Sparkle, an
 
 Market ratios: PSA10=100% | PSA9=20-40% | BGS BL=200-1000% | BGS10=100-150% | BGS9.5=50-75% | BGS9=40-60%
 Submission threshold: net profit ≥ $30 AND ROI ≥ 25%
-PSA tiers: Value $22(<$500), Regular $75(<$1500), Express $150(<$2500), Super Express $250(<$5000), Walk-Through $600(<$10000), Premium ≥$10000 ($1000 per $25k declared value, e.g. $10k card=$1000, $26k card=$2000)
+PSA tiers: Value $33(<$500), Regular $75(<$1500), Express $150(<$2500), Super Express $250(<$5000), Walk-Through $600(<$10000), Premium ≥$10000 ($1000 per $25k declared value, e.g. $10k card=$1000, $26k card=$2000)
 BGS tiers: Standard $25(<$499), Express $40(<$999), Fast Track $100(<$2000), Walk-Through $300
 
 POP REPORT CALIBRATION — real anchors for accurate popData estimates:
@@ -1084,7 +1084,7 @@ app.post('/api/grade', async (req, res) => {
         const raw = parsed.market.raw ?? 0;
 
         const psaTierFor = (v) => {
-          if (v < 500)   return { tier: 'Value',         cost: 22   };
+          if (v < 500)   return { tier: 'Value',         cost: 33   };
           if (v < 1500)  return { tier: 'Regular',       cost: 75   };
           if (v < 2500)  return { tier: 'Express',       cost: 150  };
           if (v < 5000)  return { tier: 'Super Express', cost: 250  };

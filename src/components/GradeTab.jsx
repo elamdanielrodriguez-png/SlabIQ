@@ -955,7 +955,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
             <div style={{ position: "relative", marginBottom: 24, display: "flex", alignItems: "center", justifyContent: "center", gap: 12 }}>
               <div style={{ textAlign: "center" }}>
                 <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 3 }}>PSA</div>
-                <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 22, fontWeight: 700, letterSpacing: "-0.5px", textDecoration: "line-through", textDecorationColor: "rgba(255,80,80,0.5)" }}>$22+</div>
+                <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 22, fontWeight: 700, letterSpacing: "-0.5px", textDecoration: "line-through", textDecorationColor: "rgba(255,80,80,0.5)" }}>$33+</div>
               </div>
               <div style={{ color: "rgba(255,255,255,0.15)", fontSize: 20, fontWeight: 300 }}>→</div>
               <div style={{ textAlign: "center" }}>
