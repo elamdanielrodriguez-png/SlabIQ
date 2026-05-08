@@ -817,7 +817,32 @@ export default function GradeTab({ images, result, candidates, loading, error, o
   const [dismissedDefects, setDismissedDefects] = useState([]);
   const [showCenteringEditor, setShowCenteringEditor] = useState(false);
   const [photoQuality, setPhotoQuality] = useState(null); // null | 'good' | 'dark' | 'blurry'
+  const [showUrlInput, setShowUrlInput] = useState(false);
+  const [urlValue, setUrlValue] = useState('');
+  const [urlLoading, setUrlLoading] = useState(false);
+  const [urlError, setUrlError] = useState(null);
   const handleDrop = (e) => { e.preventDefault(); onAddImages(e.dataTransfer.files); };
+
+  const handleUrlFetch = async () => {
+    if (!urlValue.trim()) return;
+    setUrlLoading(true); setUrlError(null);
+    try {
+      const res = await fetch('/api/fetch-listing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: urlValue.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setUrlError(data.error ?? 'Failed to fetch listing'); setUrlLoading(false); return; }
+      const blob = await fetch(`data:${data.mediaType};base64,${data.imageData}`).then(r => r.blob());
+      const file = new File([blob], 'listing.jpg', { type: data.mediaType });
+      onAddImages([file]);
+      setShowUrlInput(false); setUrlValue('');
+    } catch {
+      setUrlError('Could not fetch listing. Check the URL and try again.');
+    }
+    setUrlLoading(false);
+  };
 
   useEffect(() => {
     if (!images.length || result) { setPhotoQuality(null); return; }
@@ -1016,6 +1041,43 @@ export default function GradeTab({ images, result, candidates, loading, error, o
                 }}
               >Upload Photo</button>
             </div>
+
+            {/* URL input */}
+            {showUrlInput ? (
+              <div style={{ position: "relative", marginBottom: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input
+                    autoFocus
+                    placeholder="https://ebay.com/itm/..."
+                    value={urlValue}
+                    onChange={e => { setUrlValue(e.target.value); setUrlError(null); }}
+                    onKeyDown={e => e.key === 'Enter' && handleUrlFetch()}
+                    style={{
+                      flex: 1, padding: "11px 14px",
+                      background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
+                      borderRadius: 12, color: "#fff", fontSize: 13, fontFamily: "inherit",
+                      outline: "none",
+                    }}
+                  />
+                  <button onClick={handleUrlFetch} disabled={urlLoading} style={{
+                    padding: "11px 16px", background: "#c9a84c", color: "#000",
+                    border: "none", borderRadius: 12, fontSize: 13, fontWeight: 700,
+                    cursor: urlLoading ? "not-allowed" : "pointer", fontFamily: "inherit", flexShrink: 0,
+                  }}>{urlLoading ? "…" : "Grade"}</button>
+                </div>
+                {urlError && <div style={{ color: "#ff453a", fontSize: 12 }}>{urlError}</div>}
+                <button onClick={() => { setShowUrlInput(false); setUrlValue(''); setUrlError(null); }} style={{
+                  background: "none", border: "none", color: "rgba(255,255,255,0.25)",
+                  fontSize: 12, cursor: "pointer", fontFamily: "inherit", padding: 0, textAlign: "left",
+                }}>Cancel</button>
+              </div>
+            ) : (
+              <button onClick={() => setShowUrlInput(true)} style={{
+                background: "none", border: "none", color: "rgba(255,255,255,0.3)",
+                fontSize: 12, cursor: "pointer", fontFamily: "inherit", padding: "0 0 14px",
+                textDecoration: "underline", textUnderlineOffset: 3,
+              }}>or paste an eBay listing URL</button>
+            )}
 
             {/* Free trial nudge */}
             <div style={{ position: "relative", color: "#fff", fontSize: 15, fontWeight: 700, letterSpacing: "-0.2px", opacity: 0.82, marginBottom: 20 }}>

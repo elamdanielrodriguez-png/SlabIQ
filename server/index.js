@@ -699,6 +699,40 @@ app.post('/api/checkout', async (req, res) => {
 });
 
 
+app.post('/api/fetch-listing', async (req, res) => {
+  const { url } = req.body;
+  if (!url?.trim()) return res.status(400).json({ error: 'URL required' });
+
+  const ebayMatch = url.match(/\/itm\/(?:[^/]+\/)?(\d{10,13})/);
+  if (!ebayMatch) return res.status(400).json({ error: 'Only eBay listing URLs are supported right now' });
+
+  const itemId = ebayMatch[1];
+  const token = await getEbayToken();
+  if (!token) return res.status(503).json({ error: 'eBay not configured' });
+
+  try {
+    const itemRes = await fetchWithTimeout(
+      `https://api.ebay.com/buy/browse/v1/item/v1|${itemId}|0`,
+      { headers: { 'Authorization': `Bearer ${token}`, 'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US' } },
+      8000
+    );
+    const item = await itemRes.json();
+    if (!item.itemId) return res.status(404).json({ error: 'Listing not found or has ended' });
+
+    const imageUrl = item.image?.imageUrl ?? item.additionalImages?.[0]?.imageUrl;
+    if (!imageUrl) return res.status(404).json({ error: 'No image found in this listing' });
+
+    const img = await urlToBase64(imageUrl);
+    if (!img) return res.status(502).json({ error: 'Could not download listing image' });
+
+    console.log(`Fetch listing: ${itemId} — "${item.title?.slice(0, 60)}"`);
+    res.json({ imageData: img.data, mediaType: img.mediaType, title: item.title ?? '' });
+  } catch (err) {
+    console.error('Fetch listing error:', err.message);
+    res.status(502).json({ error: 'Could not fetch listing. Make sure it\'s a valid eBay item URL.' });
+  }
+});
+
 app.post('/api/search', async (req, res) => {
   const { images, query } = req.body;
   if (!query?.trim()) return res.status(400).json({ error: 'Query is required' });
