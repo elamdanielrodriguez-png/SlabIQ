@@ -24,6 +24,7 @@ import HistoryPanel from "./HistoryPanel";
 import AuthModal from "./AuthModal";
 import PricingModal from "./PricingModal";
 import Logo from "./Logo";
+import BulkTab from "./BulkTab";
 import { supabase } from "../lib/supabase";
 
 const FREE_GRADE_KEY = 'cgon_free_grades_used';
@@ -159,9 +160,10 @@ function Toast({ onDone }) {
 }
 
 const TABS = [
-  { id: "grade", label: "Grade" },
-  { id: "market", label: "Market" },
-  { id: "submit", label: "Submit" },
+  { id: "grade",   label: "Grade"   },
+  { id: "bulk",    label: "Bulk"    },
+  { id: "market",  label: "Market"  },
+  { id: "submit",  label: "Submit"  },
   { id: "history", label: "History" },
 ];
 
@@ -842,6 +844,14 @@ export default function CardGrader() {
               onUpgrade={() => setShowPricing(true)}
               selectedModel={selectedModel}
               onSelectModel={setSelectedModel}
+            />
+          )}
+          {activeTab === "bulk" && (
+            <BulkTab
+              session={session}
+              userPlan={userPlan}
+              isLoggedIn={!!session}
+              onUpgrade={() => setShowPricing(true)}
             />
           )}
           {activeTab === "market" && result && <MarketTab result={result} />}
