@@ -161,7 +161,6 @@ function Toast({ onDone }) {
 
 const TABS = [
   { id: "grade",   label: "Grade"   },
-  { id: "bulk",    label: "Bulk"    },
   { id: "market",  label: "Market"  },
   { id: "submit",  label: "Submit"  },
   { id: "history", label: "History" },
@@ -425,6 +424,7 @@ function recomputeBgsAndPsa(prevResult, centering) {
 
 export default function CardGrader() {
   const [activeTab, setActiveTab] = useState("grade");
+  const [gradeMode, setGradeMode] = useState("single");
   const [tabKey, setTabKey] = useState(0);
   const [images, setImages] = useState([]);
   const [result, setResult] = useState(null);
@@ -824,35 +824,60 @@ export default function CardGrader() {
       <main style={{ maxWidth: 700, margin: "0 auto", padding: "20px 16px 148px" }}>
         <div key={tabKey} className="anim-fade-up">
           {activeTab === "grade" && (
-            <GradeTab
-              images={images}
-              result={result}
-              candidates={candidates}
-              loading={loading}
-              error={error}
-              onAddImages={addImages}
-              onRemoveImage={removeImage}
-              onSetRole={cycleRole}
-              onGrade={identifyCard}
-              onConfirmCandidate={(card) => gradeCards(card)}
-              onSearch={searchCards}
-              onUpdateCentering={updateImageCentering}
-              gradesUsed={gradesUsedDisplay()}
-              gradesTotal={gradeLimit()}
-              isLoggedIn={!!session}
-              planName={userPlan?.plan ?? 'free'}
-              onUpgrade={() => setShowPricing(true)}
-              selectedModel={selectedModel}
-              onSelectModel={setSelectedModel}
-            />
-          )}
-          {activeTab === "bulk" && (
-            <BulkTab
-              session={session}
-              userPlan={userPlan}
-              isLoggedIn={!!session}
-              onUpgrade={() => setShowPricing(true)}
-            />
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {/* Single / Bulk toggle */}
+              <div style={{ display: "flex", background: "rgba(255,255,255,0.05)", borderRadius: 10, padding: 3, gap: 3 }}>
+                {["single", "bulk"].map(mode => (
+                  <button
+                    key={mode}
+                    onClick={() => setGradeMode(mode)}
+                    style={{
+                      flex: 1, padding: "7px 0",
+                      background: gradeMode === mode ? "rgba(255,255,255,0.1)" : "transparent",
+                      border: "none", borderRadius: 8,
+                      color: gradeMode === mode ? "#fff" : "rgba(255,255,255,0.35)",
+                      fontSize: 13, fontWeight: gradeMode === mode ? 700 : 500,
+                      cursor: "pointer", fontFamily: "inherit",
+                      transition: "all 0.15s ease",
+                      letterSpacing: "-0.1px",
+                    }}
+                  >
+                    {mode === "single" ? "Single" : "Bulk"}
+                  </button>
+                ))}
+              </div>
+
+              {gradeMode === "single" ? (
+                <GradeTab
+                  images={images}
+                  result={result}
+                  candidates={candidates}
+                  loading={loading}
+                  error={error}
+                  onAddImages={addImages}
+                  onRemoveImage={removeImage}
+                  onSetRole={cycleRole}
+                  onGrade={identifyCard}
+                  onConfirmCandidate={(card) => gradeCards(card)}
+                  onSearch={searchCards}
+                  onUpdateCentering={updateImageCentering}
+                  gradesUsed={gradesUsedDisplay()}
+                  gradesTotal={gradeLimit()}
+                  isLoggedIn={!!session}
+                  planName={userPlan?.plan ?? 'free'}
+                  onUpgrade={() => setShowPricing(true)}
+                  selectedModel={selectedModel}
+                  onSelectModel={setSelectedModel}
+                />
+              ) : (
+                <BulkTab
+                  session={session}
+                  userPlan={userPlan}
+                  isLoggedIn={!!session}
+                  onUpgrade={() => setShowPricing(true)}
+                />
+              )}
+            </div>
           )}
           {activeTab === "market" && result && <MarketTab result={result} />}
           {activeTab === "submit" && result && <SubmitTab result={result} />}
