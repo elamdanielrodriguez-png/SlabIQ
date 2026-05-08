@@ -947,23 +947,25 @@ export default function GradeTab({ images, result, candidates, loading, error, o
             </div>
 
             {/* Headline */}
-            <div style={{ color: "#fff", fontSize: 26, fontWeight: 800, letterSpacing: "-0.8px", lineHeight: 1.15, marginBottom: 10, position: "relative" }}>
+            <div style={{ color: "#fff", fontSize: 26, fontWeight: 800, letterSpacing: "-0.8px", lineHeight: 1.15, marginBottom: 20, position: "relative" }}>
               Know If It's a 10<br />Before You Submit
             </div>
 
-            {/* Subtitle */}
-            <div style={{ color: "rgba(255,255,255,0.38)", fontSize: 13, letterSpacing: "-0.1px", lineHeight: 1.7, margin: "0 auto 16px", maxWidth: 270, position: "relative" }}>
-              Compares your card against real PSA 10 graded copies. Catches microscopic surface scratches — the flaws that cost you a gem mint.
-            </div>
-
             {/* Cost comparison */}
-            <div style={{ position: "relative", marginBottom: 20 }}>
-              <span style={{ color: "rgba(255,255,255,0.22)", fontSize: 12 }}>PSA charges $75 to find out. </span>
-              <span style={{ color: "#c9a84c", fontSize: 12, fontWeight: 600 }}>We charge $0.40.</span>
+            <div style={{ position: "relative", marginBottom: 24, display: "flex", alignItems: "center", justifyContent: "center", gap: 12 }}>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 3 }}>PSA</div>
+                <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 22, fontWeight: 700, letterSpacing: "-0.5px", textDecoration: "line-through", textDecorationColor: "rgba(255,80,80,0.5)" }}>$75</div>
+              </div>
+              <div style={{ color: "rgba(255,255,255,0.15)", fontSize: 20, fontWeight: 300 }}>→</div>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ color: "rgba(201,168,76,0.6)", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 3 }}>Us</div>
+                <div style={{ color: "#c9a84c", fontSize: 22, fontWeight: 800, letterSpacing: "-0.5px" }}>$0.40</div>
+              </div>
             </div>
 
             {/* CTA buttons */}
-            <div style={{ display: "flex", gap: 10, position: "relative", marginBottom: 14 }}>
+            <div style={{ display: "flex", gap: 10, position: "relative", marginBottom: 18 }}>
               <button
                 onClick={() => setCameraOpen(true)}
                 style={{
@@ -988,7 +990,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
             </div>
 
             {/* Free trial nudge */}
-            <div style={{ position: "relative", color: "rgba(255,255,255,0.28)", fontSize: 12 }}>
+            <div style={{ position: "relative", color: "#fff", fontSize: 15, fontWeight: 700, letterSpacing: "-0.2px", opacity: 0.82 }}>
               2 free grades — no account required
             </div>
           </div>
@@ -999,19 +1001,20 @@ export default function GradeTab({ images, result, candidates, loading, error, o
       {images.length === 0 && !result && !candidates && !loading && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
           {[
-            { title: "Graded Against Real 10s",    desc: "Pulls actual PSA 10 sold listings from eBay and inspects every corner, edge, and surface against them" },
-            { title: "Catches What You Can't See", desc: "Microscopic scratches that cost you a gem mint — spotted the same way PSA graders check surface"       },
-            { title: "Never Fakes a Flaw",         desc: "Prizm, foil, chrome, and holo patterns are never confused with real surface damage"                    },
-            { title: "Exact ROI Before You Decide", desc: "Live eBay prices, expected grade, and dollar profit at every PSA and BGS tier"                       },
-          ].map(({ title, desc }, i) => (
+            { icon: "🔍", title: "Graded Against Real 10s",     desc: "Every zone compared to actual PSA 10 sold listings" },
+            { icon: "🧬", title: "Catches What You Can't See",  desc: "Microscopic scratches spotted before you pay $75"   },
+            { icon: "✓",  title: "Never Fakes a Flaw",          desc: "Prizm & holo patterns never mistaken for damage"    },
+            { icon: "💰", title: "Exact ROI Before You Decide", desc: "Live eBay prices + dollar profit at every grade"    },
+          ].map(({ icon, title, desc }, i) => (
             <div key={title} className={`result-card-${i}`} style={{
               background: "rgba(255,255,255,0.03)",
               border: "1px solid rgba(255,255,255,0.06)",
               borderRadius: 16,
-              padding: "14px 14px",
+              padding: "14px 12px",
             }}>
-              <div style={{ color: "rgba(255,255,255,0.72)", fontSize: 13, fontWeight: 600, letterSpacing: "-0.2px", marginBottom: 4 }}>{title}</div>
-              <div style={{ color: "rgba(255,255,255,0.28)", fontSize: 12, lineHeight: 1.5 }}>{desc}</div>
+              <div style={{ fontSize: 18, marginBottom: 6 }}>{icon}</div>
+              <div style={{ color: "rgba(255,255,255,0.72)", fontSize: 12, fontWeight: 700, letterSpacing: "-0.2px", marginBottom: 4 }}>{title}</div>
+              <div style={{ color: "rgba(255,255,255,0.28)", fontSize: 11, lineHeight: 1.5 }}>{desc}</div>
             </div>
           ))}
         </div>
