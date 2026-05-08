@@ -816,7 +816,35 @@ export default function GradeTab({ images, result, candidates, loading, error, o
   const [dismissedNegs, setDismissedNegs] = useState([]);
   const [dismissedDefects, setDismissedDefects] = useState([]);
   const [showCenteringEditor, setShowCenteringEditor] = useState(false);
+  const [photoQuality, setPhotoQuality] = useState(null); // null | 'good' | 'dark' | 'blurry'
   const handleDrop = (e) => { e.preventDefault(); onAddImages(e.dataTransfer.files); };
+
+  useEffect(() => {
+    if (!images.length || result) { setPhotoQuality(null); return; }
+    const url = images[0].objectURL;
+    if (!url) return;
+    const img = new Image();
+    img.onload = () => {
+      const size = 80;
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, size, size);
+      const data = ctx.getImageData(0, 0, size, size).data;
+      let sum = 0, sumSq = 0, n = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        const b = data[i] * 0.299 + data[i+1] * 0.587 + data[i+2] * 0.114;
+        sum += b; sumSq += b * b; n++;
+      }
+      const avg = sum / n;
+      const stdDev = Math.sqrt(sumSq / n - avg * avg);
+      if (avg < 45) setPhotoQuality('dark');
+      else if (stdDev < 18) setPhotoQuality('blurry');
+      else setPhotoQuality('good');
+    };
+    img.onerror = () => setPhotoQuality(null);
+    img.src = url;
+  }, [images, result]);
 
   const frontImg = result ? (images.find(img => img.role === 'front') ?? images[0] ?? null) : null;
   // Only treat centering as "user-confirmed" if they actually opened the editor and hit Confirm.
@@ -990,8 +1018,23 @@ export default function GradeTab({ images, result, candidates, loading, error, o
             </div>
 
             {/* Free trial nudge */}
-            <div style={{ position: "relative", color: "#fff", fontSize: 15, fontWeight: 700, letterSpacing: "-0.2px", opacity: 0.82 }}>
+            <div style={{ position: "relative", color: "#fff", fontSize: 15, fontWeight: 700, letterSpacing: "-0.2px", opacity: 0.82, marginBottom: 20 }}>
               2 free grades — no account required
+            </div>
+
+            {/* Photo tips */}
+            <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 7, textAlign: "left", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 18 }}>
+              <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 2 }}>For the best grade</div>
+              {[
+                "Fill the frame — card should take up most of the photo",
+                "Use bright natural light or a lamp, no flash",
+                "Hold steady on a flat surface, avoid glare",
+              ].map(tip => (
+                <div key={tip} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                  <span style={{ color: "rgba(201,168,76,0.45)", fontSize: 12, lineHeight: 1.6, flexShrink: 0 }}>·</span>
+                  <span style={{ color: "rgba(255,255,255,0.28)", fontSize: 12, lineHeight: 1.6 }}>{tip}</span>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -1166,6 +1209,27 @@ export default function GradeTab({ images, result, candidates, loading, error, o
           </div>
         );
       })()}
+
+      {/* Photo quality warning */}
+      {images.length > 0 && !result && !candidates?.length && photoQuality && photoQuality !== 'good' && (
+        <div style={{
+          background: photoQuality === 'dark' ? "rgba(255,69,58,0.07)" : "rgba(255,159,10,0.07)",
+          border: `1px solid ${photoQuality === 'dark' ? "rgba(255,69,58,0.25)" : "rgba(255,159,10,0.25)"}`,
+          borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "flex-start", gap: 10,
+        }}>
+          <div style={{ fontSize: 16, flexShrink: 0 }}>{photoQuality === 'dark' ? '🌑' : '🔆'}</div>
+          <div>
+            <div style={{ color: photoQuality === 'dark' ? "#ff453a" : "#ff9f0a", fontSize: 13, fontWeight: 700, marginBottom: 2 }}>
+              {photoQuality === 'dark' ? 'Photo too dark' : 'Photo may be blurry or overexposed'}
+            </div>
+            <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 12, lineHeight: 1.5 }}>
+              {photoQuality === 'dark'
+                ? 'Move to bright natural light or turn on a lamp — dark photos miss surface scratches.'
+                : 'Hold your phone steady and make sure the card is in focus before capturing.'}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Grade button — hide once candidates are showing or grading is done */}
       {images.length > 0 && !result && !(candidates?.length > 0) && (
