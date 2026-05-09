@@ -1126,89 +1126,79 @@ export default function GradeTab({ images, result, candidates, loading, error, o
 
       {/* Sample grade result — shown only on empty state */}
       {images.length === 0 && !result && !candidates && !loading && (
-        <div style={{ marginTop: 8, opacity: 0.9 }}>
-          {/* Label */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-            <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.06)" }} />
-            <span style={{ color: "rgba(255,255,255,0.2)", fontSize: 10, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase" }}>Sample Grade</span>
-            <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.06)" }} />
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+
+          {/* Identity row */}
+          <div style={{ ...card, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ color: "#fff", fontSize: 17, fontWeight: 700, letterSpacing: "-0.4px", marginBottom: 4 }}>
+                Patrick Mahomes
+              </div>
+              <div style={{ color: "rgba(255,255,255,0.38)", fontSize: 12, letterSpacing: "-0.1px" }}>
+                2020  ·  Panini Prizm  ·  Base  ·  #120
+              </div>
+            </div>
+            <div style={{ textAlign: "center", flexShrink: 0 }}>
+              <div style={{ color: "rgba(255,255,255,0.15)", fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 3 }}>Preview</div>
+              <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 13, fontWeight: 700 }}>82%</div>
+            </div>
           </div>
 
-          {/* Grade card */}
-          <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 20, padding: "20px 16px", display: "flex", flexDirection: "column", gap: 16 }}>
-
-            {/* Card identity */}
-            <div style={{ textAlign: "center" }}>
-              <div style={{ color: "rgba(255,255,255,0.55)", fontSize: 13, fontWeight: 600, letterSpacing: "-0.2px" }}>Patrick Mahomes</div>
-              <div style={{ color: "rgba(255,255,255,0.25)", fontSize: 11, marginTop: 2 }}>2020 Panini Prizm · Base</div>
-            </div>
-
-            {/* PSA / BGS grades */}
+          {/* Grade hero */}
+          <div style={card}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1px 1fr" }}>
-              {[
-                { label: "PSA", grade: "8", sub: "NM-MT", color: "#4fc3f7" },
-                { label: "BGS", grade: "8.5", sub: "NM-MT+", color: "#4fc3f7" },
-              ].map(({ label, grade, sub, color }, i) => (
-                <div key={label} style={{ textAlign: "center", padding: i === 0 ? "0 20px 0 0" : "0 0 0 20px" }}>
-                  <div style={{ color: "rgba(255,255,255,0.25)", fontSize: 10, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 8 }}>{label}</div>
-                  <div style={{ fontSize: 52, fontWeight: 800, letterSpacing: "-2px", lineHeight: 1, color, textShadow: `0 0 28px ${color}55` }}>{grade}</div>
-                  <div style={{ color: "rgba(255,255,255,0.25)", fontSize: 10, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginTop: 6 }}>{sub}</div>
-                </div>
-              ))}
+              <GradeHalf label="PSA" grade={8} sub="NM-MT" side="left" />
               <div style={{ background: "rgba(255,255,255,0.06)" }} />
+              <GradeHalf label="BGS" grade={8.5} sub="Beckett" side="right" />
             </div>
-
-            {/* Subgrades */}
-            <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 14, display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6, textAlign: "center" }}>
+            <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", marginTop: 22, paddingTop: 18, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
               {[
-                { label: "Centering", value: "9.0" },
-                { label: "Corners",   value: "8.5" },
-                { label: "Edges",     value: "8.5" },
-                { label: "Surface",   value: "9.0" },
+                { label: "Centering", value: 9.0 },
+                { label: "Corners",   value: 8.5 },
+                { label: "Edges",     value: 8.5 },
+                { label: "Surface",   value: 9.0 },
               ].map(({ label, value }) => (
-                <div key={label}>
-                  <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>{label}</div>
-                  <div style={{ color: "#fff", fontSize: 16, fontWeight: 700, letterSpacing: "-0.5px" }}>{value}</div>
+                <div key={label} style={{ textAlign: "center" }}>
+                  <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>{label}</div>
+                  <SubgradeNumber value={value} />
                 </div>
               ))}
             </div>
+          </div>
 
-            {/* Verdict */}
-            <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 14 }}>
-              <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 9, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 6 }}>Verdict</div>
-              <div style={{ color: "rgba(255,255,255,0.45)", fontSize: 12, lineHeight: 1.6 }}>
-                Visible whitening on corner-TR and corner-BL. Edge-right shows a faint chip not present on the PSA 10 reference. Surface is clean. Strong candidate for PSA 8 — not gem mint.
-              </div>
-            </div>
+          {/* Verdict */}
+          <div style={card}>
+            <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 9, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 10 }}>Expert Verdict</div>
+            <p style={{ color: "rgba(255,255,255,0.5)", margin: 0, fontSize: 14, lineHeight: 1.75, letterSpacing: "-0.1px" }}>
+              Visible whitening on corner-TR and corner-BL. Edge-right shows a faint chip not present on the PSA 10 reference. Surface is clean. Strong candidate for PSA 8 — not gem mint.
+            </p>
+          </div>
 
-            {/* Market row */}
-            <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 3 }}>Raw</div>
-                <div style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>$18</div>
-              </div>
-              <div>
-                <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 3 }}>PSA Cost</div>
-                <div style={{ color: "#ff453a", fontSize: 16, fontWeight: 700 }}>$33</div>
-              </div>
-              <div>
-                <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 3 }}>PSA 8</div>
-                <div style={{ color: "#4fc3f7", fontSize: 16, fontWeight: 700 }}>$48</div>
-              </div>
-              <div>
-                <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 3 }}>PSA 10</div>
-                <div style={{ color: "#c9a84c", fontSize: 16, fontWeight: 700 }}>$220</div>
-              </div>
+          {/* Market + ROI */}
+          <div style={card}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+              {[
+                { label: "Raw",     value: "$18",  color: "#fff" },
+                { label: "PSA 8",   value: "$48",  color: "rgba(255,255,255,0.65)" },
+                { label: "PSA 10",  value: "$220", color: "#c9a84c" },
+                { label: "PSA Fee", value: "$33",  color: "#ff453a" },
+              ].map(({ label, value, color }) => (
+                <div key={label} style={{ textAlign: "center" }}>
+                  <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>{label}</div>
+                  <div style={{ color, fontSize: 16, fontWeight: 700, letterSpacing: "-0.5px" }}>{value}</div>
+                </div>
+              ))}
             </div>
             <div style={{
               background: "rgba(255,69,58,0.08)", border: "1px solid rgba(255,69,58,0.2)",
-              borderRadius: 10, padding: "8px 12px", display: "flex", justifyContent: "space-between", alignItems: "center",
+              borderRadius: 10, padding: "8px 14px",
+              display: "flex", justifyContent: "space-between", alignItems: "center",
             }}>
-              <span style={{ color: "#ff453a", fontSize: 12, fontWeight: 700 }}>Don't Submit</span>
-              <span style={{ color: "rgba(255,255,255,0.3)", fontSize: 11 }}>$48 return − $18 raw − $33 PSA = <span style={{ color: "#ff453a", fontWeight: 600 }}>−$3</span></span>
+              <span style={{ color: "#ff453a", fontSize: 13, fontWeight: 700 }}>Don't Submit</span>
+              <span style={{ color: "rgba(255,255,255,0.3)", fontSize: 11 }}>$48 − $18 − $33 PSA = <span style={{ color: "#ff453a", fontWeight: 600 }}>−$3</span></span>
             </div>
-
           </div>
+
         </div>
       )}
 
