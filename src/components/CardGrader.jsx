@@ -655,11 +655,12 @@ export default function CardGrader() {
 
   const identifyCard = async () => {
     if (!images.length) return;
-    // Block if no device free grades AND no account tokens
-    if (deviceFreeLeft() === 0 && (!session || gradesRemaining() === 0)) {
-      setShowPricing(true);
-      posthog.capture('paywall_hit');
-      return;
+    // Signed-in users: must have account tokens (device free grades ignored)
+    // Anonymous users: must have device free grades
+    if (session) {
+      if (gradesRemaining() === 0) { setShowPricing(true); posthog.capture('paywall_hit'); return; }
+    } else {
+      if (deviceFreeLeft() === 0) { setShowPricing(true); posthog.capture('paywall_hit'); return; }
     }
     posthog.capture('grade_started');
     setLoading(true);
@@ -721,10 +722,10 @@ export default function CardGrader() {
 
       setLoadingMessage("Fetching market data…");
 
-      const usingDeviceFree = deviceFreeLeft() > 0;
+      // Signed-in users always use account tokens; anonymous users use device free grades
+      const usingDeviceFree = !session && deviceFreeLeft() > 0;
       const res = await fetch("/api/grade", {
         method: "POST",
-        // Device free grades bypass account token check — send no auth so server treats as anon
         headers: { "Content-Type": "application/json", ...(usingDeviceFree ? {} : authHeaders()) },
         body: JSON.stringify({
           images: images.map((i) => i.imageData),
