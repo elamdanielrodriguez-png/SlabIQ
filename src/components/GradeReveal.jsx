@@ -1,5 +1,139 @@
 import { useState, useEffect } from "react";
 
+function shareColor(g) {
+  if (g >= 10) return "#c9a84c";
+  if (g >= 9)  return "#e0e0e0";
+  if (g >= 8)  return "#aaaaaa";
+  if (g >= 6)  return "#ffb43c";
+  return "#ff453a";
+}
+
+async function generateShareCanvas(result) {
+  const grade     = result?.psa?.grade != null ? Number(result.psa.grade) : null;
+  const is10      = grade >= 10;
+  const gradeName = PSA_FULL_NAME[grade] ?? result?.psa?.label ?? "";
+  const color     = grade != null ? shareColor(grade) : "#888";
+  const S         = 1080;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = S; canvas.height = S;
+  const ctx = canvas.getContext("2d");
+
+  // Background
+  ctx.fillStyle = "#080808";
+  ctx.fillRect(0, 0, S, S);
+
+  // Gold radial glow for 10
+  if (is10) {
+    const grd = ctx.createRadialGradient(S/2, S*0.42, 0, S/2, S*0.42, S*0.52);
+    grd.addColorStop(0, "rgba(201,168,76,0.20)");
+    grd.addColorStop(0.55, "rgba(201,168,76,0.06)");
+    grd.addColorStop(1, "transparent");
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, S, S);
+  }
+
+  // Horizontal accent lines (top + bottom)
+  const drawLine = (y) => {
+    const lg = ctx.createLinearGradient(0, y, S, y);
+    lg.addColorStop(0,    "transparent");
+    lg.addColorStop(0.25, color + (is10 ? "55" : "28"));
+    lg.addColorStop(0.5,  color + (is10 ? "99" : "44"));
+    lg.addColorStop(0.75, color + (is10 ? "55" : "28"));
+    lg.addColorStop(1,    "transparent");
+    ctx.strokeStyle = lg;
+    ctx.lineWidth = is10 ? 1.5 : 1;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(S, y); ctx.stroke();
+  };
+  drawLine(88);
+  drawLine(S - 88);
+
+  // PSA label
+  ctx.fillStyle = "rgba(255,255,255,0.18)";
+  ctx.font = "600 28px -apple-system, system-ui, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText("P  S  A", S/2, 172);
+
+  // Big grade number
+  const numSize = is10 ? 380 : 340;
+  ctx.font = `800 ${numSize}px -apple-system, system-ui, sans-serif`;
+  ctx.textBaseline = "middle";
+  if (is10) { ctx.shadowColor = color; ctx.shadowBlur = 80; }
+  ctx.fillStyle = color;
+  ctx.fillText(grade != null ? String(grade) : "—", S/2, S * 0.42);
+  ctx.shadowBlur = 0;
+
+  // Grade name
+  if (gradeName) {
+    ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = is10 ? color : color + "99";
+    ctx.font = `700 40px -apple-system, system-ui, sans-serif`;
+    ctx.fillText(gradeName.toUpperCase(), S/2, S * 0.67);
+  }
+
+  // Divider
+  ctx.strokeStyle = "rgba(255,255,255,0.07)";
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(80, S*0.73); ctx.lineTo(S-80, S*0.73); ctx.stroke();
+
+  // Player name — scale down if too wide
+  const player = result?.player ?? "";
+  let pSize = 58;
+  ctx.font = `700 ${pSize}px -apple-system, system-ui, sans-serif`;
+  while (ctx.measureText(player).width > S - 160 && pSize > 26) {
+    pSize -= 2;
+    ctx.font = `700 ${pSize}px -apple-system, system-ui, sans-serif`;
+  }
+  ctx.fillStyle = "rgba(255,255,255,0.88)";
+  ctx.fillText(player, S/2, S * 0.81);
+
+  // Year · Set · Variant
+  const sub = [result?.year, result?.set, result?.variant].filter(Boolean).join("  ·  ");
+  if (sub) {
+    let sSize = 28;
+    ctx.font = `400 ${sSize}px -apple-system, system-ui, sans-serif`;
+    while (ctx.measureText(sub).width > S - 160 && sSize > 16) {
+      sSize -= 1;
+      ctx.font = `400 ${sSize}px -apple-system, system-ui, sans-serif`;
+    }
+    ctx.fillStyle = "rgba(255,255,255,0.28)";
+    ctx.fillText(sub, S/2, S * 0.88);
+  }
+
+  // Branding
+  ctx.fillStyle = "rgba(255,255,255,0.14)";
+  ctx.font = "500 22px -apple-system, system-ui, sans-serif";
+  ctx.fillText("CardGradeOrNot.com", S/2, S - 34);
+
+  return canvas;
+}
+
+async function shareGrade(result) {
+  const canvas = await generateShareCanvas(result);
+  return new Promise((resolve) => {
+    canvas.toBlob(async (blob) => {
+      const grade    = result?.psa?.grade != null ? `PSA${result.psa.grade}` : "grade";
+      const player   = (result?.player ?? "card").replace(/\s+/g, "_").slice(0, 40);
+      const filename = `${player}_${grade}.png`;
+      const file     = new File([blob], filename, { type: "image/png" });
+
+      if (navigator.canShare?.({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: `${result?.player ?? "Card"} — PSA ${result?.psa?.grade}` });
+          resolve(); return;
+        } catch {}
+      }
+      // Fallback: trigger download
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = filename; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      resolve();
+    }, "image/png");
+  });
+}
+
 const PSA_FULL_NAME = {
   10: "Gem Mint",
   9:  "Mint",
@@ -97,6 +231,7 @@ export default function GradeReveal({ result, onDone }) {
   const [phase,   setPhase]   = useState(0);
   const [display, setDisplay] = useState(null);
   const [exiting, setExiting] = useState(false);
+  const [sharing, setSharing] = useState(false);
 
   const exit = () => {
     if (exiting) return;
@@ -361,6 +496,46 @@ export default function GradeReveal({ result, onDone }) {
           ))}
         </div>
       )}
+
+      {/* Share button */}
+      <button
+        onClick={async (e) => {
+          e.stopPropagation();
+          if (sharing || phase < 3) return;
+          setSharing(true);
+          try { await shareGrade(result); } finally { setSharing(false); }
+        }}
+        style={{
+          position: "absolute", bottom: 96,
+          display: "flex", alignItems: "center", gap: 7,
+          background: is10 ? "rgba(201,168,76,0.12)" : "rgba(255,255,255,0.08)",
+          border: `1px solid ${is10 ? "rgba(201,168,76,0.3)" : "rgba(255,255,255,0.15)"}`,
+          borderRadius: 100, padding: "10px 22px",
+          color: is10 ? "#c9a84c" : "rgba(255,255,255,0.75)",
+          fontSize: 13, fontWeight: 600,
+          cursor: sharing ? "default" : "pointer",
+          fontFamily: "inherit",
+          opacity: phase >= 3 ? 1 : 0,
+          transition: "opacity 0.6s ease 1.8s",
+          pointerEvents: phase >= 3 ? "auto" : "none",
+        }}
+      >
+        {sharing ? (
+          <>
+            <div style={{ width: 12, height: 12, borderRadius: "50%", border: "2px solid currentColor", borderTopColor: "transparent", animation: "cgonSpin 0.7s linear infinite" }} />
+            Saving…
+          </>
+        ) : (
+          <>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+              <polyline points="16 6 12 2 8 6"/>
+              <line x1="12" y1="2" x2="12" y2="15"/>
+            </svg>
+            Share
+          </>
+        )}
+      </button>
 
       {/* Tap to continue */}
       <div style={{
