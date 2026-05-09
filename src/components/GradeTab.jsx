@@ -3,7 +3,7 @@ import { useRef, useState, useEffect } from "react";
 // Camera capture with a fixed 5:7 rectangle overlay. User aligns the card inside
 // the rectangle and taps capture. Captured frame is cropped to exactly the
 // rectangle area — no detection, no AI, no post-processing. Card is the rectangle.
-function CameraCapture({ onCapture, onClose }) {
+export function CameraCapture({ onCapture, onClose }) {
   const videoRef = useRef(null);
   const containerRef = useRef(null);
   const rectRef = useRef(null);
@@ -826,8 +826,7 @@ function computeCentering(cm) {
 const ROLE_LABEL = { front: 'Front', back: 'Back', detail: 'Detail' };
 const ROLE_COLOR = { front: '#c9a84c', back: '#0a84ff', detail: 'rgba(255,255,255,0.28)' };
 
-export default function GradeTab({ images, result, candidates, loading, error, onAddImages, onRemoveImage, onSetRole, onGrade, onConfirmCandidate, onSearch, onUpdateCentering, gradesUsed = 0, gradesTotal = 2, isLoggedIn = false, planName = 'free', onUpgrade, selectedModel = 'claude-sonnet-4-6', onSelectModel, onRevealAgain }) {
-  const [cameraOpen, setCameraOpen] = useState(false);
+export default function GradeTab({ images, result, candidates, loading, error, onAddImages, onRemoveImage, onSetRole, onGrade, onConfirmCandidate, onSearch, onUpdateCentering, gradesUsed = 0, gradesTotal = 2, isLoggedIn = false, planName = 'free', onUpgrade, selectedModel = 'claude-sonnet-4-6', onSelectModel, onRevealAgain, onOpenCamera }) {
   const [gradePressed, setGradePressed] = useState(false);
   const fileInputRef = useRef(null);
   const [dismissedNegs, setDismissedNegs] = useState([]);
@@ -947,7 +946,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
             {images.length < 10 && (
               <>
                 <button
-                  onClick={() => setCameraOpen(true)}
+                  onClick={() => onOpenCamera?.()}
                   title="Take photo with alignment rectangle"
                   style={{
                     width: 68, height: 86, borderRadius: 8,
@@ -1037,7 +1036,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
             {/* CTA buttons */}
             <div style={{ display: "flex", gap: 10, position: "relative", marginBottom: 18 }}>
               <button
-                onClick={() => setCameraOpen(true)}
+                onClick={() => onOpenCamera?.()}
                 style={{
                   flex: 1, padding: "15px 0",
                   background: "#c9a84c", color: "#000",
@@ -1219,12 +1218,6 @@ export default function GradeTab({ images, result, candidates, loading, error, o
         </div>
       )}
 
-      {cameraOpen && (
-        <CameraCapture
-          onCapture={(file) => { onAddImages([file]); setCameraOpen(false); }}
-          onClose={() => setCameraOpen(false)}
-        />
-      )}
 
       {/* Model toggle — kept for future use
       {images.length > 0 && !result && isLoggedIn && planName !== 'free' && (

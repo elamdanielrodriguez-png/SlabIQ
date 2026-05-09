@@ -26,6 +26,7 @@ import PricingModal from "./PricingModal";
 import Logo from "./Logo";
 import BulkTab from "./BulkTab";
 import GradeReveal from "./GradeReveal";
+import { CameraCapture } from "./GradeTab";
 import { supabase } from "../lib/supabase";
 
 const FREE_GRADE_KEY = 'cgon_free_grades_used';
@@ -442,6 +443,7 @@ export default function CardGrader() {
   const [toast, setToast] = useState(false);
   const [error, setError] = useState(null);
   const [showReveal, setShowReveal] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
 
   // ── Auth + subscription state ──────────────────────────────────────────────
   const [session, setSession] = useState(null);
@@ -892,6 +894,7 @@ export default function CardGrader() {
                   selectedModel={selectedModel}
                   onSelectModel={setSelectedModel}
                   onRevealAgain={result ? () => setShowReveal(true) : undefined}
+                  onOpenCamera={() => setCameraOpen(true)}
                 />
               ) : (
                 <BulkTab
@@ -929,6 +932,13 @@ export default function CardGrader() {
           onClose={() => setShowPricing(false)}
           session={session}
           tokenBalance={gradesRemaining()}
+        />
+      )}
+
+      {cameraOpen && (
+        <CameraCapture
+          onCapture={(file) => { addImages([file]); setCameraOpen(false); }}
+          onClose={() => setCameraOpen(false)}
         />
       )}
 
