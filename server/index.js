@@ -703,8 +703,11 @@ app.post('/api/fetch-listing', async (req, res) => {
   const { url } = req.body;
   if (!url?.trim()) return res.status(400).json({ error: 'URL required' });
 
-  const ebayMatch = url.match(/\/itm\/(?:[^/]+\/)?(\d{10,13})/);
-  if (!ebayMatch) return res.status(400).json({ error: 'Only eBay listing URLs are supported right now' });
+  if (!url.includes('ebay.com') && !url.includes('ebay.us')) {
+    return res.status(400).json({ error: 'Only eBay listing URLs are supported right now' });
+  }
+  const ebayMatch = url.match(/\/itm\/(?:[^/?#]+\/)?(\d{8,15})/);
+  if (!ebayMatch) return res.status(400).json({ error: 'Could not find the listing ID — try copying the URL directly from the eBay listing page' });
 
   const itemId = ebayMatch[1];
   const token = await getEbayToken();
