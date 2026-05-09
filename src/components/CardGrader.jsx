@@ -855,6 +855,7 @@ export default function CardGrader() {
                   onUpgrade={() => setShowPricing(true)}
                   selectedModel={selectedModel}
                   onSelectModel={setSelectedModel}
+                  onRevealAgain={result ? () => setShowReveal(true) : undefined}
                 />
               ) : (
                 <BulkTab

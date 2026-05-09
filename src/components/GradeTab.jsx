@@ -809,7 +809,7 @@ function computeCentering(cm) {
 const ROLE_LABEL = { front: 'Front', back: 'Back', detail: 'Detail' };
 const ROLE_COLOR = { front: '#c9a84c', back: '#0a84ff', detail: 'rgba(255,255,255,0.28)' };
 
-export default function GradeTab({ images, result, candidates, loading, error, onAddImages, onRemoveImage, onSetRole, onGrade, onConfirmCandidate, onSearch, onUpdateCentering, gradesUsed = 0, gradesTotal = 2, isLoggedIn = false, planName = 'free', onUpgrade, selectedModel = 'claude-sonnet-4-6', onSelectModel }) {
+export default function GradeTab({ images, result, candidates, loading, error, onAddImages, onRemoveImage, onSetRole, onGrade, onConfirmCandidate, onSearch, onUpdateCentering, gradesUsed = 0, gradesTotal = 2, isLoggedIn = false, planName = 'free', onUpgrade, selectedModel = 'claude-sonnet-4-6', onSelectModel, onRevealAgain }) {
   const [cameraOpen, setCameraOpen] = useState(false);
   const [gradePressed, setGradePressed] = useState(false);
   const fileInputRef = useRef(null);
@@ -1342,6 +1342,20 @@ export default function GradeTab({ images, result, candidates, loading, error, o
 
           {/* PSA | BGS hero */}
           <div className="result-card-1" data-grade-hero="true" style={card}>
+            {onRevealAgain && (
+              <button
+                onClick={onRevealAgain}
+                style={{
+                  float: "right", background: "none", border: "none",
+                  color: "rgba(255,255,255,0.2)", fontSize: 11, fontWeight: 600,
+                  cursor: "pointer", fontFamily: "inherit", padding: 0,
+                  letterSpacing: "0.06em", textTransform: "uppercase",
+                  marginBottom: 4,
+                }}
+              >
+                ↺ Replay
+              </button>
+            )}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1px 1fr" }}>
               <GradeHalf
                 label="PSA"
