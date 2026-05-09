@@ -84,52 +84,69 @@ function CameraCapture({ onCapture, onClose }) {
   }
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "#000", zIndex: 1000, display: "flex", flexDirection: "column" }}>
-      <div style={{ padding: "14px 20px", color: "#fff", textAlign: "center", fontSize: 13, fontWeight: 600, letterSpacing: "-0.2px" }}>
-        Align card inside the rectangle
-      </div>
+    <div style={{ position: "fixed", inset: 0, background: "#000", zIndex: 1000 }}>
 
-      <div ref={containerRef} style={{ flex: 1, position: "relative", overflow: "hidden", minHeight: 0 }}>
+      {/* Video fills the whole screen */}
+      <div ref={containerRef} style={{ position: "absolute", inset: 0 }}>
         <video
           ref={videoRef}
           autoPlay playsInline muted
           style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
         />
-
-        {/* Centered card-aspect rectangle, dim outside via huge box-shadow */}
-        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
-          <div ref={rectRef} style={{
-            width: "min(78vw, calc(75vh * 5 / 7))",
-            aspectRatio: "5 / 7",
-            border: "3px solid #c9a84c",
-            borderRadius: 8,
-            boxShadow: "0 0 0 9999px rgba(0,0,0,0.65), 0 0 0 5px rgba(201,168,76,0.3), 0 0 32px rgba(201,168,76,0.6)",
-          }} />
-        </div>
-
-        {error && (
-          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#ff453a", padding: 24, textAlign: "center", background: "rgba(0,0,0,0.85)", fontSize: 13 }}>
-            {error}
-          </div>
-        )}
       </div>
 
-      <div style={{ padding: 16, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <button onClick={onClose} style={{ background: "transparent", border: "none", color: "#fff", fontSize: 14, padding: 12, cursor: "pointer", fontFamily: "inherit" }}>
+      {/* Alignment rectangle — centered, shifted up so button stays visible */}
+      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+        <div ref={rectRef} style={{
+          width: "min(72vw, calc(48vh * 5 / 7))",
+          aspectRatio: "5 / 7",
+          border: "3px solid #c9a84c",
+          borderRadius: 8,
+          marginBottom: "18vh",
+          boxShadow: "0 0 0 9999px rgba(0,0,0,0.6), 0 0 0 4px rgba(201,168,76,0.25), 0 0 28px rgba(201,168,76,0.5)",
+        }} />
+      </div>
+
+      {/* Instruction — top overlay */}
+      <div style={{
+        position: "absolute", top: 0, left: 0, right: 0,
+        padding: "16px 20px 20px",
+        background: "linear-gradient(to bottom, rgba(0,0,0,0.6), transparent)",
+        color: "#fff", textAlign: "center", fontSize: 13, fontWeight: 600,
+        letterSpacing: "-0.2px", pointerEvents: "none",
+      }}>
+        Align card inside the rectangle
+      </div>
+
+      {/* Buttons — bottom overlay */}
+      <div style={{
+        position: "absolute", bottom: 0, left: 0, right: 0,
+        padding: "24px 28px 44px",
+        background: "linear-gradient(to top, rgba(0,0,0,0.7), transparent)",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+      }}>
+        <button onClick={onClose} style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.8)", fontSize: 15, fontWeight: 600, padding: "8px 4px", cursor: "pointer", fontFamily: "inherit" }}>
           Cancel
         </button>
         <button
           onClick={capture}
           disabled={!ready}
           style={{
-            width: 72, height: 72, borderRadius: "50%",
+            width: 76, height: 76, borderRadius: "50%",
             background: ready ? "#c9a84c" : "rgba(201,168,76,0.3)",
-            border: "4px solid rgba(255,255,255,0.5)",
+            border: "4px solid rgba(255,255,255,0.55)",
             cursor: ready ? "pointer" : "not-allowed",
+            boxShadow: ready ? "0 0 24px rgba(201,168,76,0.5)" : "none",
           }}
         />
         <div style={{ width: 60 }} />
       </div>
+
+      {error && (
+        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#ff453a", padding: 24, textAlign: "center", background: "rgba(0,0,0,0.85)", fontSize: 13 }}>
+          {error}
+        </div>
+      )}
     </div>
   );
 }
