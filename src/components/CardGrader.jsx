@@ -15,7 +15,7 @@
 // v3.0.0 — Camera capture replaces scanner: live camera feed with fixed 5:7 alignment rectangle. User aligns card inside, captures, frame is cropped to rectangle. No detection, no AI, just static crop. All scanner code (perspective correction, pixel detection, manual corner editor, AI corner detection) removed.
 const VERSION = "3.0.0";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { posthog } from "../main";
 import GradeTab from "./GradeTab";
 import MarketTab from "./MarketTab";
@@ -444,6 +444,7 @@ export default function CardGrader() {
   const [error, setError] = useState(null);
   const [showReveal, setShowReveal] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const bulkCaptureRef = useRef(null);
 
   // ── Auth + subscription state ──────────────────────────────────────────────
   const [session, setSession] = useState(null);
@@ -902,6 +903,10 @@ export default function CardGrader() {
                   userPlan={userPlan}
                   isLoggedIn={!!session}
                   onUpgrade={() => setShowPricing(true)}
+                  onOpenCamera={(callback) => {
+                    bulkCaptureRef.current = callback;
+                    setCameraOpen(true);
+                  }}
                 />
               )}
             </div>
@@ -937,8 +942,16 @@ export default function CardGrader() {
 
       {cameraOpen && (
         <CameraCapture
-          onCapture={(file) => { addImages([file]); setCameraOpen(false); }}
-          onClose={() => setCameraOpen(false)}
+          onCapture={(file) => {
+            if (bulkCaptureRef.current) {
+              bulkCaptureRef.current(file);
+              bulkCaptureRef.current = null;
+            } else {
+              addImages([file]);
+            }
+            setCameraOpen(false);
+          }}
+          onClose={() => { bulkCaptureRef.current = null; setCameraOpen(false); }}
         />
       )}
 

@@ -161,12 +161,14 @@ function BulkItem({ item, onConfirm, onRemove }) {
   );
 }
 
-export default function BulkTab({ session, userPlan, onUpgrade, isLoggedIn }) {
+export default function BulkTab({ session, userPlan, onUpgrade, isLoggedIn, onOpenCamera }) {
   const [items, setItems] = useState([]);
   const [grading, setGrading] = useState(false);
   const fileInputRef = useRef();
 
   const authHeaders = () => session ? { Authorization: `Bearer ${session.access_token}` } : {};
+
+  const openCamera = () => onOpenCamera?.((file) => addImages([file]));
 
   const tokensLeft = userPlan
     ? Math.max(0, userPlan.grade_limit - userPlan.grades_used)
@@ -271,20 +273,44 @@ export default function BulkTab({ session, userPlan, onUpgrade, isLoggedIn }) {
 
       {/* Upload area */}
       {items.length === 0 ? (
-        <div onClick={() => fileInputRef.current?.click()} style={{
+        <div style={{
           ...CARD,
-          padding: "44px 24px", textAlign: "center", cursor: "pointer",
+          padding: "32px 24px", textAlign: "center",
           borderStyle: "dashed", borderColor: "rgba(201,168,76,0.3)",
         }}>
-          <svg width="32" height="32" viewBox="0 0 32 32" fill="none" style={{ margin: "0 auto 14px" }}>
-            <rect x="2" y="6" width="28" height="20" rx="3" stroke="rgba(201,168,76,0.5)" strokeWidth="1.6" fill="none"/>
-            <line x1="16" y1="12" x2="16" y2="22" stroke="rgba(201,168,76,0.5)" strokeWidth="1.6" strokeLinecap="round"/>
-            <line x1="11" y1="17" x2="21" y2="17" stroke="rgba(201,168,76,0.5)" strokeWidth="1.6" strokeLinecap="round"/>
-            <path d="M10 6 L12 2 L20 2 L22 6" stroke="rgba(201,168,76,0.5)" strokeWidth="1.6" fill="none" strokeLinejoin="round"/>
-          </svg>
-          <div style={{ color: "#fff", fontSize: 15, fontWeight: 700, marginBottom: 6 }}>Upload Card Photos</div>
-          <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 13, marginBottom: 10 }}>One photo per card — up to 20 at once</div>
-          <div style={{ color: "rgba(201,168,76,0.55)", fontSize: 12 }}>{tokensLeft} token{tokensLeft !== 1 ? "s" : ""} available · 1 per grade</div>
+          <div style={{ color: "#fff", fontSize: 15, fontWeight: 700, marginBottom: 4 }}>Add Card Photos</div>
+          <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 13, marginBottom: 6 }}>One photo per card — up to 20 at once</div>
+          <div style={{ color: "rgba(201,168,76,0.55)", fontSize: 12, marginBottom: 20 }}>{tokensLeft} token{tokensLeft !== 1 ? "s" : ""} available · 1 per grade</div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => fileInputRef.current?.click()} style={{
+              flex: 1, padding: "12px 0",
+              background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 12, cursor: "pointer", fontFamily: "inherit",
+              display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
+            }}>
+              <svg width="22" height="22" viewBox="0 0 32 32" fill="none">
+                <rect x="2" y="6" width="28" height="20" rx="3" stroke="rgba(255,255,255,0.4)" strokeWidth="1.6" fill="none"/>
+                <line x1="16" y1="12" x2="16" y2="22" stroke="rgba(255,255,255,0.4)" strokeWidth="1.6" strokeLinecap="round"/>
+                <line x1="11" y1="17" x2="21" y2="17" stroke="rgba(255,255,255,0.4)" strokeWidth="1.6" strokeLinecap="round"/>
+                <path d="M10 6 L12 2 L20 2 L22 6" stroke="rgba(255,255,255,0.4)" strokeWidth="1.6" fill="none" strokeLinejoin="round"/>
+              </svg>
+              <span style={{ color: "rgba(255,255,255,0.55)", fontSize: 12, fontWeight: 600 }}>Upload</span>
+            </button>
+            {onOpenCamera && (
+              <button onClick={openCamera} style={{
+                flex: 1, padding: "12px 0",
+                background: "rgba(201,168,76,0.06)", border: "1px solid rgba(201,168,76,0.25)",
+                borderRadius: 12, cursor: "pointer", fontFamily: "inherit",
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
+              }}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" stroke="rgba(201,168,76,0.7)" strokeWidth="1.6" fill="none" strokeLinejoin="round"/>
+                  <circle cx="12" cy="13" r="4" stroke="rgba(201,168,76,0.7)" strokeWidth="1.6" fill="none"/>
+                </svg>
+                <span style={{ color: "rgba(201,168,76,0.8)", fontSize: 12, fontWeight: 600 }}>Camera</span>
+              </button>
+            )}
+          </div>
         </div>
       ) : (
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -292,12 +318,29 @@ export default function BulkTab({ session, userPlan, onUpgrade, isLoggedIn }) {
             {items.length} card{items.length !== 1 ? "s" : ""}
             {doneCount > 0 && <span style={{ color: "#30d158" }}> · {doneCount} graded</span>}
           </span>
-          <button onClick={() => fileInputRef.current?.click()} style={{
-            background: "none", border: "1px solid rgba(255,255,255,0.1)",
-            borderRadius: 8, padding: "5px 12px",
-            color: "rgba(255,255,255,0.45)", fontSize: 12,
-            cursor: "pointer", fontFamily: "inherit",
-          }}>+ Add More</button>
+          <div style={{ display: "flex", gap: 6 }}>
+            {onOpenCamera && (
+              <button onClick={openCamera} style={{
+                background: "none", border: "1px solid rgba(201,168,76,0.2)",
+                borderRadius: 8, padding: "5px 10px",
+                color: "rgba(201,168,76,0.65)", fontSize: 12,
+                cursor: "pointer", fontFamily: "inherit",
+                display: "flex", alignItems: "center", gap: 5,
+              }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" stroke="currentColor" strokeWidth="1.8" fill="none" strokeLinejoin="round"/>
+                  <circle cx="12" cy="13" r="4" stroke="currentColor" strokeWidth="1.8" fill="none"/>
+                </svg>
+                Camera
+              </button>
+            )}
+            <button onClick={() => fileInputRef.current?.click()} style={{
+              background: "none", border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 8, padding: "5px 12px",
+              color: "rgba(255,255,255,0.45)", fontSize: 12,
+              cursor: "pointer", fontFamily: "inherit",
+            }}>+ Add More</button>
+          </div>
         </div>
       )}
 

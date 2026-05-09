@@ -128,13 +128,6 @@ export default function GradeReveal({ result, onDone }) {
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, []);
 
-  // Auto-exit: longer for 10 (let them enjoy it), shorter for others
-  useEffect(() => {
-    if (phase !== 3) return;
-    const t = setTimeout(exit, is10 ? 3800 : 2200);
-    return () => clearTimeout(t);
-  }, [phase]);
-
   const color      = revealColor(grade);
   const glow       = phase >= 3 ? revealGlow(grade) : "none";
   const displayStr = display == null ? "" : isInt ? String(display) : Number(display).toFixed(1);
