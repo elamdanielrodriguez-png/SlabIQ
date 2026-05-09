@@ -729,8 +729,16 @@ app.post('/api/fetch-listing', async (req, res) => {
       { headers: { 'Authorization': `Bearer ${token}`, 'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US' } },
       8000
     );
+    if (!itemRes.ok) {
+      const errText = await itemRes.text().catch(() => '');
+      console.error(`eBay API ${itemRes.status} for item ${itemId}: ${errText.slice(0, 300)}`);
+      return res.status(404).json({ error: `Listing not found or unavailable (eBay ${itemRes.status})` });
+    }
     const item = await itemRes.json();
-    if (!item.itemId) return res.status(404).json({ error: 'Listing not found or has ended' });
+    if (!item.itemId) {
+      console.error(`eBay no itemId for ${itemId}:`, JSON.stringify(item).slice(0, 300));
+      return res.status(404).json({ error: 'Listing not found or has ended' });
+    }
 
     const allUrls = [
       item.image?.imageUrl,
