@@ -423,6 +423,13 @@ function recomputeBgsAndPsa(prevResult, centering) {
   };
 }
 
+function base64ToBlob(b64, mime = 'image/jpeg') {
+  const bytes = atob(b64);
+  const arr = new Uint8Array(bytes.length);
+  for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
+
 export default function CardGrader() {
   const [activeTab, setActiveTab] = useState("grade");
   const [gradeMode, setGradeMode] = useState("single");
@@ -446,6 +453,33 @@ export default function CardGrader() {
   );
   const [selectedModel, setSelectedModel] = useState('claude-opus-4-7');
   const [purchaseSuccess, setPurchaseSuccess] = useState(null); // null | 'polling' | 'confirmed'
+
+  // Restore images that were in-flight when OAuth / Stripe redirect happened
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('cgon_pending_images');
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      if (!Array.isArray(saved) || saved.length === 0) return;
+      const restored = saved.map(img => ({
+        ...img,
+        objectURL: URL.createObjectURL(base64ToBlob(img.imageData)),
+      }));
+      setImages(restored);
+    } catch (e) {}
+  }, []);
+
+  // Persist images to sessionStorage so they survive redirects
+  useEffect(() => {
+    if (images.length === 0) { sessionStorage.removeItem('cgon_pending_images'); return; }
+    try {
+      sessionStorage.setItem('cgon_pending_images', JSON.stringify(
+        images.map(({ imageData, centering, centeringLines, cardBounds, role, width, height }) => ({
+          imageData, centering, centeringLines, cardBounds, role, width, height,
+        }))
+      ));
+    } catch (e) {}
+  }, [images]);
 
   useEffect(() => {
     // Load session on mount
@@ -708,6 +742,7 @@ export default function CardGrader() {
       } else {
         setResult(parsed);
         setCandidates(null);
+        sessionStorage.removeItem('cgon_pending_images');
         saveGrading(parsed);
         posthog.capture('grade_completed', { psa_grade: parsed.psa?.grade, player: parsed.player, year: parsed.year, set: parsed.set });
         setToast(true);
