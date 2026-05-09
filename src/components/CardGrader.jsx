@@ -656,7 +656,7 @@ export default function CardGrader() {
     });
   };
 
-  const identifyCard = async () => {
+  const identifyCard = async (listingTitle = null) => {
     if (!images.length) return;
     // Signed-in users: must have account tokens (device free grades ignored)
     // Anonymous users: must have device free grades
@@ -675,7 +675,7 @@ export default function CardGrader() {
       const res = await fetch("/api/identify", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify({ images: images.map((i) => i.imageData) }),
+        body: JSON.stringify({ images: images.map((i) => i.imageData), listingTitle: listingTitle || undefined }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);

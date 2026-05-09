@@ -373,6 +373,11 @@ ZONE RULES:
   Lighting / angle / shadow / glare differences = "matches"
   Foil / prizm / holographic / chrome patterns visible on the PSA 10 = "matches"
 
+CARD BOUNDARY — CRITICAL:
+  Only inspect the card's physical surface. Anything outside the card border is background and must be completely ignored.
+  DO NOT flag: background surface, table, scanner glass, display case interior, shadows around the card, reflections near edges, or any mark that is clearly not on the card itself.
+  If you cannot confirm a flaw is on the card's actual surface, it does not exist. When in doubt, it's background — not a defect.
+
 SURFACE INSPECTION (separate from zones):
   Scan the user's full front and back photos for surface defects (print lines, scratches, dents, color rubs, indentations, gloss disruption).
   Compare each candidate flaw to the PSA 10 reference at the same location. Only list it if it's NOT on the PSA 10.
@@ -815,7 +820,7 @@ Rules:
 });
 
 app.post('/api/identify', async (req, res) => {
-  const { images, imageData, mediaType = 'image/jpeg' } = req.body;
+  const { images, imageData, mediaType = 'image/jpeg', listingTitle } = req.body;
   const imageList = images || (imageData ? [imageData] : null);
   if (!imageList?.length) return res.status(400).json({ error: 'At least one image is required' });
 
@@ -825,6 +830,10 @@ app.post('/api/identify', async (req, res) => {
       source: { type: 'base64', media_type: mediaType, data },
     }));
 
+    const listingHint = listingTitle
+      ? `The eBay listing title for this card is: "${listingTitle}"\nThis title is authoritative — extract player, year, set, and variant directly from it. Set confidence to 98. Only create multiple candidates if the title is genuinely ambiguous between parallel variants.\n\n`
+      : '';
+
     const msg = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 400,
@@ -832,7 +841,7 @@ app.post('/api/identify', async (req, res) => {
         role: 'user',
         content: [
           ...imageContent,
-          { type: 'text', text: `Identify this sports card. Return ONLY a JSON object with no extra text:
+          { type: 'text', text: `${listingHint}Identify this sports card. Return ONLY a JSON object with no extra text:
 {
   "confidence": <integer 0-100 — how certain you are. 98+ = certain of player, year, set AND exact variant. Under 98 = any doubt at all>,
   "candidates": [

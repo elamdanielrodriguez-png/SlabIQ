@@ -837,6 +837,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
   const [urlValue, setUrlValue] = useState('');
   const [urlLoading, setUrlLoading] = useState(false);
   const [urlError, setUrlError] = useState(null);
+  const [listingTitle, setListingTitle] = useState(null);
   const handleDrop = (e) => { e.preventDefault(); onAddImages(e.dataTransfer.files); };
 
   const handleUrlFetch = async () => {
@@ -855,6 +856,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
         const blob = await fetch(`data:${img.mediaType ?? 'image/jpeg'};base64,${img.data}`).then(r => r.blob());
         return new File([blob], `listing-${i + 1}.jpg`, { type: img.mediaType ?? 'image/jpeg' });
       }));
+      if (data.title) setListingTitle(data.title);
       onAddImages(files);
       setShowUrlInput(false); setUrlValue('');
     } catch {
@@ -1299,7 +1301,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
       {/* Grade button — hide once candidates are showing or grading is done */}
       {images.length > 0 && !result && !(candidates?.length > 0) && (
         <button
-          onClick={onGrade}
+          onClick={() => onGrade(listingTitle)}
           disabled={loading}
           onPointerDown={() => !loading && setGradePressed(true)}
           onPointerUp={() => setGradePressed(false)}
