@@ -60,11 +60,16 @@ body {
   100% { transform: scale(4.5); opacity: 0;    }
 }
 
-@keyframes spotlightReveal {
-  0%   { opacity: 0; }
-  8%   { opacity: 1; }
-  78%  { opacity: 1; }
-  100% { opacity: 0; }
+@keyframes revealSlam {
+  0%   { transform: scale(1.18); }
+  55%  { transform: scale(0.94); }
+  78%  { transform: scale(1.04); }
+  100% { transform: scale(1.00); }
+}
+
+@keyframes revealPulse {
+  0%, 100% { opacity: 1;    }
+  50%       { opacity: 0.42; }
 }
 
 

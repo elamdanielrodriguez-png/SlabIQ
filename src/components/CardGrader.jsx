@@ -25,6 +25,7 @@ import AuthModal from "./AuthModal";
 import PricingModal from "./PricingModal";
 import Logo from "./Logo";
 import BulkTab from "./BulkTab";
+import GradeReveal from "./GradeReveal";
 import { supabase } from "../lib/supabase";
 
 const FREE_GRADE_KEY = 'cgon_free_grades_used';
@@ -433,8 +434,7 @@ export default function CardGrader() {
   const [loadingMessage, setLoadingMessage] = useState(null);
   const [toast, setToast] = useState(false);
   const [error, setError] = useState(null);
-  const [spotlightActive, setSpotlightActive] = useState(false);
-  const [spotlightPos, setSpotlightPos] = useState(null);
+  const [showReveal, setShowReveal] = useState(false);
 
   // ── Auth + subscription state ──────────────────────────────────────────────
   const [session, setSession] = useState(null);
@@ -552,19 +552,6 @@ export default function CardGrader() {
     document.body.scrollTop = 0;
   }, [activeTab]);
 
-  useEffect(() => {
-    if (!spotlightActive) return;
-    const el = document.querySelector('[data-grade-hero]');
-    if (!el) return;
-    el.scrollIntoView({ behavior: 'instant', block: 'center' });
-    const rect = el.getBoundingClientRect();
-    setSpotlightPos({
-      cx: Math.round(rect.left + rect.width / 2),
-      cy: Math.round(rect.top + rect.height / 2),
-      rx: Math.round(rect.width / 2) + 48,
-      ry: Math.round(rect.height / 2) + 36,
-    });
-  }, [spotlightActive]);
 
   const saveGrading = (parsed) => {
     try {
@@ -724,7 +711,7 @@ export default function CardGrader() {
         saveGrading(parsed);
         posthog.capture('grade_completed', { psa_grade: parsed.psa?.grade, player: parsed.player, year: parsed.year, set: parsed.set });
         setToast(true);
-        setSpotlightActive(true);
+        setShowReveal(true);
         // Track usage
         if (usingDeviceFree) {
           const next = freeGradesUsed + 1;
@@ -908,17 +895,10 @@ export default function CardGrader() {
         />
       )}
 
-      {spotlightActive && spotlightPos && (
-        <div
-          onAnimationEnd={() => { setSpotlightActive(false); setSpotlightPos(null); }}
-          style={{
-            position: "fixed", inset: 0, zIndex: 90, pointerEvents: "none",
-            background: [
-              `radial-gradient(ellipse ${spotlightPos.rx}px ${spotlightPos.ry}px at ${spotlightPos.cx}px ${spotlightPos.cy}px, rgba(255,218,100,0.82) 0%, rgba(255,218,100,0.45) 40%, transparent 72%)`,
-              `radial-gradient(ellipse ${spotlightPos.rx + 60}px ${spotlightPos.ry + 40}px at ${spotlightPos.cx}px ${spotlightPos.cy}px, rgba(255,200,60,0.22) 0%, transparent 100%)`,
-            ].join(", "),
-            animation: "spotlightReveal 2.8s ease forwards",
-          }}
+      {showReveal && result && (
+        <GradeReveal
+          result={result}
+          onDone={() => setShowReveal(false)}
         />
       )}
       {/* Post-purchase confirmation banner */}
