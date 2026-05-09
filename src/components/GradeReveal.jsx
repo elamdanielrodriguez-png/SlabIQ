@@ -1,5 +1,18 @@
 import { useState, useEffect } from "react";
 
+const PSA_FULL_NAME = {
+  10: "Gem Mint",
+  9:  "Mint",
+  8:  "NM-MT",
+  7:  "Near Mint",
+  6:  "EX-MT",
+  5:  "Excellent",
+  4:  "VG-EX",
+  3:  "Very Good",
+  2:  "Good",
+  1:  "Poor",
+};
+
 function revealColor(g) {
   if (!g && g !== 0) return "rgba(255,255,255,0.55)";
   if (g >= 10) return "#c9a84c";
@@ -181,15 +194,15 @@ export default function GradeReveal({ result, onDone }) {
         }} />
       ))}
 
-      {/* PSA 10: "GEM MINT" label above identity */}
-      {is10 && (
-        <div style={{
-          textAlign: "center",
-          marginBottom: 12,
-          opacity: phase >= 3 ? 1 : 0,
-          transform: phase >= 3 ? "translateY(0) scale(1)" : "translateY(8px) scale(0.9)",
-          transition: "opacity 0.5s ease 0.1s, transform 0.5s cubic-bezier(0.22,1,0.36,1) 0.1s",
-        }}>
+      {/* Grade name above identity — always shown, gold shimmer for 10 */}
+      <div style={{
+        textAlign: "center",
+        marginBottom: 12,
+        opacity: phase >= 3 ? 1 : 0,
+        transform: phase >= 3 ? "translateY(0) scale(1)" : "translateY(8px) scale(0.9)",
+        transition: "opacity 0.5s ease 0.1s, transform 0.5s cubic-bezier(0.22,1,0.36,1) 0.1s",
+      }}>
+        {is10 ? (
           <div style={{
             fontSize: 11, fontWeight: 800, letterSpacing: "0.35em",
             textTransform: "uppercase",
@@ -198,10 +211,17 @@ export default function GradeReveal({ result, onDone }) {
             WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
             animation: phase >= 3 ? "goldShimmer 2.5s ease-in-out infinite" : "none",
           }}>
-            Gem Mint
+            {PSA_FULL_NAME[10]}
           </div>
-        </div>
-      )}
+        ) : (
+          <div style={{
+            fontSize: 11, fontWeight: 700, letterSpacing: "0.28em",
+            textTransform: "uppercase", color: `${color}99`,
+          }}>
+            {PSA_FULL_NAME[grade] ?? result?.psa?.label ?? ""}
+          </div>
+        )}
+      </div>
 
       {/* Card identity */}
       <div style={{
@@ -307,16 +327,16 @@ export default function GradeReveal({ result, onDone }) {
           )}
         </div>
 
-        {/* Grade label */}
+        {/* Grade label below number */}
         <div style={{
           color,
-          fontSize: is10 ? 14 : 12,
-          fontWeight: 700, letterSpacing: "0.2em",
-          textTransform: "uppercase", marginTop: 16,
-          opacity: phase >= 3 ? (is10 ? 0.85 : 0.65) : 0,
+          fontSize: 15,
+          fontWeight: 700, letterSpacing: "0.18em",
+          textTransform: "uppercase", marginTop: 18,
+          opacity: phase >= 3 ? (is10 ? 0 : 0.75) : 0,
           transition: "opacity 0.5s ease 0.1s",
         }}>
-          {result?.psa?.label}
+          {PSA_FULL_NAME[grade] ?? result?.psa?.label ?? ""}
         </div>
 
         {/* BGS */}
