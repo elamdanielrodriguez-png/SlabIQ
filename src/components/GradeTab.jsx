@@ -850,9 +850,12 @@ export default function GradeTab({ images, result, candidates, loading, error, o
       });
       const data = await res.json();
       if (!res.ok) { setUrlError(data.error ?? 'Failed to fetch listing'); setUrlLoading(false); return; }
-      const blob = await fetch(`data:${data.mediaType};base64,${data.imageData}`).then(r => r.blob());
-      const file = new File([blob], 'listing.jpg', { type: data.mediaType });
-      onAddImages([file]);
+      const imgs = data.images ?? (data.imageData ? [{ data: data.imageData, mediaType: data.mediaType }] : []);
+      const files = await Promise.all(imgs.map(async (img, i) => {
+        const blob = await fetch(`data:${img.mediaType ?? 'image/jpeg'};base64,${img.data}`).then(r => r.blob());
+        return new File([blob], `listing-${i + 1}.jpg`, { type: img.mediaType ?? 'image/jpeg' });
+      }));
+      onAddImages(files);
       setShowUrlInput(false); setUrlValue('');
     } catch {
       setUrlError('Could not fetch listing. Check the URL and try again.');

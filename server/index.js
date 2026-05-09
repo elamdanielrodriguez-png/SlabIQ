@@ -732,14 +732,18 @@ app.post('/api/fetch-listing', async (req, res) => {
     const item = await itemRes.json();
     if (!item.itemId) return res.status(404).json({ error: 'Listing not found or has ended' });
 
-    const imageUrl = item.image?.imageUrl ?? item.additionalImages?.[0]?.imageUrl;
-    if (!imageUrl) return res.status(404).json({ error: 'No image found in this listing' });
+    const allUrls = [
+      item.image?.imageUrl,
+      ...(item.additionalImages ?? []).map(i => i.imageUrl),
+    ].filter(Boolean).slice(0, 8);
+    if (!allUrls.length) return res.status(404).json({ error: 'No image found in this listing' });
 
-    const img = await urlToBase64(imageUrl);
-    if (!img) return res.status(502).json({ error: 'Could not download listing image' });
+    const downloaded = await Promise.all(allUrls.map(u => urlToBase64(u).catch(() => null)));
+    const images = downloaded.filter(Boolean);
+    if (!images.length) return res.status(502).json({ error: 'Could not download listing images' });
 
-    console.log(`Fetch listing: ${itemId} — "${item.title?.slice(0, 60)}"`);
-    res.json({ imageData: img.data, mediaType: img.mediaType, title: item.title ?? '' });
+    console.log(`Fetch listing: ${itemId} — ${images.length} image(s) — "${item.title?.slice(0, 60)}"`);
+    res.json({ images, title: item.title ?? '' });
   } catch (err) {
     console.error('Fetch listing error:', err.message);
     res.status(502).json({ error: 'Could not fetch listing. Make sure it\'s a valid eBay item URL.' });
