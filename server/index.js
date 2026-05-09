@@ -700,12 +700,22 @@ app.post('/api/checkout', async (req, res) => {
 
 
 app.post('/api/fetch-listing', async (req, res) => {
-  const { url } = req.body;
+  let { url } = req.body;
   if (!url?.trim()) return res.status(400).json({ error: 'URL required' });
+  url = url.trim();
 
   if (!url.includes('ebay.com') && !url.includes('ebay.us')) {
     return res.status(400).json({ error: 'Only eBay listing URLs are supported right now' });
   }
+
+  // Follow redirects for shortened URLs like ebay.us/m/...
+  if (!url.includes('/itm/')) {
+    try {
+      const r = await fetchWithTimeout(url, { redirect: 'follow' }, 6000);
+      if (r.url) url = r.url;
+    } catch {}
+  }
+
   const ebayMatch = url.match(/\/itm\/(?:[^/?#]+\/)?(\d{8,15})/);
   if (!ebayMatch) return res.status(400).json({ error: 'Could not find the listing ID — try copying the URL directly from the eBay listing page' });
 
