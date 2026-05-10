@@ -1033,7 +1033,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
                 AI Card Grading
               </div>
               <div style={{ color: "#fff", fontSize: 28, fontWeight: 800, letterSpacing: "-0.8px", lineHeight: 1.12, marginBottom: 10 }}>
-                Know If It's Worth<br />Grading Before You Pay
+                Know If You Should<br />Grade — Or Not
               </div>
               <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 14, lineHeight: 1.5, marginBottom: 22 }}>
                 Get a PSA &amp; BGS estimate in 30 seconds — free to try, no account needed.
