@@ -26,6 +26,7 @@ import PricingModal from "./PricingModal";
 import Logo from "./Logo";
 import BulkTab from "./BulkTab";
 import GradeReveal from "./GradeReveal";
+import LegalModal from "./LegalModal";
 import { CameraCapture } from "./GradeTab";
 import { supabase } from "../lib/supabase";
 
@@ -444,6 +445,7 @@ export default function CardGrader() {
   const [error, setError] = useState(null);
   const [showReveal, setShowReveal] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [legalPage, setLegalPage] = useState(null); // null | 'privacy' | 'terms'
   const bulkCaptureRef = useRef(null);
 
   // ── Auth + subscription state ──────────────────────────────────────────────
@@ -990,6 +992,35 @@ export default function CardGrader() {
 
       <LoadingOverlay message={loadingMessage} />
       {toast && <Toast onDone={() => setToast(false)} />}
+
+      {legalPage && <LegalModal page={legalPage} onClose={() => setLegalPage(null)} />}
+
+      {/* Footer */}
+      <div style={{
+        textAlign: "center",
+        padding: "0 0 140px",
+        display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
+      }}>
+        <div style={{ display: "flex", gap: 20 }}>
+          {[["privacy", "Privacy Policy"], ["terms", "Terms of Service"]].map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setLegalPage(key)}
+              style={{
+                background: "none", border: "none",
+                color: "rgba(255,255,255,0.2)", fontSize: 11,
+                cursor: "pointer", fontFamily: "inherit",
+                letterSpacing: "0.02em", padding: 0,
+                textDecoration: "underline", textUnderlineOffset: 3,
+                textDecorationColor: "rgba(255,255,255,0.1)",
+              }}
+            >{label}</button>
+          ))}
+        </div>
+        <div style={{ color: "rgba(255,255,255,0.1)", fontSize: 10 }}>
+          © 2026 CardGradeOrNot · AI estimates are not official PSA or BGS grades
+        </div>
+      </div>
 
       {/* Floating tab bar */}
       <nav style={{

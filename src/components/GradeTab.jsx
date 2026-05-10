@@ -1028,19 +1028,27 @@ export default function GradeTab({ images, result, candidates, loading, error, o
             </div>
 
             {/* Headline */}
-            <div style={{ color: "#fff", fontSize: 26, fontWeight: 800, letterSpacing: "-0.8px", lineHeight: 1.15, marginBottom: 20, position: "relative" }}>
-              Know If It's a 10<br />Before You Submit
+            <div style={{ position: "relative" }}>
+              <div style={{ color: "rgba(201,168,76,0.75)", fontSize: 11, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 10 }}>
+                AI Card Grading
+              </div>
+              <div style={{ color: "#fff", fontSize: 28, fontWeight: 800, letterSpacing: "-0.8px", lineHeight: 1.12, marginBottom: 10 }}>
+                Know If It's Worth<br />Grading Before You Pay
+              </div>
+              <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 14, lineHeight: 1.5, marginBottom: 22 }}>
+                Get a PSA &amp; BGS estimate in 30 seconds — free to try, no account needed.
+              </div>
             </div>
 
             {/* Cost comparison */}
             <div style={{ position: "relative", marginBottom: 24, display: "flex", alignItems: "center", justifyContent: "center", gap: 12 }}>
               <div style={{ textAlign: "center" }}>
-                <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 3 }}>PSA</div>
+                <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 3 }}>PSA fee</div>
                 <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 22, fontWeight: 700, letterSpacing: "-0.5px", textDecoration: "line-through", textDecorationColor: "rgba(255,80,80,0.5)" }}>$33+</div>
               </div>
               <div style={{ color: "rgba(255,255,255,0.15)", fontSize: 20, fontWeight: 300 }}>→</div>
               <div style={{ textAlign: "center" }}>
-                <div style={{ color: "rgba(201,168,76,0.6)", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 3 }}>Us</div>
+                <div style={{ color: "rgba(201,168,76,0.6)", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 3 }}>Here</div>
                 <div style={{ color: "#c9a84c", fontSize: 22, fontWeight: 800, letterSpacing: "-0.5px" }}>50¢ max</div>
               </div>
             </div>
@@ -1107,9 +1115,16 @@ export default function GradeTab({ images, result, candidates, loading, error, o
               }}>or paste an eBay listing URL</button>
             )}
 
-            {/* Free trial nudge */}
-            <div style={{ position: "relative", color: "#fff", fontSize: 15, fontWeight: 700, letterSpacing: "-0.2px", opacity: 0.82, marginBottom: 20 }}>
-              2 free grades — no account required
+            {/* Free trial badge */}
+            <div style={{ position: "relative", display: "flex", justifyContent: "center", marginBottom: 20 }}>
+              <div style={{
+                display: "inline-flex", alignItems: "center", gap: 6,
+                background: "rgba(48,209,88,0.1)", border: "1px solid rgba(48,209,88,0.25)",
+                borderRadius: 100, padding: "6px 14px",
+              }}>
+                <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#30d158", flexShrink: 0 }} />
+                <span style={{ color: "#30d158", fontSize: 12, fontWeight: 700 }}>2 free grades — no account needed</span>
+              </div>
             </div>
 
             {/* Photo tips */}
