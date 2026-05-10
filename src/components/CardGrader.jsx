@@ -658,6 +658,14 @@ export default function CardGrader() {
     });
   };
 
+  const resetGrade = () => {
+    setImages(prev => { prev.forEach(img => URL.revokeObjectURL(img.objectURL)); return []; });
+    setResult(null);
+    setCandidates(null);
+    setError(null);
+    sessionStorage.removeItem('cgon_pending_images');
+  };
+
   const identifyCard = async (listingTitle = null) => {
     if (!images.length) return;
     // Signed-in users: must have account tokens (device free grades ignored)
@@ -897,6 +905,7 @@ export default function CardGrader() {
                   selectedModel={selectedModel}
                   onSelectModel={setSelectedModel}
                   onRevealAgain={result ? () => setShowReveal(true) : undefined}
+                  onGradeAnother={resetGrade}
                   onOpenCamera={() => setCameraOpen(true)}
                 />
               ) : (

@@ -833,7 +833,7 @@ function computeCentering(cm) {
 const ROLE_LABEL = { front: 'Front', back: 'Back', detail: 'Detail' };
 const ROLE_COLOR = { front: '#c9a84c', back: '#0a84ff', detail: 'rgba(255,255,255,0.28)' };
 
-export default function GradeTab({ images, result, candidates, loading, error, onAddImages, onRemoveImage, onSetRole, onGrade, onConfirmCandidate, onSearch, onUpdateCentering, gradesUsed = 0, gradesTotal = 2, isLoggedIn = false, planName = 'free', onUpgrade, selectedModel = 'claude-sonnet-4-6', onSelectModel, onRevealAgain, onOpenCamera }) {
+export default function GradeTab({ images, result, candidates, loading, error, onAddImages, onRemoveImage, onSetRole, onGrade, onConfirmCandidate, onSearch, onUpdateCentering, gradesUsed = 0, gradesTotal = 2, isLoggedIn = false, planName = 'free', onUpgrade, selectedModel = 'claude-sonnet-4-6', onSelectModel, onRevealAgain, onGradeAnother, onOpenCamera }) {
   const [gradePressed, setGradePressed] = useState(false);
   const fileInputRef = useRef(null);
   const [dismissedNegs, setDismissedNegs] = useState([]);
@@ -1687,6 +1687,21 @@ export default function GradeTab({ images, result, candidates, loading, error, o
             }}
           >
             Share Grade
+          </button>
+
+          <button
+            onClick={onGradeAnother}
+            style={{
+              width: '100%', padding: '15px 0',
+              background: '#fff', color: '#000',
+              border: 'none', borderRadius: 14,
+              fontSize: 15, fontWeight: 700,
+              cursor: 'pointer', fontFamily: 'inherit',
+              letterSpacing: '-0.2px',
+              boxShadow: '0 2px 16px rgba(255,255,255,0.12)',
+            }}
+          >
+            Grade Another Card
           </button>
         </>
       )}
