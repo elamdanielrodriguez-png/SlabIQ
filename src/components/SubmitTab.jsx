@@ -4,6 +4,12 @@ export default function SubmitTab({ result }) {
   const { submission, market, bgs } = result;
   const bgsIsBlackLabel = bgs?.isBlackLabel === true;
 
+  const bothRecommended = submission?.psaRecommended && submission?.bgsRecommended;
+  const psaRoi = Number(submission?.psaRoi) || 0;
+  const bgsRoi = Number(submission?.bgsRoi) || 0;
+  const psaBestPick = bothRecommended && psaRoi >= bgsRoi;
+  const bgsBestPick = bothRecommended && bgsRoi > psaRoi;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       {/* Company cards */}
@@ -11,6 +17,7 @@ export default function SubmitTab({ result }) {
         <CompanyCard
           company="PSA"
           recommended={submission?.psaRecommended}
+          bestPick={psaBestPick}
           tier={submission?.psaTier}
           cost={submission?.psaCost}
           expectedGrade={submission?.psaExpectedGrade}
@@ -21,6 +28,7 @@ export default function SubmitTab({ result }) {
         <CompanyCard
           company="BGS"
           recommended={submission?.bgsRecommended}
+          bestPick={bgsBestPick}
           tier={submission?.bgsTier}
           cost={submission?.bgsCost}
           expectedGrade={submission?.bgsExpectedGrade}
@@ -73,7 +81,7 @@ export default function SubmitTab({ result }) {
   );
 }
 
-function CompanyCard({ company, recommended, tier, cost, expectedGrade, expectedGradeLabel, expectedValue, roi, rawValue }) {
+function CompanyCard({ company, recommended, bestPick, tier, cost, expectedGrade, expectedGradeLabel, expectedValue, roi, rawValue }) {
   const roiPositive = (roi ?? 0) > 0;
   const profit = (expectedValue ?? 0) - (rawValue ?? 0) - (cost ?? 0);
   const accentColor = recommended ? "#30d158" : "#ff453a";
@@ -111,14 +119,32 @@ function CompanyCard({ company, recommended, tier, cost, expectedGrade, expected
   return (
     <div style={{
       background: "#1c1c1e",
-      border: `1px solid ${recommended ? "rgba(48,209,88,0.22)" : "rgba(255,255,255,0.08)"}`,
+      border: `1px solid ${bestPick ? "rgba(201,168,76,0.35)" : recommended ? "rgba(48,209,88,0.22)" : "rgba(255,255,255,0.08)"}`,
       borderRadius: 20,
       padding: "20px 20px",
-      boxShadow: recommended ? "0 2px 20px rgba(48,209,88,0.06)" : "0 2px 20px rgba(0,0,0,0.4)",
+      boxShadow: bestPick ? "0 2px 28px rgba(201,168,76,0.12)" : recommended ? "0 2px 20px rgba(48,209,88,0.06)" : "0 2px 20px rgba(0,0,0,0.4)",
+      position: "relative",
+      overflow: "hidden",
     }}>
+      {/* Best Pick banner */}
+      {bestPick && (
+        <div style={{
+          position: "absolute", top: 14, right: -28,
+          background: "linear-gradient(90deg, #a07830, #c9a84c, #e8c870)",
+          color: "#000", fontSize: 10, fontWeight: 800,
+          letterSpacing: "0.12em", textTransform: "uppercase",
+          padding: "5px 40px",
+          transform: "rotate(35deg)",
+          transformOrigin: "center",
+          boxShadow: "0 2px 8px rgba(201,168,76,0.4)",
+        }}>
+          Best Pick
+        </div>
+      )}
+
       {/* Header row */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-        <div style={{ color: "#c9a84c", fontSize: 22, fontWeight: 700, letterSpacing: "-0.5px" }}>
+        <div style={{ color: bestPick ? "#c9a84c" : "#c9a84c", fontSize: 22, fontWeight: 700, letterSpacing: "-0.5px" }}>
           {company}
         </div>
         <div style={{
