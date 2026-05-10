@@ -13,7 +13,14 @@ export function CameraCapture({ onCapture, onClose }) {
 
   useEffect(() => {
     let active = true;
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false })
+    navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: "environment",
+        width:  { ideal: 3840, min: 1280 },
+        height: { ideal: 2160, min: 720 },
+      },
+      audio: false,
+    })
       .then(s => {
         if (!active) { s.getTracks().forEach(t => t.stop()); return; }
         streamRef.current = s;
@@ -80,7 +87,7 @@ export function CameraCapture({ onCapture, onClose }) {
       if (!blob) return;
       const file = new File([blob], `card-${Date.now()}.jpg`, { type: "image/jpeg" });
       onCapture(file);
-    }, "image/jpeg", 0.92);
+    }, "image/jpeg", 0.97);
   }
 
   return (
