@@ -63,7 +63,7 @@ export default function SubmitTab({ result }) {
               { name: "Express", cost: "$150", note: "Under $2,500" },
               { name: "Super Express", cost: "$250", note: "Under $5,000" },
               { name: "Walk-Through", cost: "$600", note: "Under $10,000" },
-              { name: "Premium", cost: "$1k/25k", note: "$10k+ · per $25k insured" },
+              { name: "Premium", cost: "$1k / 25k insured", note: "$10k+" },
             ]}
           />
           <TierGuide
