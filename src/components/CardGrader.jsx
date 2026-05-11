@@ -336,6 +336,7 @@ function processImageFile(file) {
           resolve({
             imageData: canvas.toDataURL("image/jpeg", 0.92).split(",")[1],
             objectURL: blob ? URL.createObjectURL(blob) : URL.createObjectURL(file),
+            originalObjectURL: URL.createObjectURL(file),
             centering: detected ? { leftPct: detected.leftPct, rightPct: detected.rightPct, topPct: detected.topPct, bottomPct: detected.bottomPct } : null,
             centeringLines: detected?.lines ?? null,
             cardBounds: detected?.cardBounds ?? { cL: 0, cR: w, cT: 0, cB: h },
@@ -350,42 +351,61 @@ function processImageFile(file) {
   });
 }
 
-// Crop 8 zoom-in regions (4 corners + 4 edges) from a stored image — sent to server for loupe-style inspection
-function cropZonesFromImageData(imageData, bounds) {
+// Crop 8 zoom-in regions (4 corners + 4 edges) from a stored image — sent to server for loupe-style inspection.
+// If originalObjectURL is supplied the crop loads from the full-resolution original file instead of the
+// already-downscaled imageData, then scales the stored bounds proportionally. This means a 12MP phone photo
+// gives real corner detail instead of a 600px slice of a 2000px downscale.
+function cropZonesFromImageData(imageData, bounds, { width: storedW, height: storedH, originalObjectURL } = {}) {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.onerror = reject;
+    img.onerror = () => {
+      // Fall back to the compressed imageData if the original URL fails
+      if (originalObjectURL) {
+        cropZonesFromImageData(imageData, bounds, {}).then(resolve).catch(reject);
+      } else {
+        reject(new Error("image load failed"));
+      }
+    };
     img.onload = () => {
       const src = document.createElement("canvas");
-      src.width = img.width;
-      src.height = img.height;
+      src.width = img.naturalWidth;
+      src.height = img.naturalHeight;
       src.getContext("2d").drawImage(img, 0, 0);
 
-      const { cL, cR, cT, cB } = bounds;
-      const cW = cR - cL, cH = cB - cT;
-      const corner = Math.round(Math.min(cW, cH) * 0.30);
-      const edgeLong = Math.round(Math.max(cW, cH) * 0.50);
-      const edgeShort = Math.round(Math.min(cW, cH) * 0.22);
+      // Scale stored bounds (which are in resized-image space) to actual image dimensions
+      const scaleX = storedW ? img.naturalWidth  / storedW : 1;
+      const scaleY = storedH ? img.naturalHeight / storedH : 1;
+      const cL = Math.round(bounds.cL * scaleX);
+      const cR = Math.round(bounds.cR * scaleX);
+      const cT = Math.round(bounds.cT * scaleY);
+      const cB = Math.round(bounds.cB * scaleY);
 
-      const crop = (x, y, w, h) => {
+      const cW = cR - cL, cH = cB - cT;
+      // Tighter corner window: 18% of short side — targets the actual corner tip with less dead space
+      const corner   = Math.round(Math.min(cW, cH) * 0.18);
+      const edgeLong = Math.round(Math.max(cW, cH) * 0.50);
+      const edgeShort = Math.round(Math.min(cW, cH) * 0.18);
+
+      // crop(src rect) → fixed output size at 0.95 quality so Claude always gets a consistent, detail-rich image
+      const crop = (x, y, w, h, outW, outH) => {
         const out = document.createElement("canvas");
-        out.width = w; out.height = h;
-        out.getContext("2d").drawImage(src, x, y, w, h, 0, 0, w, h);
-        return out.toDataURL("image/jpeg", 0.9).split(",")[1];
+        out.width = outW; out.height = outH;
+        out.getContext("2d").drawImage(src, x, y, w, h, 0, 0, outW, outH);
+        return out.toDataURL("image/jpeg", 0.95).split(",")[1];
       };
 
       resolve({
-        "corner-TL":   crop(cL, cT, corner, corner),
-        "corner-TR":   crop(cR - corner, cT, corner, corner),
-        "corner-BL":   crop(cL, cB - corner, corner, corner),
-        "corner-BR":   crop(cR - corner, cB - corner, corner, corner),
-        "edge-top":    crop(cL + Math.round((cW - edgeLong) / 2), cT, edgeLong, edgeShort),
-        "edge-bottom": crop(cL + Math.round((cW - edgeLong) / 2), cB - edgeShort, edgeLong, edgeShort),
-        "edge-left":   crop(cL, cT + Math.round((cH - edgeLong) / 2), edgeShort, edgeLong),
-        "edge-right":  crop(cR - edgeShort, cT + Math.round((cH - edgeLong) / 2), edgeShort, edgeLong),
+        "corner-TL":   crop(cL,           cT,            corner,   corner,   640, 640),
+        "corner-TR":   crop(cR - corner,  cT,            corner,   corner,   640, 640),
+        "corner-BL":   crop(cL,           cB - corner,   corner,   corner,   640, 640),
+        "corner-BR":   crop(cR - corner,  cB - corner,   corner,   corner,   640, 640),
+        "edge-top":    crop(cL + Math.round((cW - edgeLong) / 2), cT,            edgeLong, edgeShort, 900, 350),
+        "edge-bottom": crop(cL + Math.round((cW - edgeLong) / 2), cB - edgeShort,edgeLong, edgeShort, 900, 350),
+        "edge-left":   crop(cL,           cT + Math.round((cH - edgeLong) / 2), edgeShort, edgeLong, 350, 900),
+        "edge-right":  crop(cR - edgeShort, cT + Math.round((cH - edgeLong) / 2), edgeShort, edgeLong, 350, 900),
       });
     };
-    img.src = `data:image/jpeg;base64,${imageData}`;
+    img.src = originalObjectURL ?? `data:image/jpeg;base64,${imageData}`;
   });
 }
 
@@ -655,6 +675,7 @@ export default function CardGrader() {
   const removeImage = (idx) => {
     setImages((prev) => {
       URL.revokeObjectURL(prev[idx].objectURL);
+      if (prev[idx].originalObjectURL) URL.revokeObjectURL(prev[idx].originalObjectURL);
       return prev.filter((_, i) => i !== idx);
     });
   };
@@ -670,7 +691,7 @@ export default function CardGrader() {
   };
 
   const resetGrade = () => {
-    setImages(prev => { prev.forEach(img => URL.revokeObjectURL(img.objectURL)); return []; });
+    setImages(prev => { prev.forEach(img => { URL.revokeObjectURL(img.objectURL); if (img.originalObjectURL) URL.revokeObjectURL(img.originalObjectURL); }); return []; });
     setResult(null);
     setCandidates(null);
     setError(null);
@@ -739,7 +760,11 @@ export default function CardGrader() {
       let zoneCrops = null;
       if (frontImg?.cardBounds && frontImg?.imageData) {
         try {
-          zoneCrops = await cropZonesFromImageData(frontImg.imageData, frontImg.cardBounds);
+          zoneCrops = await cropZonesFromImageData(frontImg.imageData, frontImg.cardBounds, {
+            width: frontImg.width,
+            height: frontImg.height,
+            originalObjectURL: frontImg.originalObjectURL,
+          });
         } catch (err) {
           console.warn("Zone cropping failed:", err);
         }
