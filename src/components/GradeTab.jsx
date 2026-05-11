@@ -1001,28 +1001,28 @@ export default function GradeTab({ images, result, candidates, loading, error, o
             {/* Ambient top glow */}
             <div style={{
               position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)",
-              width: "130%", height: 180,
-              background: "radial-gradient(ellipse 60% 100% at 50% 0%, rgba(201,168,76,0.22) 0%, transparent 100%)",
+              width: "140%", height: 220,
+              background: "radial-gradient(ellipse 65% 100% at 50% 0%, rgba(201,168,76,0.30) 0%, transparent 100%)",
               pointerEvents: "none",
             }} />
 
             {/* Mock grade badges */}
-            <div style={{ display: "flex", justifyContent: "center", gap: 16, marginBottom: 28, position: "relative" }}>
+            <div style={{ display: "flex", justifyContent: "center", gap: 14, marginBottom: 28, position: "relative" }}>
               {[
                 { company: "PSA", grade: "10", sub: "GEM MT" },
                 { company: "BGS", grade: "10", sub: "PRISTINE" },
               ].map(({ company, grade, sub }) => (
                 <div key={company} style={{
-                  background: "rgba(0,0,0,0.5)",
-                  border: "1px solid rgba(201,168,76,0.32)",
-                  borderRadius: 18,
-                  padding: "16px 22px",
-                  minWidth: 95,
-                  boxShadow: "0 4px 24px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.07)",
+                  background: "linear-gradient(160deg, rgba(32,28,16,0.98) 0%, rgba(18,18,20,0.99) 100%)",
+                  border: "1px solid rgba(201,168,76,0.42)",
+                  borderRadius: 20,
+                  padding: "18px 26px",
+                  minWidth: 105,
+                  boxShadow: "0 10px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(201,168,76,0.1), inset 0 1px 0 rgba(255,255,255,0.1)",
                 }}>
-                  <div style={{ color: "rgba(255,255,255,0.28)", fontSize: 9, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", marginBottom: 6 }}>{company}</div>
-                  <div style={{ color: "#c9a84c", fontSize: 42, fontWeight: 800, lineHeight: 1, letterSpacing: "-2.5px", textShadow: "0 0 28px rgba(201,168,76,0.6)" }}>{grade}</div>
-                  <div style={{ color: "rgba(255,255,255,0.25)", fontSize: 9, fontWeight: 600, letterSpacing: "0.07em", textTransform: "uppercase", marginTop: 6 }}>{sub}</div>
+                  <div style={{ color: "rgba(201,168,76,0.5)", fontSize: 9, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 8 }}>{company}</div>
+                  <div style={{ color: "#c9a84c", fontSize: 52, fontWeight: 800, lineHeight: 1, letterSpacing: "-3px", textShadow: "0 0 40px rgba(201,168,76,0.85), 0 0 80px rgba(201,168,76,0.3)" }}>{grade}</div>
+                  <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 9, fontWeight: 600, letterSpacing: "0.09em", textTransform: "uppercase", marginTop: 8 }}>{sub}</div>
                 </div>
               ))}
             </div>
@@ -1032,7 +1032,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
               <div style={{ color: "rgba(201,168,76,0.75)", fontSize: 11, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 10 }}>
                 AI Card Grading
               </div>
-              <div style={{ color: "#fff", fontSize: 28, fontWeight: 800, letterSpacing: "-0.8px", lineHeight: 1.12, marginBottom: 10 }}>
+              <div style={{ color: "#fff", fontSize: 30, fontWeight: 800, letterSpacing: "-1px", lineHeight: 1.1, marginBottom: 10 }}>
                 Know If You Should<br />Grade — Or Not
               </div>
               <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 14, lineHeight: 1.5, marginBottom: 22 }}>
@@ -1041,15 +1041,26 @@ export default function GradeTab({ images, result, candidates, loading, error, o
             </div>
 
             {/* Cost comparison */}
-            <div style={{ position: "relative", marginBottom: 24, display: "flex", alignItems: "center", justifyContent: "center", gap: 12 }}>
-              <div style={{ textAlign: "center" }}>
-                <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 3 }}>PSA fee</div>
-                <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 22, fontWeight: 700, letterSpacing: "-0.5px", textDecoration: "line-through", textDecorationColor: "rgba(255,80,80,0.5)" }}>$33+</div>
-              </div>
-              <div style={{ color: "rgba(255,255,255,0.15)", fontSize: 20, fontWeight: 300 }}>→</div>
-              <div style={{ textAlign: "center" }}>
-                <div style={{ color: "rgba(201,168,76,0.6)", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 3 }}>Here</div>
-                <div style={{ color: "#c9a84c", fontSize: 22, fontWeight: 800, letterSpacing: "-0.5px" }}>50¢ max</div>
+            <div style={{ position: "relative", marginBottom: 24 }}>
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 20,
+                background: "rgba(255,255,255,0.03)",
+                border: "1px solid rgba(255,255,255,0.07)",
+                borderRadius: 16,
+                padding: "16px 28px",
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.05)",
+              }}>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ color: "rgba(255,255,255,0.25)", fontSize: 10, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>PSA fee</div>
+                  <div style={{ color: "rgba(255,100,100,0.55)", fontSize: 24, fontWeight: 700, letterSpacing: "-0.5px", textDecoration: "line-through", textDecorationColor: "rgba(255,80,80,0.55)" }}>$33+</div>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                  <div style={{ color: "rgba(255,255,255,0.12)", fontSize: 18, fontWeight: 300 }}>→</div>
+                </div>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ color: "rgba(201,168,76,0.55)", fontSize: 10, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>CardGradeOrNot</div>
+                  <div style={{ color: "#c9a84c", fontSize: 24, fontWeight: 800, letterSpacing: "-0.5px", textShadow: "0 0 20px rgba(201,168,76,0.4)" }}>50¢ max</div>
+                </div>
               </div>
             </div>
 
@@ -1058,22 +1069,24 @@ export default function GradeTab({ images, result, candidates, loading, error, o
               <button
                 onClick={() => onOpenCamera?.()}
                 style={{
-                  flex: 1, padding: "15px 0",
-                  background: "#c9a84c", color: "#000",
-                  border: "none", borderRadius: 14,
+                  flex: 1, padding: "16px 0",
+                  background: "linear-gradient(180deg, #dfc055 0%, #c9a84c 55%, #b89040 100%)",
+                  color: "#000",
+                  border: "none", borderRadius: 16,
                   fontSize: 15, fontWeight: 700, letterSpacing: "-0.2px",
                   cursor: "pointer", fontFamily: "inherit",
-                  boxShadow: "0 4px 24px rgba(201,168,76,0.45)",
+                  boxShadow: "0 6px 32px rgba(201,168,76,0.55), inset 0 1px 0 rgba(255,255,255,0.25)",
                 }}
               >Take Photo</button>
               <button
                 onClick={() => fileInputRef.current?.click()}
                 style={{
-                  flex: 1, padding: "15px 0",
-                  background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.75)",
-                  border: "1px solid rgba(255,255,255,0.12)", borderRadius: 14,
+                  flex: 1, padding: "16px 0",
+                  background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.7)",
+                  border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16,
                   fontSize: 15, fontWeight: 600, letterSpacing: "-0.2px",
                   cursor: "pointer", fontFamily: "inherit",
+                  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08)",
                 }}
               >Upload Photo</button>
             </div>
@@ -1128,16 +1141,16 @@ export default function GradeTab({ images, result, candidates, loading, error, o
             </div>
 
             {/* Photo tips */}
-            <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 7, textAlign: "left", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 18 }}>
-              <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 2 }}>For the best grade</div>
+            <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 8, textAlign: "left", borderTop: "1px solid rgba(255,255,255,0.07)", paddingTop: 18 }}>
+              <div style={{ color: "rgba(255,255,255,0.22)", fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 3 }}>For the best grade</div>
               {[
                 "Fill the frame — card should take up most of the photo",
                 "Use bright natural light or a lamp, no flash",
                 "Hold steady on a flat surface, avoid glare",
               ].map(tip => (
-                <div key={tip} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                  <span style={{ color: "rgba(201,168,76,0.45)", fontSize: 12, lineHeight: 1.6, flexShrink: 0 }}>·</span>
-                  <span style={{ color: "rgba(255,255,255,0.28)", fontSize: 12, lineHeight: 1.6 }}>{tip}</span>
+                <div key={tip} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                  <span style={{ color: "rgba(201,168,76,0.65)", fontSize: 10, lineHeight: 1.8, flexShrink: 0, fontWeight: 700 }}>›</span>
+                  <span style={{ color: "rgba(255,255,255,0.32)", fontSize: 12, lineHeight: 1.65 }}>{tip}</span>
                 </div>
               ))}
             </div>
@@ -1149,19 +1162,21 @@ export default function GradeTab({ images, result, candidates, loading, error, o
       {images.length === 0 && !result && !candidates && !loading && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
           {[
-            { title: "Graded Against Real 10s",     desc: "Every zone compared to actual PSA 10 sold listings" },
-            { title: "Catches What You Can't See",  desc: "Microscopic scratches spotted before you pay $33"   },
-            { title: "Never Fakes a Flaw",          desc: "Prizm & holo patterns never mistaken for damage"    },
-            { title: "Exact ROI Before You Decide", desc: "Live eBay prices + dollar profit at every grade"    },
-          ].map(({ title, desc }, i) => (
+            { num: "01", title: "Graded Against Real 10s",     desc: "Every zone compared to actual PSA 10 sold listings" },
+            { num: "02", title: "Catches What You Can't See",  desc: "Microscopic scratches spotted before you pay $33"   },
+            { num: "03", title: "Never Fakes a Flaw",          desc: "Prizm & holo patterns never mistaken for damage"    },
+            { num: "04", title: "Exact ROI Before You Decide", desc: "Live eBay prices + dollar profit at every grade"    },
+          ].map(({ num, title, desc }, i) => (
             <div key={title} className={`result-card-${i}`} style={{
               background: "rgba(255,255,255,0.03)",
-              border: "1px solid rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.07)",
               borderRadius: 16,
-              padding: "14px 12px",
+              padding: "16px 14px",
+              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.055)",
             }}>
-              <div style={{ color: "rgba(255,255,255,0.72)", fontSize: 12, fontWeight: 700, letterSpacing: "-0.2px", marginBottom: 4 }}>{title}</div>
-              <div style={{ color: "rgba(255,255,255,0.28)", fontSize: 11, lineHeight: 1.5 }}>{desc}</div>
+              <div style={{ color: "rgba(201,168,76,0.42)", fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", marginBottom: 6 }}>{num}</div>
+              <div style={{ color: "rgba(255,255,255,0.78)", fontSize: 12, fontWeight: 700, letterSpacing: "-0.2px", marginBottom: 4 }}>{title}</div>
+              <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11, lineHeight: 1.55 }}>{desc}</div>
             </div>
           ))}
         </div>
@@ -1330,18 +1345,19 @@ export default function GradeTab({ images, result, candidates, loading, error, o
           onPointerCancel={() => setGradePressed(false)}
           style={{
             width: "100%",
-            padding: "14px 0",
-            background: loading ? "rgba(255,255,255,0.05)" : "#c9a84c",
+            padding: "15px 0",
+            background: loading ? "rgba(255,255,255,0.05)" : "linear-gradient(180deg, #dfc055 0%, #c9a84c 55%, #b89040 100%)",
             color: loading ? "rgba(255,255,255,0.2)" : "#000",
-            fontWeight: 600,
+            fontWeight: 700,
             fontSize: 15,
             letterSpacing: "-0.2px",
             border: "none",
-            borderRadius: 14,
+            borderRadius: 16,
             cursor: loading ? "not-allowed" : "pointer",
             fontFamily: "inherit",
-            transition: "background 0.18s ease, color 0.18s ease, transform 0.08s ease",
+            transition: "opacity 0.18s ease, transform 0.08s ease",
             transform: gradePressed && !loading ? "scale(0.97)" : "scale(1)",
+            boxShadow: loading ? "none" : "0 4px 24px rgba(201,168,76,0.45), inset 0 1px 0 rgba(255,255,255,0.22)",
           }}
         >
           {loading ? "Analyzing…" : `Grade ${images.length > 1 ? `${images.length} Photos` : "Card"}`}
@@ -1678,12 +1694,13 @@ export default function GradeTab({ images, result, candidates, loading, error, o
             }}
             style={{
               width: '100%', padding: '13px 0',
-              background: 'rgba(201,168,76,0.08)',
-              border: '1px solid rgba(201,168,76,0.25)',
+              background: 'rgba(201,168,76,0.07)',
+              border: '1px solid rgba(201,168,76,0.28)',
               borderRadius: 14,
               color: '#c9a84c', fontSize: 14, fontWeight: 600,
               cursor: 'pointer', fontFamily: 'inherit',
               letterSpacing: '-0.1px',
+              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.07)',
             }}
           >
             Share Grade
@@ -1938,11 +1955,11 @@ const card = {
 };
 
 const heroUploadCard = {
-  background: "linear-gradient(180deg, rgba(201,168,76,0.11) 0%, #1c1c1e 52%)",
-  border: "1px solid rgba(201,168,76,0.22)",
+  background: "linear-gradient(180deg, rgba(201,168,76,0.16) 0%, rgba(201,168,76,0.04) 40%, #1c1c1e 60%)",
+  border: "1px solid rgba(201,168,76,0.28)",
   borderRadius: 24,
   overflow: "hidden",
-  boxShadow: "0 2px 40px rgba(201,168,76,0.10), inset 0 1px 0 rgba(255,255,255,0.08)",
+  boxShadow: "0 4px 48px rgba(201,168,76,0.15), inset 0 1px 0 rgba(255,255,255,0.1)",
 };
 
 const sectionLabel = {
@@ -1954,10 +1971,10 @@ const sectionLabel = {
 };
 
 const listItem = {
-  color: "rgba(255,255,255,0.42)",
+  color: "rgba(255,255,255,0.45)",
   fontSize: 13,
-  lineHeight: 1.6,
+  lineHeight: 1.65,
   marginBottom: 6,
   paddingLeft: 10,
-  borderLeft: "2px solid rgba(255,255,255,0.08)",
+  borderLeft: "2px solid rgba(201,168,76,0.2)",
 };

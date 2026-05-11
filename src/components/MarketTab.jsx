@@ -208,7 +208,7 @@ function PopPanel({ title, subtitle, total, gemRate, gemLabel, distribution, hig
 
 function ValueTable({ heading, rows }) {
   return (
-    <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, overflow: "hidden" }}>
+    <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, overflow: "hidden", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.05)" }}>
       <div style={{
         padding: "9px 14px",
         borderBottom: "1px solid rgba(255,255,255,0.06)",
@@ -270,7 +270,7 @@ const sectionLabel = {
 
 const ebayLinkStyle = {
   fontSize: 10,
-  color: "rgba(255,255,255,0.22)",
+  color: "rgba(201,168,76,0.55)",
   textDecoration: "none",
   letterSpacing: "0.02em",
   lineHeight: 1,

@@ -781,7 +781,7 @@ export default function CardGrader() {
   return (
     <div style={{
       minHeight: "100vh",
-      background: "radial-gradient(ellipse 100% 38% at 50% 0%, rgba(201,168,76,0.07) 0%, transparent 70%), #000",
+      background: "radial-gradient(ellipse 120% 45% at 50% 0%, rgba(201,168,76,0.1) 0%, transparent 60%), radial-gradient(ellipse 70% 25% at 50% 100%, rgba(201,168,76,0.035) 0%, transparent 70%), #000",
       color: "#fff",
       fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif",
       WebkitFontSmoothing: "antialiased",
@@ -1058,7 +1058,7 @@ export default function CardGrader() {
                 padding: "9px 18px",
                 borderRadius: 100,
                 border: "none",
-                background: active ? "rgba(255,255,255,0.13)" : "transparent",
+                background: active ? "rgba(255,255,255,0.11)" : "transparent",
                 color: active ? "#fff" : locked ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.4)",
                 fontWeight: active ? 600 : 400,
                 fontSize: 13,
@@ -1067,11 +1067,11 @@ export default function CardGrader() {
                 fontFamily: "inherit",
                 transition: "background 0.15s ease, color 0.15s ease",
                 whiteSpace: "nowrap",
-                boxShadow: active ? "0 1px 6px rgba(0,0,0,0.35)" : "none",
+                boxShadow: active ? "0 1px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08)" : "none",
               }}
             >
               {tab.label}
-              {active && <div style={{ width: 4, height: 4, borderRadius: "50%", background: "#c9a84c", margin: "3px auto 0" }} />}
+              {active && <div style={{ width: 4, height: 4, borderRadius: "50%", background: "#c9a84c", margin: "3px auto 0", boxShadow: "0 0 6px rgba(201,168,76,0.8)" }} />}
             </button>
           );
         })}
