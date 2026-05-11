@@ -906,12 +906,39 @@ export default function GradeTab({ images, result, candidates, loading, error, o
   const [dismissedDefects, setDismissedDefects] = useState([]);
   const [showCenteringEditor, setShowCenteringEditor] = useState(false);
   const [photoQuality, setPhotoQuality] = useState(null); // null | 'good' | 'dark' | 'blurry'
+  const [imageRes, setImageRes] = useState(null); // short-side pixel count of primary image
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [urlValue, setUrlValue] = useState('');
   const [urlLoading, setUrlLoading] = useState(false);
   const [urlError, setUrlError] = useState(null);
   const [listingTitle, setListingTitle] = useState(null);
   const displayResult = useMemo(() => applyDismissals(result, dismissedDefects), [result, dismissedDefects]);
+
+  const confidence = useMemo(() => {
+    if (!images.length) return 0;
+    const hasFront  = images.some(i => i.role === 'front');
+    const hasBack   = images.some(i => i.role === 'back');
+    const hasDetail = images.some(i => i.role === 'detail');
+
+    let score = hasFront ? 58 : 42; // front labeled vs unlabeled
+    if (hasBack)   score += 20;
+    if (hasDetail) score += 13;
+
+    // Resolution of primary image (short side in pixels)
+    const res = imageRes ?? 0;
+    if      (res >= 2500) score += 17;
+    else if (res >= 1800) score += 13;
+    else if (res >= 1200) score +=  9;
+    else if (res >=  700) score +=  4;
+    else if (res >=  400) score -=  8;
+    else if (res >     0) score -= 18;
+
+    // Photo quality multiplier (applies on top of structure + resolution)
+    const qMult = photoQuality === 'dark' ? 0.57 : photoQuality === 'blurry' ? 0.63 : 1.0;
+    score = Math.round(score * qMult);
+
+    return Math.max(12, Math.min(95, score));
+  }, [images, photoQuality, imageRes]);
   const handleDrop = (e) => { e.preventDefault(); onAddImages(e.dataTransfer.files); };
 
   const handleUrlFetch = async () => {
@@ -945,6 +972,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
     if (!url) return;
     const img = new Image();
     img.onload = () => {
+      setImageRes(Math.min(img.naturalWidth, img.naturalHeight));
       const size = 80;
       const canvas = document.createElement('canvas');
       canvas.width = canvas.height = size;
@@ -965,6 +993,16 @@ export default function GradeTab({ images, result, candidates, loading, error, o
     img.onerror = () => setPhotoQuality(null);
     img.src = url;
   }, [images, result]);
+
+  // Capture resolution of primary image after grading (effect above exits early when result exists)
+  useEffect(() => {
+    if (!result || !images.length) return;
+    const primary = images.find(i => i.role === 'front') ?? images[0];
+    if (!primary?.objectURL) return;
+    const img = new Image();
+    img.onload = () => setImageRes(Math.min(img.naturalWidth, img.naturalHeight));
+    img.src = primary.objectURL;
+  }, [result, images]);
 
   const frontImg = result ? (images.find(img => img.role === 'front') ?? images[0] ?? null) : null;
   // Only treat centering as "user-confirmed" if they actually opened the editor and hit Confirm.
@@ -1460,7 +1498,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
                   .filter(Boolean).join("  ·  ")}
               </div>
             </div>
-            <ConfidenceArc confidence={result.confidence} />
+            <ConfidenceArc confidence={confidence} />
           </div>
 
           {/* PSA | BGS hero */}
