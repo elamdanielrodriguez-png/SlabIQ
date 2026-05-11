@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useMemo } from "react";
 
 // Camera capture with a fixed 5:7 rectangle overlay. User aligns the card inside
 // the rectangle and taps capture. Captured frame is cropped to exactly the
@@ -833,6 +833,72 @@ function computeCentering(cm) {
 const ROLE_LABEL = { front: 'Front', back: 'Back', detail: 'Detail' };
 const ROLE_COLOR = { front: '#c9a84c', back: '#0a84ff', detail: 'rgba(255,255,255,0.28)' };
 
+// ── Client-side grade recomputation (dismiss defect → update grade) ────────
+
+function clientCategoryGrade(severities) {
+  if (severities.length === 0) return 10.0;
+  const n = severities.length;
+  const obviousCount = severities.filter(s => s === 'obvious').length;
+  const worst = obviousCount > 0 ? 'obvious' : severities.includes('visible') ? 'visible' : 'microscopic';
+  if (worst === 'microscopic') return n >= 2 ? 9.0 : 9.5;
+  if (worst === 'visible')     return n >= 3 ? 7.5 : n >= 2 ? 8.0 : 8.5;
+  if (obviousCount >= 4) return 2.0;
+  if (obviousCount >= 3) return 3.5;
+  if (obviousCount >= 2) return 5.0;
+  return 7.0;
+}
+
+function defectToZone(x, y) {
+  const C = 0.22, E = 0.12;
+  if (x < C && y < C)         return 'corner-TL';
+  if (x > 1-C && y < C)       return 'corner-TR';
+  if (x < C && y > 1-C)       return 'corner-BL';
+  if (x > 1-C && y > 1-C)     return 'corner-BR';
+  if (y < E)                   return 'edge-top';
+  if (y > 1-E)                 return 'edge-bottom';
+  if (x < E)                   return 'edge-left';
+  if (x > 1-E)                 return 'edge-right';
+  return 'surface';
+}
+
+const PSA_LABELS_CLIENT = { 10:'GEM MT', 9:'MINT', 8:'NM-MT', 7:'NM', 6:'EX-MT', 5:'EX', 4:'VG-EX', 3:'VG', 2:'GOOD', 1:'PR' };
+const CORNER_ZONE_IDS = new Set(['corner-TL','corner-TR','corner-BL','corner-BR']);
+const EDGE_ZONE_IDS   = new Set(['edge-top','edge-right','edge-bottom','edge-left']);
+
+function applyDismissals(result, dismissedDefectIndices) {
+  if (!result?.zones || !result?.bgs) return result;
+  if (dismissedDefectIndices.length === 0) return result;
+
+  const clearedZones = new Set();
+  (result.defects ?? []).forEach((d, i) => {
+    if (dismissedDefectIndices.includes(i)) clearedZones.add(defectToZone(d.x, d.y));
+  });
+
+  const zones = result.zones ?? [];
+  const cornerSevs = zones.filter(z => CORNER_ZONE_IDS.has(z.zone) && z.severity && !clearedZones.has(z.zone)).map(z => z.severity);
+  const edgeSevs   = zones.filter(z => EDGE_ZONE_IDS.has(z.zone)   && z.severity && !clearedZones.has(z.zone)).map(z => z.severity);
+  const surfaceSevs = clearedZones.has('surface') ? [] : (result.surfaceFlaws ?? []).map(f => f.severity).filter(Boolean);
+
+  const corners = clientCategoryGrade(cornerSevs);
+  const edges   = clientCategoryGrade(edgeSevs);
+  const surface = clientCategoryGrade(surfaceSevs);
+
+  const c = typeof result.bgs.centering === 'number' ? result.bgs.centering : null;
+  const subs = c != null ? [c, corners, edges, surface] : [corners, edges, surface];
+  const avg = subs.reduce((a, b) => a + b, 0) / subs.length;
+  const rounded = Math.round(avg * 2) / 2;
+  const lowest = Math.min(...subs);
+  const overall = Math.min(rounded, lowest + 0.5);
+  const isBlackLabel = subs.length === 4 && subs.every(v => v === 10.0);
+  const psaGrade = Math.max(1, Math.min(10, Math.round(avg)));
+
+  return {
+    ...result,
+    bgs: { ...result.bgs, corners, edges, surface, overall, isBlackLabel },
+    psa: { grade: psaGrade, label: PSA_LABELS_CLIENT[psaGrade] || result.psa?.label || '' },
+  };
+}
+
 export default function GradeTab({ images, result, candidates, loading, error, onAddImages, onRemoveImage, onSetRole, onGrade, onConfirmCandidate, onSearch, onUpdateCentering, gradesUsed = 0, gradesTotal = 2, isLoggedIn = false, planName = 'free', onUpgrade, selectedModel = 'claude-sonnet-4-6', onSelectModel, onRevealAgain, onGradeAnother, onOpenCamera, onSwitchTab }) {
   const [gradePressed, setGradePressed] = useState(false);
   const fileInputRef = useRef(null);
@@ -845,6 +911,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
   const [urlLoading, setUrlLoading] = useState(false);
   const [urlError, setUrlError] = useState(null);
   const [listingTitle, setListingTitle] = useState(null);
+  const displayResult = useMemo(() => applyDismissals(result, dismissedDefects), [result, dismissedDefects]);
   const handleDrop = (e) => { e.preventDefault(); onAddImages(e.dataTransfer.files); };
 
   const handleUrlFetch = async () => {
@@ -1415,24 +1482,24 @@ export default function GradeTab({ images, result, candidates, loading, error, o
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1px 1fr" }}>
               <GradeHalf
                 label="PSA"
-                grade={result.psa?.grade}
-                sub={result.psa?.label}
+                grade={displayResult.psa?.grade}
+                sub={displayResult.psa?.label}
                 side="left"
               />
               <div style={{ background: "rgba(255,255,255,0.06)" }} />
               <GradeHalf
                 label="BGS"
-                grade={result.bgs?.overall}
-                sub={result.bgs?.isBlackLabel ? "Black Label" : result.bgs?.overall === 10 ? "Pristine" : result.bgs?.overall === 9.5 ? "Gem Mint" : "Beckett"}
+                grade={displayResult.bgs?.overall}
+                sub={displayResult.bgs?.isBlackLabel ? "Black Label" : displayResult.bgs?.overall === 10 ? "Pristine" : displayResult.bgs?.overall === 9.5 ? "Gem Mint" : "Beckett"}
                 side="right"
-                blackLabel={result.bgs?.isBlackLabel}
+                blackLabel={displayResult.bgs?.isBlackLabel}
               />
             </div>
 
             {/* BGS subgrades */}
             {(() => {
               // Single source of truth: result.bgs.centering. AI sets it initially; recomputeBgsAndPsa updates it on user confirm.
-              const centeringDisplay = result.bgs?.centering ?? null;
+              const centeringDisplay = displayResult.bgs?.centering ?? null;
               const isManual = userConfirmed;
               return (
                 <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", marginTop: 22, paddingTop: 18, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
@@ -1460,9 +1527,9 @@ export default function GradeTab({ images, result, candidates, loading, error, o
                     )}
                   </button>
                   {[
-                    { label: "Corners", value: result.bgs?.corners },
-                    { label: "Edges", value: result.bgs?.edges },
-                    { label: "Surface", value: result.bgs?.surface },
+                    { label: "Corners", value: displayResult.bgs?.corners },
+                    { label: "Edges", value: displayResult.bgs?.edges },
+                    { label: "Surface", value: displayResult.bgs?.surface },
                   ].map((s) => (
                     <div key={s.label} style={{ textAlign: "center" }}>
                       <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>{s.label}</div>
@@ -1713,13 +1780,13 @@ export default function GradeTab({ images, result, candidates, loading, error, o
           <button
             onClick={async () => {
               try {
-                const blob = await generateShareImage(result);
+                const blob = await generateShareImage(displayResult);
                 const file = new File([blob], 'cgon-grade.png', { type: 'image/png' });
                 if (navigator.share && navigator.canShare?.({ files: [file] })) {
                   await navigator.share({
                     files: [file],
-                    title: `${result.player} — PSA ${result.psa?.grade}`,
-                    text: `Just graded my ${[result.year, result.player, result.variant].filter(Boolean).join(' ')} on CardGradeOrNot — PSA ${result.psa?.grade} / BGS ${result.bgs?.overall}`,
+                    title: `${result.player} — PSA ${displayResult.psa?.grade}`,
+                    text: `Just graded my ${[result.year, result.player, result.variant].filter(Boolean).join(' ')} on CardGradeOrNot — PSA ${displayResult.psa?.grade} / BGS ${displayResult.bgs?.overall}`,
                   });
                 } else {
                   const url = URL.createObjectURL(blob);
