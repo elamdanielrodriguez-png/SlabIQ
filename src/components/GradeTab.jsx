@@ -833,7 +833,7 @@ function computeCentering(cm) {
 const ROLE_LABEL = { front: 'Front', back: 'Back', detail: 'Detail' };
 const ROLE_COLOR = { front: '#c9a84c', back: '#0a84ff', detail: 'rgba(255,255,255,0.28)' };
 
-export default function GradeTab({ images, result, candidates, loading, error, onAddImages, onRemoveImage, onSetRole, onGrade, onConfirmCandidate, onSearch, onUpdateCentering, gradesUsed = 0, gradesTotal = 2, isLoggedIn = false, planName = 'free', onUpgrade, selectedModel = 'claude-sonnet-4-6', onSelectModel, onRevealAgain, onGradeAnother, onOpenCamera }) {
+export default function GradeTab({ images, result, candidates, loading, error, onAddImages, onRemoveImage, onSetRole, onGrade, onConfirmCandidate, onSearch, onUpdateCentering, gradesUsed = 0, gradesTotal = 2, isLoggedIn = false, planName = 'free', onUpgrade, selectedModel = 'claude-sonnet-4-6', onSelectModel, onRevealAgain, onGradeAnother, onOpenCamera, onSwitchTab }) {
   const [gradePressed, setGradePressed] = useState(false);
   const fileInputRef = useRef(null);
   const [dismissedNegs, setDismissedNegs] = useState([]);
@@ -1595,6 +1595,44 @@ export default function GradeTab({ images, result, candidates, loading, error, o
             })()}
           </div>
 
+          {/* What's next */}
+          <div className="result-card-2" style={{
+            background: "rgba(201,168,76,0.06)",
+            border: "1px solid rgba(201,168,76,0.2)",
+            borderRadius: 20,
+            padding: "18px 18px",
+            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)",
+          }}>
+            <div style={{ color: "rgba(201,168,76,0.65)", fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 14 }}>
+              What's next
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              {[
+                { tab: "market", label: "Market Prices",    sub: "What's it worth?" },
+                { tab: "submit", label: "Submit Analysis",  sub: "Should you grade it?" },
+              ].map(({ tab, label, sub }) => (
+                <button
+                  key={tab}
+                  onClick={() => onSwitchTab?.(tab)}
+                  className="btn-secondary"
+                  style={{
+                    padding: "14px 14px",
+                    background: "rgba(255,255,255,0.04)",
+                    border: "1px solid rgba(255,255,255,0.09)",
+                    borderRadius: 14,
+                    cursor: "pointer", fontFamily: "inherit",
+                    textAlign: "left",
+                    display: "flex", flexDirection: "column", gap: 3,
+                  }}
+                >
+                  <div style={{ color: "#fff", fontSize: 13, fontWeight: 600, letterSpacing: "-0.2px" }}>{label}</div>
+                  <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 11, lineHeight: 1.4 }}>{sub}</div>
+                  <div style={{ color: "rgba(201,168,76,0.7)", fontSize: 11, fontWeight: 600, marginTop: 3 }}>View →</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Centering editor */}
           {showCenteringEditor && frontImg && (
             <CenteringEditor
@@ -1609,10 +1647,10 @@ export default function GradeTab({ images, result, candidates, loading, error, o
           )}
 
           {/* Annotated card */}
-          <div className="result-card-2"><AnnotatedCard images={images} defects={activeDefects} /></div>
+          <div className="result-card-3"><AnnotatedCard images={images} defects={activeDefects} /></div>
 
           {/* Positives / Issues */}
-          <div className="result-card-3" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div className="result-card-4" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div style={card}>
               <div style={{ ...sectionLabel, color: "#30d158", marginBottom: 12 }}>Positives</div>
               {result.positives?.length > 0

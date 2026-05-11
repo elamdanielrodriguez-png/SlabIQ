@@ -446,6 +446,7 @@ export default function CardGrader() {
   const [showReveal, setShowReveal] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [legalPage, setLegalPage] = useState(null); // null | 'privacy' | 'terms'
+  const [visitedTabs, setVisitedTabs] = useState(new Set());
   const bulkCaptureRef = useRef(null);
 
   // ── Auth + subscription state ──────────────────────────────────────────────
@@ -658,11 +659,22 @@ export default function CardGrader() {
     });
   };
 
+  useEffect(() => {
+    if (result) setVisitedTabs(new Set(['grade']));
+  }, [result]);
+
+  const switchTab = (tabId) => {
+    setActiveTab(tabId);
+    setTabKey(k => k + 1);
+    setVisitedTabs(prev => new Set([...prev, tabId]));
+  };
+
   const resetGrade = () => {
     setImages(prev => { prev.forEach(img => URL.revokeObjectURL(img.objectURL)); return []; });
     setResult(null);
     setCandidates(null);
     setError(null);
+    setVisitedTabs(new Set());
     sessionStorage.removeItem('cgon_pending_images');
   };
 
@@ -907,6 +919,7 @@ export default function CardGrader() {
                   onRevealAgain={result ? () => setShowReveal(true) : undefined}
                   onGradeAnother={resetGrade}
                   onOpenCamera={() => setCameraOpen(true)}
+                  onSwitchTab={switchTab}
                 />
               ) : (
                 <BulkTab
@@ -928,8 +941,7 @@ export default function CardGrader() {
             <HistoryPanel
               onRestore={(savedResult) => {
                 setResult(savedResult);
-                setActiveTab("grade");
-                setTabKey(k => k + 1);
+                switchTab("grade");
               }}
             />
           )}
@@ -1050,17 +1062,18 @@ export default function CardGrader() {
         {TABS.map((tab) => {
           const locked = (tab.id === "market" || tab.id === "submit") && !result;
           const active = activeTab === tab.id;
+          const unread = result && !locked && !active && !visitedTabs.has(tab.id) && (tab.id === "market" || tab.id === "submit");
           return (
             <button
               key={tab.id}
-              onClick={() => { if (!locked) { setActiveTab(tab.id); setTabKey(k => k + 1); } }}
+              onClick={() => { if (!locked) switchTab(tab.id); }}
               style={{
                 padding: "9px 18px",
                 borderRadius: 100,
                 border: "none",
                 background: active ? "rgba(255,255,255,0.11)" : "transparent",
-                color: active ? "#fff" : locked ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.4)",
-                fontWeight: active ? 600 : 400,
+                color: active ? "#fff" : unread ? "rgba(255,220,120,0.82)" : locked ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.4)",
+                fontWeight: active ? 600 : unread ? 600 : 400,
                 fontSize: 13,
                 letterSpacing: "-0.01em",
                 cursor: locked ? "default" : "pointer",
@@ -1071,7 +1084,8 @@ export default function CardGrader() {
               }}
             >
               {tab.label}
-              {active && <div style={{ width: 4, height: 4, borderRadius: "50%", background: "#c9a84c", margin: "3px auto 0", boxShadow: "0 0 6px rgba(201,168,76,0.8)" }} />}
+              {active  && <div style={{ width: 4, height: 4, borderRadius: "50%", background: "#c9a84c", margin: "3px auto 0", boxShadow: "0 0 6px rgba(201,168,76,0.8)" }} />}
+              {unread  && <div className="tab-unread-dot" style={{ width: 4, height: 4, borderRadius: "50%", background: "#c9a84c", margin: "3px auto 0" }} />}
             </button>
           );
         })}

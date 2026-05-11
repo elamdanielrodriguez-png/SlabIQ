@@ -155,6 +155,14 @@ button {
   border-color: rgba(201,168,76,0.4) !important;
 }
 
+/* ── Tab unread dot ─────────────────────────────────────────── */
+
+@keyframes tabPulse {
+  0%, 100% { opacity: 1;    transform: scale(1);    }
+  50%       { opacity: 0.3; transform: scale(0.6);  }
+}
+.tab-unread-dot { animation: tabPulse 1.5s ease-in-out infinite; }
+
 /* ── Card hover lift ────────────────────────────────────────── */
 
 .card-hover {
