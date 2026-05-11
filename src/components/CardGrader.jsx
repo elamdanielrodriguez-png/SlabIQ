@@ -83,7 +83,7 @@ function LoadingOverlayInner({ isIdentify }) {
           position: "absolute", inset: 0,
           display: "flex", alignItems: "center", justifyContent: "center",
           color: "#c9a84c", fontSize: 11, fontWeight: 800, letterSpacing: "0.06em",
-        }}>IQ</div>
+        }}>AI</div>
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20, padding: "0 40px" }}>
