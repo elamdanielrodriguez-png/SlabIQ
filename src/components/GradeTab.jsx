@@ -1011,8 +1011,8 @@ export default function GradeTab({ images, result, candidates, loading, error, o
               {[
                 { company: "PSA", grade: "10", sub: "GEM MT" },
                 { company: "BGS", grade: "10", sub: "PRISTINE" },
-              ].map(({ company, grade, sub }) => (
-                <div key={company} style={{
+              ].map(({ company, grade, sub }, idx) => (
+                <div key={company} className={`hero-float-${idx}`} style={{
                   background: "linear-gradient(160deg, rgba(32,28,16,0.98) 0%, rgba(18,18,20,0.99) 100%)",
                   border: "1px solid rgba(201,168,76,0.42)",
                   borderRadius: 20,
@@ -1068,6 +1068,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
             <div style={{ display: "flex", gap: 10, position: "relative", marginBottom: 18 }}>
               <button
                 onClick={() => onOpenCamera?.()}
+                className="btn-gold"
                 style={{
                   flex: 1, padding: "16px 0",
                   background: "linear-gradient(180deg, #dfc055 0%, #c9a84c 55%, #b89040 100%)",
@@ -1080,6 +1081,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
               >Take Photo</button>
               <button
                 onClick={() => fileInputRef.current?.click()}
+                className="btn-secondary"
                 style={{
                   flex: 1, padding: "16px 0",
                   background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.7)",
@@ -1135,7 +1137,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
                 background: "rgba(48,209,88,0.1)", border: "1px solid rgba(48,209,88,0.25)",
                 borderRadius: 100, padding: "6px 14px",
               }}>
-                <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#30d158", flexShrink: 0 }} />
+                <div className="pulse-dot" style={{ width: 6, height: 6, borderRadius: "50%", background: "#30d158", flexShrink: 0 }} />
                 <span style={{ color: "#30d158", fontSize: 12, fontWeight: 700 }}>2 free grades — no account needed</span>
               </div>
             </div>
@@ -1167,7 +1169,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
             { num: "03", title: "Never Fakes a Flaw",          desc: "Prizm & holo patterns never mistaken for damage"    },
             { num: "04", title: "Exact ROI Before You Decide", desc: "Live eBay prices + dollar profit at every grade"    },
           ].map(({ num, title, desc }, i) => (
-            <div key={title} className={`result-card-${i}`} style={{
+            <div key={title} className={`result-card-${i} card-hover`} style={{
               background: "rgba(255,255,255,0.03)",
               border: "1px solid rgba(255,255,255,0.07)",
               borderRadius: 16,
@@ -1340,6 +1342,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
         <button
           onClick={() => onGrade(listingTitle)}
           disabled={loading}
+          className={loading ? undefined : "btn-gold"}
           onPointerDown={() => !loading && setGradePressed(true)}
           onPointerUp={() => setGradePressed(false)}
           onPointerCancel={() => setGradePressed(false)}
@@ -1692,6 +1695,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
                 if (e.name !== 'AbortError') console.warn('Share failed:', e);
               }
             }}
+            className="btn-gold-outline"
             style={{
               width: '100%', padding: '13px 0',
               background: 'rgba(201,168,76,0.07)',
@@ -1708,14 +1712,15 @@ export default function GradeTab({ images, result, candidates, loading, error, o
 
           <button
             onClick={onGradeAnother}
+            className="btn-secondary"
             style={{
               width: '100%', padding: '15px 0',
-              background: '#fff', color: '#000',
-              border: 'none', borderRadius: 14,
-              fontSize: 15, fontWeight: 700,
+              background: 'rgba(255,255,255,0.09)', color: '#fff',
+              border: '1px solid rgba(255,255,255,0.12)', borderRadius: 14,
+              fontSize: 15, fontWeight: 600,
               cursor: 'pointer', fontFamily: 'inherit',
               letterSpacing: '-0.2px',
-              boxShadow: '0 2px 16px rgba(255,255,255,0.12)',
+              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
             }}
           >
             Grade Another Card

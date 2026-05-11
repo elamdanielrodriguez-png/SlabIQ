@@ -10,6 +10,18 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+::selection {
+  background: rgba(201,168,76,0.28);
+  color: #fff;
+}
+
+button:active {
+  transform: scale(0.97);
+}
+button {
+  transition: opacity 0.15s ease, transform 0.1s ease, filter 0.15s ease, box-shadow 0.2s ease;
+}
+
 #root {
   min-height: 100vh;
 }
@@ -110,6 +122,50 @@ body {
 .cgon-toast {
   animation: cgonToastIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
+
+/* ── Hero badge float ───────────────────────────────────────── */
+
+@keyframes heroFloat {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-5px); }
+}
+.hero-float-0 { animation: heroFloat 4s ease-in-out infinite; }
+.hero-float-1 { animation: heroFloat 4s ease-in-out 0.75s infinite; }
+
+/* ── Pulse dot (free trial badge) ───────────────────────────── */
+
+@keyframes pulseDot {
+  0%, 100% { opacity: 1;    transform: scale(1);    }
+  50%       { opacity: 0.4; transform: scale(0.72); }
+}
+.pulse-dot { animation: pulseDot 2s ease-in-out infinite; }
+
+/* ── Button hover states ────────────────────────────────────── */
+
+.btn-gold:hover:not(:disabled) {
+  filter: brightness(1.09);
+  box-shadow: 0 8px 36px rgba(201,168,76,0.65), inset 0 1px 0 rgba(255,255,255,0.28) !important;
+}
+.btn-secondary:hover:not(:disabled) {
+  background: rgba(255,255,255,0.11) !important;
+  border-color: rgba(255,255,255,0.16) !important;
+}
+.btn-gold-outline:hover:not(:disabled) {
+  background: rgba(201,168,76,0.12) !important;
+  border-color: rgba(201,168,76,0.4) !important;
+}
+
+/* ── Card hover lift ────────────────────────────────────────── */
+
+.card-hover {
+  transition: transform 0.22s cubic-bezier(0.22,1,0.36,1), box-shadow 0.22s cubic-bezier(0.22,1,0.36,1);
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 36px rgba(0,0,0,0.52), inset 0 1px 0 rgba(255,255,255,0.07) !important;
+}
+
+/* ── Staggered result cards ─────────────────────────────────── */
 
 /* Staggered result cards */
 .result-card-0 { animation: cgonFadeUp 0.28s cubic-bezier(0.22,1,0.36,1) 0.00s both; }
