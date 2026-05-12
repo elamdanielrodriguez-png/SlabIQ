@@ -1079,19 +1079,6 @@ RULES:
     const parsed = JSON.parse(text.match(/\{[\s\S]*\}/)?.[0] ?? '{}');
     const candidates = parsed.candidates ?? [];
 
-    // Downtown and Color Blast inserts are visually indistinguishable from base cards
-    // in photos. Always inject them as selectable options for modern cards so the user
-    // can pick the correct variant even when the AI can't tell from the image.
-    const first = candidates[0];
-    if (first && parseInt(first.year) >= 2017) {
-      const existingVariants = candidates.map(c => (c.variant ?? '').toLowerCase());
-      const { player, year, set, cardNumber } = first;
-      // Downtown looks nearly identical to base in photos — always offer it as an option.
-      // Stained Glass has a visually distinctive design; only offer it if AI didn't already identify it.
-      if (!existingVariants.some(v => v.includes('downtown'))) {
-        candidates.push({ player, year, set, cardNumber, variant: 'Downtown', description: 'Downtown insert — nearly identical to base in photos, confirm from card back' });
-      }
-    }
 
     console.log(`Identify: confidence=${parsed.confidence}, candidates=${candidates.length}`);
     res.json({ candidates, confidence: parsed.confidence ?? 80 });
