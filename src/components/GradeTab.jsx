@@ -33,13 +33,13 @@ export function CameraCapture({ onCapture, onClose }) {
           if (!active) return;
           video.play().catch(() => {});
           setReady(true);
-          // Enable continuous autofocus if the device supports it
+          // Always attempt continuous autofocus — don't gate on getCapabilities()
+          // because many browsers return an empty object even when the mode is supported.
           const track = s.getVideoTracks()[0];
           if (track) {
-            const caps = track.getCapabilities?.() ?? {};
-            if (caps.focusMode?.includes?.('continuous')) {
-              track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
-            }
+            track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] })
+              .then(() => console.log('[cam] continuous autofocus on'))
+              .catch(err => console.log('[cam] continuous autofocus unavailable:', err.name));
           }
         };
         video.addEventListener('canplay', onCanPlay, { once: true });
@@ -55,28 +55,42 @@ export function CameraCapture({ onCapture, onClose }) {
   }, []);
 
   function handleTapFocus(e) {
+    // Use changedTouches for touch events, otherwise fall back to mouse coords
+    const src = e.changedTouches?.[0] ?? e;
+    if (!src.clientX && !src.clientY) return;
     if (!streamRef.current || !containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    const px = clientX - rect.left;
-    const py = clientY - rect.top;
-    const nx = px / rect.width;   // normalized 0–1 for camera API
-    const ny = py / rect.height;
 
-    // Show focus ring at tap position
+    const rect = containerRef.current.getBoundingClientRect();
+    const px = src.clientX - rect.left;
+    const py = src.clientY - rect.top;
+    const nx = Math.max(0, Math.min(1, px / rect.width));
+    const ny = Math.max(0, Math.min(1, py / rect.height));
+
     clearTimeout(focusTimerRef.current);
     setFocusRing({ x: px, y: py });
     focusTimerRef.current = setTimeout(() => setFocusRing(null), 1100);
 
-    // Apply point-of-interest focus
     const track = streamRef.current.getVideoTracks()[0];
     if (!track) return;
-    const caps = track.getCapabilities?.() ?? {};
-    const modes = caps.focusMode ?? [];
-    const focusMode = modes.includes('single-shot') ? 'single-shot' : modes.includes('manual') ? 'manual' : null;
-    const constraints = { advanced: [{ pointOfInterest: { x: nx, y: ny }, ...(focusMode ? { focusMode } : {}) }] };
-    track.applyConstraints(constraints).catch(() => {});
+
+    // Try focus strategies in order — stop at first success.
+    // No capability gate: getCapabilities() often returns {} even on supported devices.
+    const strategies = [
+      { pointOfInterest: { x: nx, y: ny }, focusMode: 'single-shot' },
+      { pointOfInterest: { x: nx, y: ny }, focusMode: 'manual' },
+      { pointOfInterest: { x: nx, y: ny } },
+      { focusMode: 'single-shot' },
+    ];
+    (async () => {
+      for (const s of strategies) {
+        try {
+          await track.applyConstraints({ advanced: [s] });
+          console.log('[cam] focus applied:', JSON.stringify(s));
+          return;
+        } catch {}
+      }
+      console.log('[cam] tap-to-focus not supported on this device');
+    })();
   }
 
   function capture() {
@@ -132,9 +146,9 @@ export function CameraCapture({ onCapture, onClose }) {
       {/* Video fills the whole screen — tap anywhere to focus */}
       <div
         ref={containerRef}
-        style={{ position: "absolute", inset: 0, cursor: "crosshair" }}
+        style={{ position: "absolute", inset: 0 }}
+        onTouchEnd={handleTapFocus}
         onClick={handleTapFocus}
-        onTouchStart={handleTapFocus}
       >
         <video
           ref={videoRef}
