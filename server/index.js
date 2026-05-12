@@ -600,6 +600,89 @@ function computeSubgradesFromVerifications(verifications) {
   };
 }
 
+const PSA_LABELS = { 10: 'GEM MT', 9: 'MINT', 8: 'NM-MT', 7: 'NM', 6: 'EX-MT', 5: 'EX', 4: 'VG-EX', 3: 'VG', 2: 'GOOD', 1: 'PR' };
+
+// Second-pass zone review: re-examine only the flagged zones with fresh eyes.
+// Fires when PSA 7–9 or any zone was marked microscopic (both are uncertain territory).
+// Only sends the flagged zone crops — cheap call, just revises severity.
+async function doSecondPassReview(parsedResult, zoneCrops, backZoneCrops, model) {
+  const flaggedZones = (parsedResult.zones ?? []).filter(z => z.severity);
+  if (!flaggedZones.length) return parsedResult;
+
+  const content = [];
+  for (const z of flaggedZones) {
+    const front = zoneCrops?.[z.zone];
+    const back  = backZoneCrops?.[z.zone];
+    content.push({ type: 'text', text: `Zone: ${z.zone} | Initial call: ${z.severity} | Observation: "${z.observation}"` });
+    if (front) content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: front } });
+    if (back)  content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: back } });
+  }
+
+  content.push({ type: 'text', text: `Second-opinion review. For each zone above, look at the crop carefully and re-assess severity.
+
+Rules:
+- microscopic = barely detectable even in this magnified crop; no clear color break
+- visible     = you can clearly see and describe the defect in the crop
+- obvious     = immediately apparent without looking closely
+- null        = on re-examination the zone actually looks clean
+
+If you initially called something microscopic but can clearly see it → upgrade to visible.
+If you initially called something visible but it genuinely looks fine → downgrade to null.
+Do not just confirm your first answer. Look again.
+
+Return ONLY a JSON array, no prose:
+[{"zone":"<id>","severity":"microscopic"|"visible"|"obvious"|null,"observation":"one sentence what you see"}]` });
+
+  try {
+    const msg = await anthropic.messages.create({
+      model, max_tokens: 600,
+      messages: [{ role: 'user', content }],
+    });
+    const raw = msg.content.find(b => b.type === 'text')?.text ?? '';
+    const m = raw.match(/\[[\s\S]*\]/);
+    if (!m) return parsedResult;
+    const revisions = JSON.parse(m[0]);
+
+    const updatedZones = (parsedResult.zones ?? []).map(z => {
+      const rev = revisions.find(r => r.zone === z.zone);
+      if (!rev || rev.severity === z.severity) return z;
+      console.log(`2nd pass: ${z.zone} ${z.severity} → ${rev.severity ?? 'null'}`);
+      return { ...z, severity: rev.severity ?? null, psa10Match: rev.severity ? 'differs' : 'matches', observation: rev.observation || z.observation, description: rev.severity ? (z.description || rev.observation) : null };
+    });
+
+    const cornerSevs = updatedZones.filter(z => z?.zone?.startsWith('corner') && z?.severity).map(z => z.severity);
+    const edgeSevs   = updatedZones.filter(z => z?.zone?.startsWith('edge')   && z?.severity).map(z => z.severity);
+    const surfaceSevs = (parsedResult.surfaceFlaws ?? []).map(f => f?.severity).filter(Boolean);
+
+    const corners = categoryGrade(cornerSevs);
+    const edges   = edgeCategoryGrade(edgeSevs);
+    const surface = categoryGrade(surfaceSevs);
+
+    const c = typeof parsedResult.bgs?.centering === 'number' ? parsedResult.bgs.centering : null;
+    const subs = c != null ? [c, corners, edges, surface] : [corners, edges, surface];
+    const avg = subs.reduce((a, b) => a + b, 0) / subs.length;
+    const rounded = Math.round(avg * 2) / 2;
+    const lowest  = Math.min(...subs);
+    const overall = Math.min(rounded, lowest + 0.5);
+    const isBlackLabel = subs.length === 4 && subs.every(v => v === 10.0);
+
+    const psaWeakest = Math.min(corners, edges, surface);
+    const psaCap = psaWeakest >= 9.5 ? 10 : psaWeakest >= 9.0 ? 9 : psaWeakest >= 8.0 ? 8 : psaWeakest >= 7.0 ? 7 : psaWeakest >= 6.0 ? 6 : 5;
+    const psaGrade = Math.max(1, Math.min(psaCap, Math.round(avg)));
+
+    console.log(`2nd pass result: PSA ${parsedResult.psa?.grade} → ${psaGrade}, BGS ${parsedResult.bgs?.overall} → ${overall}`);
+    return {
+      ...parsedResult,
+      zones: updatedZones,
+      bgs: { ...parsedResult.bgs, corners, edges, surface, overall, isBlackLabel },
+      psa: { grade: psaGrade, label: PSA_LABELS[psaGrade] || '' },
+    };
+  } catch (err) {
+    console.warn('Second pass failed:', err.message);
+    return parsedResult;
+  }
+}
+
 const VAGUE_CENTERING_RE = [
   /slight\w*\s+(?:centering|off-?cent\w*)[^.!?]*/gi,
   /(?:centering\s+)?(?:concern|imbalance|issue|problem|deviation|variance)\s*(?:with\s+centering)?[^.!?]*/gi,
@@ -733,7 +816,6 @@ function sanitizeGradingResponse(rawText, measuredCentering) {
       else if (totalObvious >= 2) psaGrade = Math.min(psaGrade, 5);
       delete parsed._totalObvious; delete parsed._totalVisible;
 
-      const PSA_LABELS = { 10: 'GEM MT', 9: 'MINT', 8: 'NM-MT', 7: 'NM', 6: 'EX-MT', 5: 'EX', 4: 'VG-EX', 3: 'VG', 2: 'GOOD', 1: 'PR' };
       if (!parsed.psa) parsed.psa = {};
       console.log(`Subgrades [${subs.join(',')}] avg=${avg.toFixed(2)} totalObvious=${totalObvious} → BGS ${parsed.bgs.overall}, PSA ${psaGrade}`);
       parsed.psa.grade = psaGrade;
@@ -1144,6 +1226,22 @@ app.post('/api/grade', async (req, res) => {
 
     const raw = message.content.find(b => b.type === 'text')?.text ?? '';
     let text = sanitizeGradingResponse(raw, measuredCentering);
+
+    // Second-pass zone review for uncertain grades (PSA 7–9 or any microscopic zone)
+    try {
+      const firstPass = JSON.parse(text);
+      if (!firstPass.needsClarification) {
+        const flaggedZones = (firstPass.zones ?? []).filter(z => z.severity);
+        const psaGrade = firstPass.psa?.grade ?? 10;
+        const hasMicroscopic = flaggedZones.some(z => z.severity === 'microscopic');
+        if (flaggedZones.length > 0 && (psaGrade >= 7 && psaGrade <= 9 || hasMicroscopic)) {
+          const revised = await doSecondPassReview(firstPass, zoneCrops, backZoneCrops, gradingModel);
+          text = JSON.stringify(revised);
+        }
+      }
+    } catch (err) {
+      console.warn('Second pass skipped:', err.message);
+    }
 
     // Force the response's card identity to match what the USER picked, not what the AI thinks.
     // This is critical when the user used "Other" search to pick a different variant (e.g. Stained Glass)
