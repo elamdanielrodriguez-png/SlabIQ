@@ -537,11 +537,26 @@ function categoryGrade(severities) {
               : 'microscopic';
   if (worst === 'microscopic') return n >= 2 ? 9.0 : 9.5;
   if (worst === 'visible')     return n >= 3 ? 7.5 : n >= 2 ? 8.0 : 8.5;
-  // obvious — scale down hard based on count
   if (obviousCount >= 4) return 2.0;
   if (obviousCount >= 3) return 3.5;
   if (obviousCount >= 2) return 5.0;
   return 7.0;
+}
+
+// Edges are graded harsher than corners/surface. A single visible chip or nick
+// on an edge is a hard PSA 8 ceiling — there's no partial credit.
+function edgeCategoryGrade(severities) {
+  if (severities.length === 0) return 10.0;
+  const n = severities.length;
+  const obviousCount = severities.filter(s => s === 'obvious').length;
+  const worst = obviousCount > 0 ? 'obvious'
+              : severities.includes('visible') ? 'visible'
+              : 'microscopic';
+  if (worst === 'microscopic') return n >= 3 ? 8.5 : n >= 2 ? 9.0 : 9.5;
+  if (worst === 'visible')     return n >= 3 ? 7.0 : n >= 2 ? 7.5 : 8.0;
+  if (obviousCount >= 3) return 3.0;
+  if (obviousCount >= 2) return 4.5;
+  return 6.0;
 }
 
 function computeSubgradesFromVerifications(verifications) {
@@ -625,7 +640,7 @@ function sanitizeGradingResponse(rawText, measuredCenterings) {
     if (parsed.bgs) {
       console.log(`AI grades: corners=${parsed.bgs.corners} edges=${parsed.bgs.edges} surface=${parsed.bgs.surface}`);
       parsed.bgs.corners = categoryGrade(cornerSevs);
-      parsed.bgs.edges   = categoryGrade(edgeSevs);
+      parsed.bgs.edges   = edgeCategoryGrade(edgeSevs);
       parsed.bgs.surface = categoryGrade(surfaceSevs);
       console.log(`Computed:  corners=${parsed.bgs.corners} edges=${parsed.bgs.edges} surface=${parsed.bgs.surface}`);
     }

@@ -896,6 +896,18 @@ function clientCategoryGrade(severities) {
   return 7.0;
 }
 
+function clientEdgeCategoryGrade(severities) {
+  if (severities.length === 0) return 10.0;
+  const n = severities.length;
+  const obviousCount = severities.filter(s => s === 'obvious').length;
+  const worst = obviousCount > 0 ? 'obvious' : severities.includes('visible') ? 'visible' : 'microscopic';
+  if (worst === 'microscopic') return n >= 3 ? 8.5 : n >= 2 ? 9.0 : 9.5;
+  if (worst === 'visible')     return n >= 3 ? 7.0 : n >= 2 ? 7.5 : 8.0;
+  if (obviousCount >= 3) return 3.0;
+  if (obviousCount >= 2) return 4.5;
+  return 6.0;
+}
+
 function defectToZone(x, y) {
   const C = 0.22, E = 0.12;
   if (x < C && y < C)         return 'corner-TL';
@@ -928,7 +940,7 @@ function applyDismissals(result, dismissedDefectIndices) {
   const surfaceSevs = clearedZones.has('surface') ? [] : (result.surfaceFlaws ?? []).map(f => f.severity).filter(Boolean);
 
   const corners = clientCategoryGrade(cornerSevs);
-  const edges   = clientCategoryGrade(edgeSevs);
+  const edges   = clientEdgeCategoryGrade(edgeSevs);
   const surface = clientCategoryGrade(surfaceSevs);
 
   const c = typeof result.bgs.centering === 'number' ? result.bgs.centering : null;
