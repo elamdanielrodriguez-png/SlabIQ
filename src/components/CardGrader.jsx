@@ -382,8 +382,10 @@ function cropZonesFromImageData(imageData, bounds, { width: storedW, height: sto
 
       const cW = cR - cL, cH = cB - cT;
       // Tighter corner window: 18% of short side — targets the actual corner tip with less dead space
-      const corner   = Math.round(Math.min(cW, cH) * 0.18);
-      const edgeLong = Math.round(Math.max(cW, cH) * 0.50);
+      const corner    = Math.round(Math.min(cW, cH) * 0.18);
+      // Micro-tip crop: 5% of short side — extreme close-up of just the corner point
+      const tip       = Math.round(Math.min(cW, cH) * 0.05);
+      const edgeLong  = Math.round(Math.max(cW, cH) * 0.50);
       const edgeShort = Math.round(Math.min(cW, cH) * 0.18);
 
       // crop(src rect) → fixed output size at 0.95 quality so Claude always gets a consistent, detail-rich image
@@ -395,10 +397,14 @@ function cropZonesFromImageData(imageData, bounds, { width: storedW, height: sto
       };
 
       resolve({
-        "corner-TL":   crop(cL,           cT,            corner,   corner,   640, 640),
-        "corner-TR":   crop(cR - corner,  cT,            corner,   corner,   640, 640),
-        "corner-BL":   crop(cL,           cB - corner,   corner,   corner,   640, 640),
-        "corner-BR":   crop(cR - corner,  cB - corner,   corner,   corner,   640, 640),
+        "corner-TL":     crop(cL,           cT,            corner, corner, 640, 640),
+        "corner-TR":     crop(cR - corner,  cT,            corner, corner, 640, 640),
+        "corner-BL":     crop(cL,           cB - corner,   corner, corner, 640, 640),
+        "corner-BR":     crop(cR - corner,  cB - corner,   corner, corner, 640, 640),
+        "corner-TL-tip": crop(cL,           cT,            tip,    tip,    256, 256),
+        "corner-TR-tip": crop(cR - tip,     cT,            tip,    tip,    256, 256),
+        "corner-BL-tip": crop(cL,           cB - tip,      tip,    tip,    256, 256),
+        "corner-BR-tip": crop(cR - tip,     cB - tip,      tip,    tip,    256, 256),
         "edge-top":    crop(cL + Math.round((cW - edgeLong) / 2), cT,            edgeLong, edgeShort, 900, 350),
         "edge-bottom": crop(cL + Math.round((cW - edgeLong) / 2), cB - edgeShort,edgeLong, edgeShort, 900, 350),
         "edge-left":   crop(cL,           cT + Math.round((cH - edgeLong) / 2), edgeShort, edgeLong, 350, 900),

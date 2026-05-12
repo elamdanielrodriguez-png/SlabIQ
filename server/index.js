@@ -389,7 +389,7 @@ IF a PSA 10 reference IS provided: use it as ground truth for design details —
 
 IF no PSA 10 reference is provided: grade every zone on ABSOLUTE physical standards. Do not assume the card is in good condition. PSA 10 means perfectly sharp corner tips, razor-clean edges with zero interruption, and flawless surface. Any deviation is a defect.
 
-You have ZOOM-IN crops of each of the 8 corner/edge zones labeled "ZOOM-IN FRONT: zone" and, if a back photo was provided, "ZOOM-IN BACK: zone". These are the regions a real grader inspects under a loupe. For each zone, examine BOTH the front and back crops — report the worst severity between them. A corner that is clean on the front but chipped on the back is still a flawed corner.
+You have ZOOM-IN crops of each of the 8 corner/edge zones labeled "ZOOM-IN FRONT: zone". For each corner zone, an additional TIP close-up (labeled "FRONT: corner-XX (TIP — extreme close-up of corner point)") is also provided — this is an extreme zoom on just the corner point itself, the exact region that determines PSA 9 vs PSA 10. The TIP image is your primary evidence for detecting whitening, tip rounding, soft points, or micro-fraying. If the TIP shows ANY issue, grade the corner as "differs" regardless of what the wide crop shows. For each zone, examine BOTH the front and back crops (and TIP if provided) — report the worst severity between all images for that zone. A corner that is clean on the front but chipped on the back is still a flawed corner.
 
 YOUR TASK — REPORT ON EVERY ZONE, NO SKIPPING:
 
@@ -611,11 +611,16 @@ async function doSecondPassReview(parsedResult, zoneCrops, backZoneCrops, model)
 
   const content = [];
   for (const z of flaggedZones) {
-    const front = zoneCrops?.[z.zone];
-    const back  = backZoneCrops?.[z.zone];
+    const front    = zoneCrops?.[z.zone];
+    const back     = backZoneCrops?.[z.zone];
+    const isCorner = z.zone.startsWith('corner');
+    const frontTip = isCorner ? zoneCrops?.[`${z.zone}-tip`]     : null;
+    const backTip  = isCorner ? backZoneCrops?.[`${z.zone}-tip`] : null;
     content.push({ type: 'text', text: `Zone: ${z.zone} | Initial call: ${z.severity} | Observation: "${z.observation}"` });
-    if (front) content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: front } });
-    if (back)  content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: back } });
+    if (front)    content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: front } });
+    if (frontTip) content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: frontTip } });
+    if (back)     content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: back } });
+    if (backTip)  content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: backTip } });
   }
 
   content.push({ type: 'text', text: `Second-opinion review. For each zone above, look at the crop carefully and re-assess severity.
@@ -1155,7 +1160,8 @@ app.post('/api/grade', async (req, res) => {
       console.log(`eBay refs: ${refs.graded.length} PSA 10 + ${refs.raw.length} raw for ${confirmedCard.player}`);
     }
 
-    // Build labeled zoom-in zone images (4 corners + 4 edges of front, then back)
+    // Build labeled zoom-in zone images (4 corners + 4 edges of front, then back).
+    // Each corner gets a wide crop followed immediately by a TIP close-up (extreme zoom on the corner point).
     const ZONE_ORDER = ['corner-TL', 'corner-TR', 'corner-BL', 'corner-BR', 'edge-top', 'edge-right', 'edge-bottom', 'edge-left'];
     const zoneImages = [];
     if (zoneCrops && typeof zoneCrops === 'object') {
@@ -1163,6 +1169,11 @@ app.post('/api/grade', async (req, res) => {
         if (zoneCrops[zone]) {
           zoneImages.push({ type: 'text', text: `=== ZOOM-IN FRONT: ${zone} ===` });
           zoneImages.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: zoneCrops[zone] } });
+          const tipKey = `${zone}-tip`;
+          if (zoneCrops[tipKey]) {
+            zoneImages.push({ type: 'text', text: `=== ZOOM-IN FRONT: ${zone} (TIP — extreme close-up of corner point) ===` });
+            zoneImages.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: zoneCrops[tipKey] } });
+          }
         }
       }
     }
@@ -1171,10 +1182,16 @@ app.post('/api/grade', async (req, res) => {
         if (backZoneCrops[zone]) {
           zoneImages.push({ type: 'text', text: `=== ZOOM-IN BACK: ${zone} ===` });
           zoneImages.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: backZoneCrops[zone] } });
+          const tipKey = `${zone}-tip`;
+          if (backZoneCrops[tipKey]) {
+            zoneImages.push({ type: 'text', text: `=== ZOOM-IN BACK: ${zone} (TIP — extreme close-up of corner point) ===` });
+            zoneImages.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: backZoneCrops[tipKey] } });
+          }
         }
       }
     }
-    console.log(`Zone crops: ${zoneCrops ? 8 : 0} front + ${backZoneCrops ? 8 : 0} back`);
+    const tipCount = zoneCrops ? Object.keys(zoneCrops).filter(k => k.endsWith('-tip')).length : 0;
+    console.log(`Zone crops: ${zoneCrops ? 8 : 0} front (${tipCount} tip close-ups) + ${backZoneCrops ? 8 : 0} back`);
 
     const variantLowerForPrompt = (confirmedCard?.variant ?? '').toLowerCase();
     const isOversizedProneCard = OVERSIZED_PRONE_VARIANTS.some(v => variantLowerForPrompt.includes(v));
