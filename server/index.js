@@ -389,7 +389,7 @@ IF a PSA 10 reference IS provided: use it as ground truth for design details —
 
 IF no PSA 10 reference is provided: grade every zone on ABSOLUTE physical standards. Do not assume the card is in good condition. PSA 10 means perfectly sharp corner tips, razor-clean edges with zero interruption, and flawless surface. Any deviation is a defect.
 
-You also have ZOOM-IN crops of each of the 8 corner/edge zones of the user's card. These are the regions a real grader inspects under a loupe. Examine each one carefully before deciding.
+You have ZOOM-IN crops of each of the 8 corner/edge zones labeled "ZOOM-IN FRONT: zone" and, if a back photo was provided, "ZOOM-IN BACK: zone". These are the regions a real grader inspects under a loupe. For each zone, examine BOTH the front and back crops — report the worst severity between them. A corner that is clean on the front but chipped on the back is still a flawed corner.
 
 YOUR TASK — REPORT ON EVERY ZONE, NO SKIPPING:
 
@@ -629,10 +629,11 @@ function bgsCenteringFromWorst(worst) {
   if (worst <= 55) return 9.5;
   if (worst <= 60) return 9.0;
   if (worst <= 65) return 8.5;
-  return 8.0;
+  if (worst <= 70) return 8.0;
+  return 7.5;
 }
 
-function sanitizeGradingResponse(rawText, measuredCenterings) {
+function sanitizeGradingResponse(rawText, measuredCentering) {
   let parsed;
   try { parsed = JSON.parse(rawText); } catch {
     const m = rawText.match(/\{[\s\S]*\}/);
@@ -646,6 +647,16 @@ function sanitizeGradingResponse(rawText, measuredCenterings) {
   if (parsed.physicalNotes) {
     console.log('Physical notes:', parsed.physicalNotes);
     delete parsed.physicalNotes;
+  }
+
+  // Override AI centering estimate with pixel-measured value if available
+  if (measuredCentering && parsed.bgs) {
+    const lr = Math.max(measuredCentering.leftPct ?? 50, measuredCentering.rightPct ?? 50);
+    const tb = Math.max(measuredCentering.topPct ?? 50, measuredCentering.bottomPct ?? 50);
+    const worst = Math.max(lr, tb);
+    const bgsVal = bgsCenteringFromWorst(worst);
+    console.log(`Centering override: ${measuredCentering.leftPct}/${measuredCentering.rightPct} L-R, ${measuredCentering.topPct}/${measuredCentering.bottomPct} T-B → BGS ${bgsVal} (AI estimated ${parsed.bgs.centering})`);
+    parsed.bgs.centering = bgsVal;
   }
 
   // compute subgrades from zones (forced 8) + surfaceFlaws — always overrides Claude's estimates
@@ -1004,7 +1015,7 @@ RULES:
 });
 
 app.post('/api/grade', async (req, res) => {
-  const { images, imageData, mediaType = 'image/jpeg', confirmedCard, zoneCrops } = req.body;
+  const { images, imageData, mediaType = 'image/jpeg', confirmedCard, zoneCrops, backZoneCrops, measuredCentering } = req.body;
 
   // ── Auth + plan check ──────────────────────────────────────────────────────
   let gradingModel = 'claude-opus-4-7';
@@ -1062,18 +1073,26 @@ app.post('/api/grade', async (req, res) => {
       console.log(`eBay refs: ${refs.graded.length} PSA 10 + ${refs.raw.length} raw for ${confirmedCard.player}`);
     }
 
-    // Build labeled zoom-in zone images (4 corners + 4 edges of the front photo)
+    // Build labeled zoom-in zone images (4 corners + 4 edges of front, then back)
+    const ZONE_ORDER = ['corner-TL', 'corner-TR', 'corner-BL', 'corner-BR', 'edge-top', 'edge-right', 'edge-bottom', 'edge-left'];
     const zoneImages = [];
     if (zoneCrops && typeof zoneCrops === 'object') {
-      const ZONE_ORDER = ['corner-TL', 'corner-TR', 'corner-BL', 'corner-BR', 'edge-top', 'edge-right', 'edge-bottom', 'edge-left'];
       for (const zone of ZONE_ORDER) {
         if (zoneCrops[zone]) {
-          zoneImages.push({ type: 'text', text: `=== ZOOM-IN: ${zone} (loupe view of the user's card) ===` });
+          zoneImages.push({ type: 'text', text: `=== ZOOM-IN FRONT: ${zone} ===` });
           zoneImages.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: zoneCrops[zone] } });
         }
       }
-      console.log(`Zone crops sent: ${zoneImages.filter(c => c.type === 'image').length}/8`);
     }
+    if (backZoneCrops && typeof backZoneCrops === 'object') {
+      for (const zone of ZONE_ORDER) {
+        if (backZoneCrops[zone]) {
+          zoneImages.push({ type: 'text', text: `=== ZOOM-IN BACK: ${zone} ===` });
+          zoneImages.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: backZoneCrops[zone] } });
+        }
+      }
+    }
+    console.log(`Zone crops: ${zoneCrops ? 8 : 0} front + ${backZoneCrops ? 8 : 0} back`);
 
     const variantLowerForPrompt = (confirmedCard?.variant ?? '').toLowerCase();
     const isOversizedProneCard = OVERSIZED_PRONE_VARIANTS.some(v => variantLowerForPrompt.includes(v));
@@ -1096,9 +1115,17 @@ app.post('/api/grade', async (req, res) => {
   - NEVER grade a visibly worn vintage card higher than PSA 6. Most worn vintage cards are PSA 1-4.`
       : '';
 
-    const confirmedPrefix = confirmedCard?.player
-      ? `CONFIRMED CARD IDENTITY (selected by the user — do not second-guess this): ${confirmedCard.player}, ${confirmedCard.year} ${confirmedCard.set}, ${confirmedCard.variant || 'Base'}${confirmedCard.cardNumber ? `, #${confirmedCard.cardNumber}` : ''}.${oversizedNote}${vintageNote} Set needsClarification to false and candidates to []. Provide complete grading and market data for exactly this card.\n\n`
+    const centeringNote = measuredCentering
+      ? ` CENTERING IS PIXEL-MEASURED — do not estimate it yourself. Set bgs.centering to exactly ${(() => {
+          const lr = Math.max(measuredCentering.leftPct ?? 50, measuredCentering.rightPct ?? 50);
+          const tb = Math.max(measuredCentering.topPct ?? 50, measuredCentering.bottomPct ?? 50);
+          return bgsCenteringFromWorst(Math.max(lr, tb));
+        })()}.`
       : '';
+
+    const confirmedPrefix = confirmedCard?.player
+      ? `CONFIRMED CARD IDENTITY (selected by the user — do not second-guess this): ${confirmedCard.player}, ${confirmedCard.year} ${confirmedCard.set}, ${confirmedCard.variant || 'Base'}${confirmedCard.cardNumber ? `, #${confirmedCard.cardNumber}` : ''}.${oversizedNote}${vintageNote}${centeringNote} Set needsClarification to false and candidates to []. Provide complete grading and market data for exactly this card.\n\n`
+      : centeringNote ? `${centeringNote}\n\n` : '';
 
     const content = [
       { type: 'text', text: `=== USER'S CARD (full photos) ===` },
@@ -1116,7 +1143,7 @@ app.post('/api/grade', async (req, res) => {
     });
 
     const raw = message.content.find(b => b.type === 'text')?.text ?? '';
-    let text = sanitizeGradingResponse(raw);
+    let text = sanitizeGradingResponse(raw, measuredCentering);
 
     // Force the response's card identity to match what the USER picked, not what the AI thinks.
     // This is critical when the user used "Other" search to pick a different variant (e.g. Stained Glass)

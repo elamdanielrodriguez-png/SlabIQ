@@ -755,20 +755,26 @@ export default function CardGrader() {
     try {
       const { player, year, set, variant, cardNumber } = confirmedCard;
 
-      // Generate zoom-in crops of corners/edges from the front photo for loupe-style inspection
+      // Generate zoom-in crops of corners/edges from front and back photos
       const frontImg = images.find(img => img.role === "front") ?? images[0];
-      let zoneCrops = null;
-      if (frontImg?.cardBounds && frontImg?.imageData) {
+      const backImg  = images.find(img => img.role === "back");
+
+      const makeCrops = async (img) => {
+        if (!img?.cardBounds || !img?.imageData) return null;
         try {
-          zoneCrops = await cropZonesFromImageData(frontImg.imageData, frontImg.cardBounds, {
-            width: frontImg.width,
-            height: frontImg.height,
-            originalObjectURL: frontImg.originalObjectURL,
+          return await cropZonesFromImageData(img.imageData, img.cardBounds, {
+            width: img.width, height: img.height, originalObjectURL: img.originalObjectURL,
           });
-        } catch (err) {
-          console.warn("Zone cropping failed:", err);
-        }
-      }
+        } catch (err) { console.warn("Zone cropping failed:", err); return null; }
+      };
+
+      const [zoneCrops, backZoneCrops] = await Promise.all([
+        makeCrops(frontImg),
+        makeCrops(backImg),
+      ]);
+
+      // Send pixel-measured centering if detection succeeded — server will override AI estimate
+      const measuredCentering = frontImg?.centering ?? null;
 
       setLoadingMessage("Fetching market data…");
 
@@ -781,6 +787,8 @@ export default function CardGrader() {
           images: images.map((i) => i.imageData),
           confirmedCard: { player, year, set, variant, cardNumber },
           zoneCrops,
+          backZoneCrops,
+          measuredCentering,
           gradingModel: selectedModel,
         }),
       });
