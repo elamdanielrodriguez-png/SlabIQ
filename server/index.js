@@ -1064,6 +1064,7 @@ app.post('/api/identify', async (req, res) => {
 
 RULES:
 - YEAR: Look at the back of the card first — the year is almost always printed there explicitly. Use what you read, do not guess from the front design.
+- INSERT NAME: Look for insert/parallel names printed anywhere on the card (front or back) — e.g. "Downtown", "Stained Glass", "Color Blast", "Sparkle", "Silver Prizm", etc. If you can read an insert name on the card, use it as the variant. These names are usually printed in small text near the bottom of the card face or on the back.
 - List 1–4 candidates in order of likelihood.
 - VARIANT ACCURACY IS CRITICAL: A Prizm base card, Silver Prizm, and White Prizm are DIFFERENT cards with very different values. Each possibility must be its own separate candidate entry.
 - NEVER use "or" in the variant field (e.g. NEVER write "Silver or Base", "Downtown or Base", "Silver Prizm or Base Prizm"). If you are unsure between two variants, create TWO separate candidates — one for each.
