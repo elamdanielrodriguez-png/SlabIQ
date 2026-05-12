@@ -8,8 +8,10 @@ export function CameraCapture({ onCapture, onClose }) {
   const containerRef = useRef(null);
   const rectRef = useRef(null);
   const streamRef = useRef(null);
+  const focusTimerRef = useRef(null);
   const [error, setError] = useState(null);
   const [ready, setReady] = useState(false);
+  const [focusRing, setFocusRing] = useState(null); // { x, y } in container px, or null
 
   useEffect(() => {
     let active = true;
@@ -31,6 +33,14 @@ export function CameraCapture({ onCapture, onClose }) {
           if (!active) return;
           video.play().catch(() => {});
           setReady(true);
+          // Enable continuous autofocus if the device supports it
+          const track = s.getVideoTracks()[0];
+          if (track) {
+            const caps = track.getCapabilities?.() ?? {};
+            if (caps.focusMode?.includes?.('continuous')) {
+              track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
+            }
+          }
         };
         video.addEventListener('canplay', onCanPlay, { once: true });
         if (video.readyState >= 3) onCanPlay();
@@ -38,10 +48,36 @@ export function CameraCapture({ onCapture, onClose }) {
       .catch(err => setError(err.message || "Camera unavailable. Check permissions."));
     return () => {
       active = false;
+      clearTimeout(focusTimerRef.current);
       if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
       if (videoRef.current) { videoRef.current.srcObject = null; }
     };
   }, []);
+
+  function handleTapFocus(e) {
+    if (!streamRef.current || !containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const px = clientX - rect.left;
+    const py = clientY - rect.top;
+    const nx = px / rect.width;   // normalized 0–1 for camera API
+    const ny = py / rect.height;
+
+    // Show focus ring at tap position
+    clearTimeout(focusTimerRef.current);
+    setFocusRing({ x: px, y: py });
+    focusTimerRef.current = setTimeout(() => setFocusRing(null), 1100);
+
+    // Apply point-of-interest focus
+    const track = streamRef.current.getVideoTracks()[0];
+    if (!track) return;
+    const caps = track.getCapabilities?.() ?? {};
+    const modes = caps.focusMode ?? [];
+    const focusMode = modes.includes('single-shot') ? 'single-shot' : modes.includes('manual') ? 'manual' : null;
+    const constraints = { advanced: [{ pointOfInterest: { x: nx, y: ny }, ...(focusMode ? { focusMode } : {}) }] };
+    track.applyConstraints(constraints).catch(() => {});
+  }
 
   function capture() {
     const video = videoRef.current;
@@ -93,13 +129,25 @@ export function CameraCapture({ onCapture, onClose }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "#000", zIndex: 1000 }}>
 
-      {/* Video fills the whole screen */}
-      <div ref={containerRef} style={{ position: "absolute", inset: 0 }}>
+      {/* Video fills the whole screen — tap anywhere to focus */}
+      <div
+        ref={containerRef}
+        style={{ position: "absolute", inset: 0, cursor: "crosshair" }}
+        onClick={handleTapFocus}
+        onTouchStart={handleTapFocus}
+      >
         <video
           ref={videoRef}
           autoPlay playsInline muted
           style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
         />
+        {focusRing && (
+          <div
+            key={`${focusRing.x}-${focusRing.y}`}
+            className="focus-ring"
+            style={{ left: focusRing.x, top: focusRing.y }}
+          />
+        )}
       </div>
 
       {/* Alignment rectangle — centered, shifted up so button stays visible */}
@@ -122,7 +170,7 @@ export function CameraCapture({ onCapture, onClose }) {
         color: "#fff", textAlign: "center", fontSize: 13, fontWeight: 600,
         letterSpacing: "-0.2px", pointerEvents: "none",
       }}>
-        Align card inside the rectangle
+        Align card inside the rectangle · tap to focus
       </div>
 
       {/* Buttons — bottom overlay */}
