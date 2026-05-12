@@ -125,10 +125,15 @@ async function getEbayToken() {
   return data.access_token;
 }
 
-async function ebaySearch(token, query, limit = 3, excludeGraded = false) {
+// eBay thumbnail URLs use s-l140 (140px). Replace suffix with s-l1600 for high-res.
+function upscaleEbayUrl(url) {
+  return url.replace(/s-l\d+(\.[a-z]+)$/i, 's-l1600$1');
+}
+
+async function ebaySearch(token, query, limit = 3, excludeGraded = false, requirePsa10 = false) {
   const q = encodeURIComponent(query.trim());
   const res = await fetchWithTimeout(
-    `https://api.ebay.com/buy/browse/v1/item_summary/search?q=${q}&filter=conditions:{PRE_OWNED}&limit=${limit * 2}&sort=newlyListed`,
+    `https://api.ebay.com/buy/browse/v1/item_summary/search?q=${q}&filter=conditions:{PRE_OWNED}&limit=${limit * 3}&sort=newlyListed`,
     { headers: { 'Authorization': `Bearer ${token}`, 'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US' } },
     5000
   );
@@ -137,7 +142,15 @@ async function ebaySearch(token, query, limit = 3, excludeGraded = false) {
   if (excludeGraded) {
     items = items.filter(item => !/\b(PSA|BGS|SGC|CGC|Beckett|graded|slab)\b/i.test(item.title ?? ''));
   }
-  return items.slice(0, limit).map(item => item.image?.imageUrl).filter(Boolean);
+  if (requirePsa10) {
+    // Must have PSA 10 / GEM MT / GEM MINT in the title — not just "PSA" or a lower grade
+    items = items.filter(item => /PSA\s*10\b|GEM[\s-]MT\b|GEM[\s-]MINT\b/i.test(item.title ?? ''));
+  }
+  return items
+    .slice(0, limit)
+    .map(item => item.image?.imageUrl)
+    .filter(Boolean)
+    .map(upscaleEbayUrl);
 }
 
 async function fetchWithTimeout(url, options = {}, ms = 5000) {
@@ -304,24 +317,35 @@ Return ONLY this JSON:
 async function fetchEbayReferenceImages(player, year, set, variant) {
   try {
     const token = await getEbayToken();
-    if (!token) return { raw: [], graded: [] };
+    if (!token) { console.warn('eBay ref: no token'); return { raw: [], graded: [] }; }
 
-    const base = `${player} ${year} ${set} ${variant ?? ''}`;
+    const full  = [player, year, set, variant].filter(Boolean).join(' ');
+    const short = [player, year].filter(Boolean).join(' ');
 
-    const [rawUrls, gradedUrls] = await Promise.all([
-      ebaySearch(token, `${base} raw ungraded`, 2, true),
-      ebaySearch(token, `${base} PSA 10`, 3),
-    ]);
+    // Try progressively broader queries until we get PSA 10 hits
+    let gradedUrls = await ebaySearch(token, `${full} PSA 10`, 3, false, true);
+    if (gradedUrls.length === 0) {
+      gradedUrls = await ebaySearch(token, `${short} PSA 10 gem mint`, 3, false, true);
+    }
+    if (gradedUrls.length === 0) {
+      // Last resort: no PSA-10 filter, just take graded listings
+      gradedUrls = await ebaySearch(token, `${full} PSA graded`, 3, false, false);
+      gradedUrls = gradedUrls.filter((_, i) => i < 2); // cap at 2 if unfiltered
+    }
+
+    const rawUrls = await ebaySearch(token, `${full} raw ungraded`, 2, true);
 
     const [rawImages, gradedImages] = await Promise.all([
       Promise.all(rawUrls.slice(0, 1).map(urlToBase64)),
       Promise.all(gradedUrls.slice(0, 2).map(urlToBase64)),
     ]);
 
-    return {
-      raw: rawImages.filter(Boolean),
+    const result = {
+      raw:    rawImages.filter(Boolean),
       graded: gradedImages.filter(Boolean),
     };
+    console.log(`eBay refs for "${full}": ${result.graded.length} PSA-10, ${result.raw.length} raw`);
+    return result;
   } catch (err) {
     console.warn('eBay reference fetch failed:', err.message);
     return { raw: [], graded: [] };
