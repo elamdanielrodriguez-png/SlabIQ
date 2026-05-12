@@ -403,10 +403,12 @@ EDGE ZONES — ABSOLUTE PHYSICAL INSPECTION (edge-top, edge-right, edge-bottom, 
   "matches" ONLY if the edge line is genuinely razor-clean with no physical interruption whatsoever.
   If you are uncertain, mark "differs" with severity "microscopic" — do not default to "matches" on doubt.
 
-  EDGE SEVERITY CALIBRATION:
-  microscopic = barely perceptible wear, only visible under strong magnification
-  visible     = any chip, nick, dent, or clear whitening visible in normal light (PSA 8–8.5 maximum)
-  obvious     = multiple damage points or significant wear along the edge (PSA 7 or lower)
+  EDGE SEVERITY CALIBRATION — be honest, not charitable:
+  microscopic = you can barely detect it even in the magnified zoom crop; no clear color break; most graders would pass at PSA 10
+  visible     = you can clearly see it in the zoom crop — a chip, nick, whitening, soft line, or any identifiable wear; PSA 8 maximum
+  obvious     = immediately clear without zooming in; significant damage; PSA 7 or lower
+
+  CRITICAL: The zoom crops you receive are already magnified several times over. If you can SEE the flaw and DESCRIBE it in the zoom crop, it is "visible" at minimum — NOT "microscopic." Reserve "microscopic" only for something you can barely detect even in the magnified image. Describing damage as "faint," "slight," "minor," or "subtle" but still visible = "visible" severity.
 
 CORNER ZONES — ABSOLUTE PHYSICAL INSPECTION (corner-TL, corner-TR, corner-BL, corner-BR):
   Corners do NOT need a reference to grade. You are looking at the physical corner tip.
@@ -654,8 +656,24 @@ function sanitizeGradingResponse(rawText, measuredCenterings) {
       parsed.bgs.overall = Math.min(rounded, lowest + 0.5);
       parsed.bgs.isBlackLabel = subs.length === 4 && subs.every(v => v === 10.0);
 
-      // PSA: straight round of average, then apply hard cap based on total obvious flaws
+      // PSA: round of average, then cap by weakest non-centering subgrade.
+      // Averaging alone masks damage — a single bad edge with perfect corners/surface
+      // still averages high. PSA graders don't average; they cap on the worst zone.
       let psaGrade = Math.max(1, Math.min(10, Math.round(avg)));
+      const psaWeakest = Math.min(
+        typeof corners === 'number' ? corners : 10,
+        typeof edges   === 'number' ? edges   : 10,
+        typeof surface === 'number' ? surface : 10,
+      );
+      const psaCapFromWeakest =
+        psaWeakest >= 9.5 ? 10 :
+        psaWeakest >= 9.0 ?  9 :
+        psaWeakest >= 8.0 ?  8 :
+        psaWeakest >= 7.0 ?  7 :
+        psaWeakest >= 6.0 ?  6 : 5;
+      psaGrade = Math.min(psaGrade, psaCapFromWeakest);
+
+      // Secondary cap: widespread obvious flaws (e.g. PSA 2 vintage with damage everywhere)
       const totalObvious = parsed._totalObvious ?? 0;
       const totalVisible = parsed._totalVisible ?? 0;
       if      (totalObvious >= 8) psaGrade = Math.min(psaGrade, 1);

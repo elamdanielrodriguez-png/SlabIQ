@@ -938,7 +938,14 @@ function applyDismissals(result, dismissedDefectIndices) {
   const lowest = Math.min(...subs);
   const overall = Math.min(rounded, lowest + 0.5);
   const isBlackLabel = subs.length === 4 && subs.every(v => v === 10.0);
-  const psaGrade = Math.max(1, Math.min(10, Math.round(avg)));
+  const psaWeakest = Math.min(corners, edges, surface);
+  const psaCapFromWeakest =
+    psaWeakest >= 9.5 ? 10 :
+    psaWeakest >= 9.0 ?  9 :
+    psaWeakest >= 8.0 ?  8 :
+    psaWeakest >= 7.0 ?  7 :
+    psaWeakest >= 6.0 ?  6 : 5;
+  const psaGrade = Math.max(1, Math.min(psaCapFromWeakest, Math.round(avg)));
 
   return {
     ...result,
