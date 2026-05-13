@@ -26,7 +26,7 @@ const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SEC
 const TOKEN_PACKS = {
   starter: { name: 'Starter Pack', tokens: 10, cents: 499  },
   grinder: { name: 'Grinder Pack', tokens: 25, cents: 999  },
-  pro:     { name: 'Pro Pack',     tokens: 100, cents: 2500 },
+  pro:     { name: 'Pro Pack',     tokens: 100, cents: 2499 },
 };
 
 // Token cost per grade — all paid grades use Opus (1 token each); Sonnet reserved for anonymous free grades
