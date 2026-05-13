@@ -1356,15 +1356,15 @@ export default function GradeTab({ images, result, candidates, loading, error, o
             { num: "04", title: "Exact ROI Before You Decide", desc: "Live eBay prices + dollar profit at every grade"    },
           ].map(({ num, title, desc }, i) => (
             <div key={title} className={`result-card-${i} card-hover`} style={{
-              background: "rgba(255,255,255,0.03)",
-              border: "1px solid rgba(255,255,255,0.07)",
+              background: "rgba(255,255,255,0.035)",
+              border: "1px solid rgba(255,255,255,0.08)",
               borderRadius: 16,
               padding: "16px 14px",
-              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.055)",
+              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.065)",
             }}>
-              <div style={{ color: "rgba(201,168,76,0.42)", fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", marginBottom: 6 }}>{num}</div>
-              <div style={{ color: "rgba(255,255,255,0.78)", fontSize: 12, fontWeight: 700, letterSpacing: "-0.2px", marginBottom: 4 }}>{title}</div>
-              <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11, lineHeight: 1.55 }}>{desc}</div>
+              <div style={{ color: "rgba(201,168,76,0.55)", fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 7 }}>{num}</div>
+              <div style={{ color: "rgba(255,255,255,0.88)", fontSize: 13, fontWeight: 700, letterSpacing: "-0.2px", lineHeight: 1.3, marginBottom: 5 }}>{title}</div>
+              <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 12, lineHeight: 1.55 }}>{desc}</div>
             </div>
           ))}
         </div>
@@ -1506,18 +1506,33 @@ export default function GradeTab({ images, result, candidates, loading, error, o
       {images.length > 0 && !result && !candidates?.length && photoQuality && photoQuality !== 'good' && (
         <div style={{
           background: photoQuality === 'dark' ? "rgba(255,69,58,0.07)" : "rgba(255,159,10,0.07)",
-          border: `1px solid ${photoQuality === 'dark' ? "rgba(255,69,58,0.25)" : "rgba(255,159,10,0.25)"}`,
-          borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "flex-start", gap: 10,
+          border: `1px solid ${photoQuality === 'dark' ? "rgba(255,69,58,0.22)" : "rgba(255,159,10,0.22)"}`,
+          borderRadius: 12, padding: "12px 14px", display: "flex", alignItems: "flex-start", gap: 12,
         }}>
-          <div style={{ fontSize: 16, flexShrink: 0 }}>{photoQuality === 'dark' ? '🌑' : '🔆'}</div>
+          <div style={{
+            width: 30, height: 30, borderRadius: 8, flexShrink: 0,
+            background: photoQuality === 'dark' ? "rgba(255,69,58,0.12)" : "rgba(255,159,10,0.12)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            {photoQuality === 'dark' ? (
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+                <path d="M12.5 9.5A5.5 5.5 0 015.5 2.5a.5.5 0 00-.57.63A5.5 5.5 0 1012.37 10a.5.5 0 00-.87-.5z" fill="#ff453a"/>
+              </svg>
+            ) : (
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+                <circle cx="7.5" cy="7.5" r="2.8" fill="#ff9f0a"/>
+                <path d="M7.5 1v1.5M7.5 12.5V14M1 7.5h1.5M12.5 7.5H14M2.9 2.9l1.06 1.06M11.04 11.04l1.06 1.06M2.9 12.1l1.06-1.06M11.04 3.96l1.06-1.06" stroke="#ff9f0a" strokeWidth="1.3" strokeLinecap="round"/>
+              </svg>
+            )}
+          </div>
           <div>
-            <div style={{ color: photoQuality === 'dark' ? "#ff453a" : "#ff9f0a", fontSize: 13, fontWeight: 700, marginBottom: 2 }}>
-              {photoQuality === 'dark' ? 'Photo too dark' : 'Photo may be blurry or overexposed'}
+            <div style={{ color: photoQuality === 'dark' ? "#ff453a" : "#ff9f0a", fontSize: 13, fontWeight: 700, marginBottom: 3 }}>
+              {photoQuality === 'dark' ? 'Photo too dark' : 'Photo may be blurry'}
             </div>
             <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 12, lineHeight: 1.5 }}>
               {photoQuality === 'dark'
-                ? 'Move to bright natural light or turn on a lamp — dark photos miss surface scratches.'
-                : 'Hold your phone steady and make sure the card is in focus before capturing.'}
+                ? 'Move to bright natural light or a lamp — dark photos miss surface scratches.'
+                : 'Hold steady and make sure the card is in focus before capturing.'}
             </div>
           </div>
         </div>
@@ -2193,17 +2208,17 @@ const heroUploadCard = {
 
 const sectionLabel = {
   fontSize: 10,
-  fontWeight: 600,
-  letterSpacing: "0.08em",
+  fontWeight: 700,
+  letterSpacing: "0.1em",
   textTransform: "uppercase",
-  color: "rgba(255,255,255,0.3)",
+  color: "rgba(255,255,255,0.32)",
 };
 
 const listItem = {
-  color: "rgba(255,255,255,0.45)",
+  color: "rgba(255,255,255,0.5)",
   fontSize: 13,
   lineHeight: 1.65,
   marginBottom: 6,
   paddingLeft: 10,
-  borderLeft: "2px solid rgba(201,168,76,0.2)",
+  borderLeft: "2px solid rgba(201,168,76,0.28)",
 };
