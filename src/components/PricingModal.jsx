@@ -65,90 +65,80 @@ export default function PricingModal({ onClose, session, tokenBalance = 0 }) {
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
           {TOKEN_PACKS.map((pack) => {
             const isPremium = pack.id === "pro";
-            const perToken = (pack.price / pack.tokens).toFixed(2);
+            const isMid     = pack.id === "grinder";
+            const perToken  = (pack.price / pack.tokens).toFixed(2);
             const isLoading = loading === pack.id;
+
+            const goldAlpha  = isPremium ? 0.09 : isMid ? 0.055 : 0.03;
+            const borderAlpha= isPremium ? 0.52 : isMid ? 0.35  : 0.22;
+            const nameSize   = isPremium ? 16   : isMid ? 15    : 14;
+            const numSize    = isPremium ? 38   : isMid ? 32    : 26;
+            const padding    = isPremium ? "20px 18px" : isMid ? "17px 16px" : "14px 16px";
 
             return (
               <div key={pack.id} style={{
-                background: isPremium ? "rgba(201,168,76,0.055)" : "rgba(255,255,255,0.03)",
-                border: `${isPremium ? "1.5px" : "1px"} solid ${isPremium ? "rgba(201,168,76,0.42)" : "rgba(255,255,255,0.07)"}`,
+                background: `rgba(201,168,76,${goldAlpha})`,
+                border: `${isPremium ? "1.5px" : "1px"} solid rgba(201,168,76,${borderAlpha})`,
                 borderRadius: 16,
-                padding: isPremium ? "18px 16px" : "14px 16px",
+                padding,
                 boxShadow: isPremium
-                  ? "0 4px 24px rgba(201,168,76,0.1), inset 0 1px 0 rgba(201,168,76,0.12)"
-                  : "inset 0 1px 0 rgba(255,255,255,0.04)",
+                  ? "0 6px 28px rgba(201,168,76,0.14), inset 0 1px 0 rgba(201,168,76,0.18)"
+                  : isMid
+                    ? "0 3px 16px rgba(201,168,76,0.07), inset 0 1px 0 rgba(201,168,76,0.1)"
+                    : "inset 0 1px 0 rgba(201,168,76,0.06)",
               }}>
 
                 {/* Name + badge */}
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: isPremium ? 10 : 6 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
                   <span style={{
-                    color: isPremium ? "#c9a84c" : "#fff",
-                    fontSize: isPremium ? 15 : 14,
-                    fontWeight: 700, letterSpacing: "-0.3px",
+                    color: isPremium ? "#c9a84c" : isMid ? "rgba(201,168,76,0.85)" : "rgba(201,168,76,0.65)",
+                    fontSize: nameSize, fontWeight: 700, letterSpacing: "-0.3px",
                   }}>{pack.name}</span>
                   {pack.savePct && (
                     <span style={{
-                      background: isPremium ? "rgba(201,168,76,0.14)" : "rgba(48,209,88,0.1)",
-                      border: `1px solid ${isPremium ? "rgba(201,168,76,0.38)" : "rgba(48,209,88,0.22)"}`,
+                      background: "rgba(201,168,76,0.12)",
+                      border: "1px solid rgba(201,168,76,0.3)",
                       borderRadius: 5, padding: "2px 8px",
-                      color: isPremium ? "#c9a84c" : "#30d158",
+                      color: "#c9a84c",
                       fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase",
-                    }}>{isPremium ? "Best Value" : `${pack.savePct}% off`}</span>
+                    }}>{pack.savePct}% off</span>
                   )}
                 </div>
 
                 {/* Token count */}
-                <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: isPremium ? 14 : 10 }}>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 14 }}>
                   <span style={{
-                    color: isPremium ? "rgba(201,168,76,0.9)" : "rgba(255,255,255,0.7)",
-                    fontSize: isPremium ? 34 : 24,
-                    fontWeight: 800, letterSpacing: "-1.5px", lineHeight: 1,
+                    color: isPremium ? "#c9a84c" : isMid ? "rgba(201,168,76,0.8)" : "rgba(201,168,76,0.6)",
+                    fontSize: numSize, fontWeight: 800, letterSpacing: "-1.5px", lineHeight: 1,
                   }}>{pack.tokens}</span>
-                  <span style={{ color: isPremium ? "rgba(201,168,76,0.45)" : "rgba(255,255,255,0.28)", fontSize: 13, fontWeight: 500 }}>tokens</span>
-                  <span style={{ color: "rgba(255,255,255,0.16)", fontSize: 11, marginLeft: 2 }}>· ${perToken}/ea</span>
+                  <span style={{ color: "rgba(201,168,76,0.35)", fontSize: 13, fontWeight: 500 }}>tokens</span>
+                  <span style={{ color: "rgba(201,168,76,0.22)", fontSize: 11, marginLeft: 2 }}>· ${perToken}/ea</span>
                 </div>
 
                 {/* Buy row */}
-                {isPremium ? (
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 17, fontWeight: 700, letterSpacing: "-0.4px" }}>${pack.price}</span>
-                    <button
-                      onClick={() => buy(pack.id)}
-                      disabled={isLoading}
-                      className="btn-gold"
-                      style={{
-                        flex: 1, padding: "13px 0",
-                        background: isLoading
-                          ? "rgba(255,255,255,0.05)"
-                          : "linear-gradient(180deg, #dfc055 0%, #c9a84c 55%, #b89040 100%)",
-                        color: isLoading ? "rgba(255,255,255,0.2)" : "#000",
-                        fontWeight: 700, fontSize: 14, border: "none",
-                        borderRadius: 12, cursor: isLoading ? "not-allowed" : "pointer",
-                        fontFamily: "inherit", letterSpacing: "-0.2px",
-                        boxShadow: isLoading ? "none" : "0 4px 18px rgba(201,168,76,0.45), inset 0 1px 0 rgba(255,255,255,0.25)",
-                        opacity: isLoading ? 0.5 : 1,
-                      }}
-                    >{isLoading ? "…" : "Buy Premium"}</button>
-                  </div>
-                ) : (
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <span style={{ color: "rgba(255,255,255,0.55)", fontSize: 16, fontWeight: 700, letterSpacing: "-0.4px" }}>${pack.price}</span>
-                    <button
-                      onClick={() => buy(pack.id)}
-                      disabled={isLoading}
-                      style={{
-                        padding: "8px 22px",
-                        background: "rgba(255,255,255,0.08)",
-                        color: "rgba(255,255,255,0.6)",
-                        fontWeight: 600, fontSize: 13,
-                        border: "1px solid rgba(255,255,255,0.1)",
-                        borderRadius: 9, cursor: isLoading ? "not-allowed" : "pointer",
-                        fontFamily: "inherit", opacity: isLoading ? 0.5 : 1,
-                        transition: "background 0.15s ease, color 0.15s ease",
-                      }}
-                    >{isLoading ? "…" : "Buy"}</button>
-                  </div>
-                )}
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <span style={{ color: "rgba(255,255,255,0.45)", fontSize: 17, fontWeight: 700, letterSpacing: "-0.4px" }}>${pack.price}</span>
+                  <button
+                    onClick={() => buy(pack.id)}
+                    disabled={isLoading}
+                    style={{
+                      flex: 1, padding: isPremium ? "13px 0" : "11px 0",
+                      background: isLoading
+                        ? "rgba(255,255,255,0.05)"
+                        : isPremium
+                          ? "linear-gradient(180deg, #dfc055 0%, #c9a84c 55%, #b89040 100%)"
+                          : "rgba(201,168,76,0.15)",
+                      color: isLoading ? "rgba(255,255,255,0.2)" : isPremium ? "#000" : "#c9a84c",
+                      fontWeight: 700, fontSize: 14, border: "none",
+                      borderRadius: 12, cursor: isLoading ? "not-allowed" : "pointer",
+                      fontFamily: "inherit", letterSpacing: "-0.2px",
+                      boxShadow: isLoading ? "none" : isPremium
+                        ? "0 4px 18px rgba(201,168,76,0.45), inset 0 1px 0 rgba(255,255,255,0.25)"
+                        : "inset 0 1px 0 rgba(201,168,76,0.15)",
+                      opacity: isLoading ? 0.5 : 1,
+                    }}
+                  >{isLoading ? "…" : `Buy ${pack.name}`}</button>
+                </div>
               </div>
             );
           })}

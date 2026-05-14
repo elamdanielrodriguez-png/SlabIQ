@@ -11,7 +11,8 @@
     "mobile": "npm run build && node server/index.js",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "tune": "node eval/tune.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.40.0",

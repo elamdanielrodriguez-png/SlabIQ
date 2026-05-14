@@ -1002,7 +1002,7 @@ export default function CardGrader() {
         <PricingModal
           onClose={() => setShowPricing(false)}
           session={session}
-          tokenBalance={gradesRemaining()}
+          tokenBalance={session && userPlan ? Math.max(0, userPlan.grade_limit - userPlan.grades_used) : 0}
         />
       )}
 
