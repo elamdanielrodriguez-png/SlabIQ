@@ -387,6 +387,9 @@ function cropZonesFromImageData(imageData, bounds, { width: storedW, height: sto
       const tip       = Math.round(Math.min(cW, cH) * 0.05);
       const edgeLong  = Math.round(Math.max(cW, cH) * 0.50);
       const edgeShort = Math.round(Math.min(cW, cH) * 0.18);
+      // Surface crop: 55% of card dimensions centered — high-res view for scratch/print-line/haze detection
+      const surfaceW  = Math.round(cW * 0.55);
+      const surfaceH  = Math.round(cH * 0.55);
 
       // crop(src rect) → fixed output size at 0.95 quality so Claude always gets a consistent, detail-rich image
       const crop = (x, y, w, h, outW, outH) => {
@@ -405,10 +408,11 @@ function cropZonesFromImageData(imageData, bounds, { width: storedW, height: sto
         "corner-TR-tip": crop(cR - tip,     cT,            tip,    tip,    256, 256),
         "corner-BL-tip": crop(cL,           cB - tip,      tip,    tip,    256, 256),
         "corner-BR-tip": crop(cR - tip,     cB - tip,      tip,    tip,    256, 256),
-        "edge-top":    crop(cL + Math.round((cW - edgeLong) / 2), cT,            edgeLong, edgeShort, 900, 350),
-        "edge-bottom": crop(cL + Math.round((cW - edgeLong) / 2), cB - edgeShort,edgeLong, edgeShort, 900, 350),
-        "edge-left":   crop(cL,           cT + Math.round((cH - edgeLong) / 2), edgeShort, edgeLong, 350, 900),
-        "edge-right":  crop(cR - edgeShort, cT + Math.round((cH - edgeLong) / 2), edgeShort, edgeLong, 350, 900),
+        "edge-top":      crop(cL + Math.round((cW - edgeLong) / 2), cT,             edgeLong,  edgeShort, 900, 350),
+        "edge-bottom":   crop(cL + Math.round((cW - edgeLong) / 2), cB - edgeShort, edgeLong,  edgeShort, 900, 350),
+        "edge-left":     crop(cL,             cT + Math.round((cH - edgeLong) / 2), edgeShort, edgeLong,  350, 900),
+        "edge-right":    crop(cR - edgeShort, cT + Math.round((cH - edgeLong) / 2), edgeShort, edgeLong,  350, 900),
+        "surface-center": crop(cL + Math.round((cW - surfaceW) / 2), cT + Math.round((cH - surfaceH) / 2), surfaceW, surfaceH, 900, 900),
       });
     };
     img.src = originalObjectURL ?? `data:image/jpeg;base64,${imageData}`;

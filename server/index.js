@@ -391,7 +391,17 @@ IF no PSA 10 reference is provided: grade every zone on ABSOLUTE physical standa
 
 You have ZOOM-IN crops of each of the 8 corner/edge zones labeled "ZOOM-IN FRONT: zone". For each corner zone, an additional TIP close-up (labeled "FRONT: corner-XX (TIP — extreme close-up of corner point)") is also provided — this is an extreme zoom on just the corner point itself, the exact region that determines PSA 9 vs PSA 10. The TIP image is your primary evidence for detecting whitening, tip rounding, soft points, or micro-fraying. If the TIP shows ANY issue, grade the corner as "differs" regardless of what the wide crop shows. For each zone, examine BOTH the front and back crops (and TIP if provided) — report the worst severity between all images for that zone. A corner that is clean on the front but chipped on the back is still a flawed corner.
 
-YOUR TASK — REPORT ON EVERY ZONE, NO SKIPPING:
+A SURFACE CLOSE-UP crop of the center of the card is also provided (labeled "SURFACE CLOSE-UP"). Use this — not the full card photo — as your primary reference for surface defect detection. At this magnification, scratches appear as thin lines or matte interruptions in the surface gloss, print lines appear as faint horizontal streaks, and haze appears as a general dullness. Be thorough.
+
+STEP 1 — DEFECT INVENTORY (fill "physicalNotes" first):
+Before assigning any zone severities, scan EVERY image provided: full card photos, all zone crops, all TIP close-ups, and the SURFACE CLOSE-UP. In the "physicalNotes" JSON field, write a numbered plain-text list of every anomaly you detect. For each entry include:
+  - What: the physical defect type (chip, whitening, scratch, nick, print line, haze, soft tip, etc.)
+  - Where: exact location (corner-TL tip, edge-right at midpoint, front surface near top-right, etc.)
+  - Visibility: barely detectable / clearly visible / immediately obvious
+Include uncertain anomalies — you will resolve them in Step 2. Do not skip this step.
+
+STEP 2 — ZONE GRADING (use your inventory):
+For each of the 8 zones, consult your physicalNotes inventory. Any anomaly you documented in that zone MUST be reflected in its severity. Do not discover new defects here — everything comes from your Step 1 inventory.
 
 For each of these 8 zones, write an entry:
   corner-TL, corner-TR, corner-BL, corner-BR, edge-top, edge-right, edge-bottom, edge-left
@@ -456,8 +466,13 @@ CARD BOUNDARY — CRITICAL:
   Rule of thumb: interior marks → when in doubt, skip. Edge marks → when in doubt, look harder.
 
 SURFACE INSPECTION (separate from zones):
-  Scan the user's full front and back photos for surface defects: print lines, scratches, dents, color rubs, indentations, gloss disruption, haze.
+  Use the SURFACE CLOSE-UP crop as your primary source. Look for:
+  ● Print lines — faint horizontal streaks from the printing press (run the full width of the card)
+  ● Scratches — thin lines or matte interruptions in the surface gloss; even light scratches show here
+  ● Haze — overall dullness vs the PSA 10 reference; the surface should be uniformly glossy
+  ● Indentations, color rubs, dents — any physical disruption to the surface texture
   Compare each candidate flaw to the PSA 10 reference at the same location. Only list it if it's NOT on the PSA 10.
+  Pull any surface anomalies you found in physicalNotes into the surfaceFlaws array.
   Output as "surfaceFlaws" array. [] if genuinely clean — but be thorough before declaring clean.
 
 SEVERITY:
@@ -519,6 +534,7 @@ Use these to estimate realistic counts per grade — never invent implausibly ro
 Return ONLY raw JSON. If card identity uncertain: needsClarification:true with candidates only.
 
 {
+  "physicalNotes": "<numbered defect inventory from Step 1 — every anomaly seen across all images>",
   "needsClarification": false,
   "candidates": [],
   "confidence": <0-100>,
@@ -1178,8 +1194,19 @@ app.post('/api/grade', async (req, res) => {
         }
       }
     }
+    // Surface close-up crop (center of card) — separate from zone crops, used for surface defect inspection
+    if (zoneCrops?.['surface-center']) {
+      zoneImages.push({ type: 'text', text: `=== SURFACE CLOSE-UP (front — use for scratch / print line / haze / gloss disruption inspection) ===` });
+      zoneImages.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: zoneCrops['surface-center'] } });
+    }
+    if (backZoneCrops?.['surface-center']) {
+      zoneImages.push({ type: 'text', text: `=== SURFACE CLOSE-UP (back — use for scratch / print line / haze / gloss disruption inspection) ===` });
+      zoneImages.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: backZoneCrops['surface-center'] } });
+    }
+
     const tipCount = zoneCrops ? Object.keys(zoneCrops).filter(k => k.endsWith('-tip')).length : 0;
-    console.log(`Zone crops: ${zoneCrops ? 8 : 0} front (${tipCount} tip close-ups) + ${backZoneCrops ? 8 : 0} back`);
+    const hasSurface = zoneCrops?.['surface-center'] ? 1 : 0;
+    console.log(`Zone crops: ${zoneCrops ? 8 : 0} front (${tipCount} tip close-ups, ${hasSurface} surface) + ${backZoneCrops ? 8 : 0} back`);
 
     const variantLowerForPrompt = (confirmedCard?.variant ?? '').toLowerCase();
     const isOversizedProneCard = OVERSIZED_PRONE_VARIANTS.some(v => variantLowerForPrompt.includes(v));
