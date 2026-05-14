@@ -192,6 +192,8 @@ button {
 
 /* Staggered result cards */
 .result-card-0 { animation: cgonFadeUp 0.28s cubic-bezier(0.22,1,0.36,1) 0.00s both; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
 .result-card-1 { animation: cgonFadeUp 0.28s cubic-bezier(0.22,1,0.36,1) 0.06s both; }
 .result-card-2 { animation: cgonFadeUp 0.28s cubic-bezier(0.22,1,0.36,1) 0.12s both; }
 .result-card-3 { animation: cgonFadeUp 0.28s cubic-bezier(0.22,1,0.36,1) 0.18s both; }

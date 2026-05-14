@@ -31,7 +31,7 @@ export default function PricingModal({ onClose, session, tokenBalance = 0 }) {
 
   return (
     <div style={overlay} onClick={onClose}>
-      <div style={sheet} onClick={e => e.stopPropagation()}>
+      <div style={sheet} className="no-scrollbar" onClick={e => e.stopPropagation()}>
 
         {/* Drag handle */}
         <div style={{ width: 36, height: 4, background: "rgba(255,255,255,0.14)", borderRadius: 99, margin: "0 auto 24px" }} />
@@ -180,5 +180,7 @@ const sheet = {
   maxHeight: "90vh",
   overflowY: "auto",
   overscrollBehavior: "contain",
+  scrollbarWidth: "none",
+  msOverflowStyle: "none",
   boxShadow: "0 -8px 48px rgba(0,0,0,0.65), 0 -1px 0 rgba(255,255,255,0.06)",
 };
