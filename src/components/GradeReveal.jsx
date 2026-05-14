@@ -147,7 +147,7 @@ const PSA_FULL_NAME = {
   1:  "Poor",
 };
 
-function revealColor(g) {
+function gradeColor(g) {
   if (!g && g !== 0) return "rgba(255,255,255,0.55)";
   if (g >= 10) return "#c9a84c";
   if (g >= 9)  return "#f2f2f2";
@@ -156,12 +156,19 @@ function revealColor(g) {
   return "#ff453a";
 }
 
-function revealGlow(g) {
+function gradeGlow(g) {
   if (!g) return "none";
   if (g >= 10) return "0 0 120px rgba(201,168,76,0.7), 0 0 280px rgba(201,168,76,0.25)";
   if (g >= 9)  return "0 0 80px rgba(255,255,255,0.25)";
   return "none";
 }
+
+const JUDGES = [
+  { key: "corners",   label: "Corners",   icon: "◆" },
+  { key: "edges",     label: "Edges",     icon: "━" },
+  { key: "surface",   label: "Surface",   icon: "✦" },
+  { key: "centering", label: "Centering", icon: "⊕" },
+];
 
 // Radial particles — wrapper handles rotation so translateX flies them outward correctly
 function GoldParticles({ grade }) {
@@ -202,7 +209,6 @@ function GoldParticles({ grade }) {
   );
 }
 
-// Starburst rays shooting outward on grade land
 function StarburstRays({ grade }) {
   if (grade < 9) return null;
   const is10  = grade >= 10;
@@ -246,9 +252,7 @@ function GoldConfetti() {
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
       {pieces.map((p, i) => (
         <div key={i} style={{
-          position: "absolute",
-          top: "-8px",
-          left: p.left,
+          position: "absolute", top: "-8px", left: p.left,
           width: p.size, height: p.size,
           borderRadius: i % 2 === 0 ? "50%" : "1px",
           background: p.color,
@@ -260,20 +264,76 @@ function GoldConfetti() {
   );
 }
 
+// Single judge scorecard
+function JudgeCard({ judge, score, visible, fromLeft }) {
+  const color = gradeColor(score);
+  const isGold = score >= 10;
+  const isGood = score >= 9;
+
+  return (
+    <div style={{
+      width: "100%",
+      background: isGold
+        ? "rgba(201,168,76,0.08)"
+        : isGood
+          ? "rgba(255,255,255,0.04)"
+          : "rgba(255,255,255,0.025)",
+      border: `1px solid ${isGold ? "rgba(201,168,76,0.4)" : isGood ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.07)"}`,
+      borderRadius: 14,
+      padding: "12px 16px",
+      display: "flex", alignItems: "center", justifyContent: "space-between",
+      opacity: visible ? 1 : 0,
+      transform: visible ? "translateX(0)" : `translateX(${fromLeft ? "-60px" : "60px"})`,
+      transition: "opacity 0.45s cubic-bezier(0.22,1,0.36,1), transform 0.45s cubic-bezier(0.22,1,0.36,1)",
+      boxShadow: isGold && visible ? "0 2px 20px rgba(201,168,76,0.12)" : "none",
+    }}>
+      {/* Left: icon + label */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <span style={{ fontSize: 16, opacity: 0.7 }}>{judge.icon}</span>
+        <div>
+          <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase" }}>
+            {judge.label}
+          </div>
+        </div>
+      </div>
+
+      {/* Right: score */}
+      <div style={{
+        color, fontSize: 28, fontWeight: 800,
+        letterSpacing: "-1px", lineHeight: 1,
+        textShadow: isGold && visible ? "0 0 20px rgba(201,168,76,0.6)" : "none",
+        fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif",
+        minWidth: 48, textAlign: "right",
+      }}>
+        {score != null ? Number(score).toFixed(1) : "—"}
+      </div>
+    </div>
+  );
+}
+
 export default function GradeReveal({ result, onDone }) {
   const psaRaw = result?.psa?.grade;
   const bgsRaw = result?.bgs?.overall;
   const grade  = psaRaw != null ? Number(psaRaw) : null;
-  const isInt  = grade != null && Number.isInteger(grade);
   const is10   = grade >= 10;
   const is9    = grade >= 9 && grade < 10;
 
-  const [phase,   setPhase]   = useState(0);
-  const [display, setDisplay] = useState(null);
-  const [exiting, setExiting] = useState(false);
-  const [sharing, setSharing] = useState(false);
-  const [shaking, setShaking] = useState(false);
-  const [flashing, setFlashing] = useState(false);
+  const [phase,          setPhase]          = useState(0);
+  const [judgesRevealed, setJudgesRevealed] = useState(0);
+  const [gradeVisible,   setGradeVisible]   = useState(false);
+  const [exiting,        setExiting]        = useState(false);
+  const [sharing,        setSharing]        = useState(false);
+  const [shaking,        setShaking]        = useState(false);
+  const [flashing,       setFlashing]       = useState(false);
+
+  const bgs = result?.bgs ?? {};
+  const getScore = (key) => {
+    const v = bgs[key] != null ? Number(bgs[key]) : null;
+    if (v != null) return v;
+    if (grade == null) return null;
+    const jitter = { corners: 0, edges: 0.2, surface: -0.1, centering: 0.1 };
+    return Math.min(10, Math.max(1, grade + jitter[key]));
+  };
 
   const exit = () => {
     if (exiting) return;
@@ -283,44 +343,35 @@ export default function GradeReveal({ result, onDone }) {
 
   useEffect(() => {
     const t1 = setTimeout(() => setPhase(1), 200);
-    const t2 = setTimeout(() => {
-      setPhase(2);
-      if (grade == null) return;
-      setDisplay(isInt ? 0 : 0.0);
-      const FAST = 16, SLOW = 8, TOTAL = FAST + SLOW;
-      let step = 0, tid;
-      const tick = () => {
-        step++;
-        const eased = 1 - Math.pow(1 - step / TOTAL, 3.0);
-        if (step >= TOTAL) {
-          setDisplay(grade);
-          setPhase(3);
-          // Trigger flash + shake on land
-          if (grade >= 9) {
-            setFlashing(true);
-            setTimeout(() => setFlashing(false), 600);
-            setShaking(true);
-            setTimeout(() => setShaking(false), 500);
-          }
-          return;
+    const t2 = setTimeout(() => setPhase(2), 700);
+    const t3 = setTimeout(() => {
+      setPhase(3);
+      setJudgesRevealed(1);
+      setTimeout(() => setJudgesRevealed(2), 550);
+      setTimeout(() => setJudgesRevealed(3), 1100);
+      setTimeout(() => setJudgesRevealed(4), 1650);
+      setTimeout(() => setPhase(4), 2500);
+      setTimeout(() => {
+        setPhase(5);
+        setGradeVisible(true);
+        if (grade != null && grade >= 9) {
+          setFlashing(true);
+          setTimeout(() => setFlashing(false), 600);
+          setShaking(true);
+          setTimeout(() => setShaking(false), 500);
         }
-        setDisplay(isInt ? Math.floor(eased * grade) : Math.round(eased * grade * 2) / 2);
-        tid = setTimeout(tick, step > FAST ? 200 : 38);
-      };
-      tid = setTimeout(tick, 38);
-      return () => clearTimeout(tid);
-    }, 420);
-    return () => { clearTimeout(t1); clearTimeout(t2); };
+      }, 3300);
+    }, 1200);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, []);
 
-  const color      = revealColor(grade);
-  const glow       = phase >= 3 ? revealGlow(grade) : "none";
-  const displayStr = display == null ? "" : isInt ? String(display) : Number(display).toFixed(1);
-  const fontSize   = is10 ? 192 : 160;
+  const color    = gradeColor(grade);
+  const glow     = gradeVisible ? gradeGlow(grade) : "none";
+  const fontSize = is10 ? 192 : 160;
 
   return (
     <div
-      onClick={() => phase >= 2 && exit()}
+      onClick={() => phase >= 5 && exit()}
       style={{
         position: "fixed", inset: 0, zIndex: 700,
         display: "flex", flexDirection: "column",
@@ -331,14 +382,13 @@ export default function GradeReveal({ result, onDone }) {
         opacity: exiting ? 0 : 1,
         transform: exiting ? "scale(1.04)" : "scale(1)",
         transition: exiting ? "opacity 0.5s ease, transform 0.5s ease" : "opacity 0.2s ease",
-        cursor: phase >= 2 ? "pointer" : "default",
+        cursor: phase >= 5 ? "pointer" : "default",
         userSelect: "none",
         overflow: "hidden",
-        animation: shaking ? `screenShake 0.5s cubic-bezier(0.36,0.07,0.19,0.97) forwards` : "none",
+        animation: shaking ? "screenShake 0.5s cubic-bezier(0.36,0.07,0.19,0.97) forwards" : "none",
       }}
     >
-
-      {/* Screen flash on grade land */}
+      {/* Screen flash */}
       {flashing && (
         <div style={{
           position: "absolute", inset: 0, pointerEvents: "none", zIndex: 10,
@@ -349,229 +399,227 @@ export default function GradeReveal({ result, onDone }) {
         }} />
       )}
 
-      {/* PSA 10: full-screen gold wash on land */}
-      {is10 && phase >= 3 && (
+      {is10 && gradeVisible && (
         <div style={{
           position: "absolute", inset: 0, pointerEvents: "none",
           background: "radial-gradient(ellipse 80% 60% at 50% 50%, rgba(201,168,76,0.18) 0%, rgba(201,168,76,0.05) 55%, transparent 80%)",
           animation: "revealPulse 3s ease-in-out infinite",
         }} />
       )}
-
-      {/* PSA 9: subtle white glow */}
-      {is9 && phase >= 3 && (
+      {is9 && gradeVisible && (
         <div style={{
           position: "absolute", inset: 0, pointerEvents: "none",
           background: "radial-gradient(ellipse 60% 45% at 50% 50%, rgba(255,255,255,0.07) 0%, transparent 75%)",
           animation: "revealPulse 2.8s ease-in-out infinite",
         }} />
       )}
+      {is10 && gradeVisible && <GoldConfetti />}
 
-      {/* PSA 10 confetti rain */}
-      {is10 && phase >= 3 && <GoldConfetti />}
-
-      {/* Accent lines top + bottom */}
-      {[{ pos: "top: 0" }, { pos: "bottom: 0" }].map(({ pos }, i) => (
+      {/* Accent lines */}
+      {[0, 1].map((i) => (
         <div key={i} style={{
           position: "absolute", [i === 0 ? "top" : "bottom"]: 0, left: "50%",
-          width: phase >= 3 ? "100%" : "0%",
+          width: gradeVisible ? "100%" : "0%",
           height: is10 ? 2 : 1,
           background: `linear-gradient(90deg, transparent, ${color}${is10 ? "99" : "44"}, transparent)`,
           transform: "translateX(-50%)",
           transition: "width 0.7s cubic-bezier(0.22,1,0.36,1) 0.05s",
           pointerEvents: "none",
-          boxShadow: is10 && phase >= 3 ? `0 0 12px ${color}66` : "none",
+          boxShadow: is10 && gradeVisible ? `0 0 12px ${color}66` : "none",
         }} />
       ))}
 
-      {/* Grade name above identity — always shown, gold shimmer for 10 */}
+      {/* ── JUDGE PANEL (phases 1–4) ── */}
       <div style={{
-        textAlign: "center",
-        marginBottom: 12,
-        opacity: phase >= 3 ? 1 : 0,
-        transform: phase >= 3 ? "translateY(0) scale(1)" : "translateY(8px) scale(0.9)",
-        transition: "opacity 0.5s ease 0.1s, transform 0.5s cubic-bezier(0.22,1,0.36,1) 0.1s",
+        width: "100%", maxWidth: 360, padding: "0 24px",
+        opacity: phase >= 5 ? 0 : 1,
+        transition: phase >= 5 ? "opacity 0.35s ease" : "opacity 0.5s ease",
+        pointerEvents: "none",
+        position: phase >= 5 ? "absolute" : "relative",
       }}>
-        {is10 ? (
-          <div style={{
-            fontSize: 11, fontWeight: 800, letterSpacing: "0.35em",
-            textTransform: "uppercase",
-            background: "linear-gradient(90deg, #a07830, #c9a84c, #e8c870, #c9a84c, #a07830)",
-            backgroundSize: "200% 100%",
-            WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-            animation: phase >= 3 ? "goldShimmer 2.5s ease-in-out infinite" : "none",
-          }}>
-            {PSA_FULL_NAME[10]}
+        {/* Card identity */}
+        <div style={{
+          textAlign: "center", marginBottom: 20,
+          opacity: phase >= 1 ? 1 : 0,
+          transform: phase >= 1 ? "translateY(0)" : "translateY(-12px)",
+          transition: "opacity 0.5s cubic-bezier(0.22,1,0.36,1), transform 0.5s cubic-bezier(0.22,1,0.36,1)",
+        }}>
+          <div style={{ color: "rgba(255,255,255,0.88)", fontSize: 20, fontWeight: 700, letterSpacing: "-0.5px", marginBottom: 4 }}>
+            {result?.player}
           </div>
-        ) : (
-          <div style={{
-            fontSize: 11, fontWeight: 700, letterSpacing: "0.28em",
-            textTransform: "uppercase", color: `${color}99`,
-          }}>
-            {PSA_FULL_NAME[grade] ?? result?.psa?.label ?? ""}
+          <div style={{ color: "rgba(255,255,255,0.28)", fontSize: 12 }}>
+            {[result?.year, result?.set, result?.variant].filter(Boolean).join("  ·  ")}
           </div>
-        )}
+        </div>
+
+        {/* Deliberating subtitle */}
+        <div style={{
+          textAlign: "center", marginBottom: 16,
+          opacity: phase >= 2 && phase < 4 ? 1 : 0,
+          transition: "opacity 0.45s ease",
+          color: "rgba(255,255,255,0.28)", fontSize: 11, fontWeight: 700,
+          letterSpacing: "0.2em", textTransform: "uppercase",
+        }}>
+          The judges have deliberated
+        </div>
+
+        {/* Judge cards */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {JUDGES.map((judge, idx) => (
+            <JudgeCard
+              key={judge.key}
+              judge={judge}
+              score={getScore(judge.key)}
+              visible={judgesRevealed > idx}
+              fromLeft={idx % 2 === 0}
+            />
+          ))}
+        </div>
+
+        {/* Verdict label */}
+        <div style={{
+          textAlign: "center", marginTop: 20,
+          opacity: phase >= 4 ? 1 : 0,
+          transform: phase >= 4 ? "translateY(0)" : "translateY(8px)",
+          transition: "opacity 0.4s ease, transform 0.4s cubic-bezier(0.22,1,0.36,1)",
+          color: "rgba(255,255,255,0.35)", fontSize: 11, fontWeight: 700,
+          letterSpacing: "0.2em", textTransform: "uppercase",
+        }}>
+          The Verdict
+        </div>
       </div>
 
-      {/* Card identity */}
+      {/* ── GRADE SLAM (phase 5) ── */}
       <div style={{
-        textAlign: "center",
-        marginBottom: is10 ? 44 : 52,
-        opacity: phase >= 1 ? 1 : 0,
-        transform: phase >= 1 ? "translateY(0)" : "translateY(-12px)",
-        transition: "opacity 0.5s cubic-bezier(0.22,1,0.36,1), transform 0.5s cubic-bezier(0.22,1,0.36,1)",
+        position: "absolute",
+        display: "flex", flexDirection: "column", alignItems: "center",
+        opacity: phase >= 5 ? 1 : 0,
+        transition: "opacity 0.3s ease",
+        pointerEvents: phase >= 5 ? "auto" : "none",
       }}>
+        {/* Grade name */}
         <div style={{
-          color: "rgba(255,255,255,0.88)", fontSize: 22, fontWeight: 700,
-          letterSpacing: "-0.5px", marginBottom: 6,
-          fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif",
+          textAlign: "center", marginBottom: 12,
+          opacity: gradeVisible ? 1 : 0,
+          transform: gradeVisible ? "translateY(0) scale(1)" : "translateY(8px) scale(0.9)",
+          transition: "opacity 0.5s ease 0.1s, transform 0.5s cubic-bezier(0.22,1,0.36,1) 0.1s",
         }}>
-          {result?.player}
-        </div>
-        <div style={{ color: "rgba(255,255,255,0.28)", fontSize: 13 }}>
-          {[result?.year, result?.set, result?.variant].filter(Boolean).join("  ·  ")}
-        </div>
-      </div>
-
-      {/* Grade block */}
-      <div style={{ textAlign: "center", position: "relative" }}>
-
-        {/* PSA label */}
-        <div style={{
-          color: "rgba(255,255,255,0.18)", fontSize: 11, fontWeight: 700,
-          letterSpacing: "0.22em", textTransform: "uppercase", marginBottom: 4,
-          opacity: phase >= 2 ? 1 : 0,
-          transition: "opacity 0.3s ease",
-        }}>PSA</div>
-
-        {/* Flash burst */}
-        {phase >= 3 && (
-          <div style={{
-            position: "absolute", top: "35%", left: "50%",
-            width: is10 ? 200 : 140,
-            height: is10 ? 200 : 140,
-            marginLeft: is10 ? -100 : -70,
-            marginTop: is10 ? -100 : -70,
-            borderRadius: "50%",
-            background: is10
-              ? "radial-gradient(circle, rgba(201,168,76,0.75) 0%, rgba(201,168,76,0.2) 50%, transparent 72%)"
-              : is9
-                ? "radial-gradient(circle, rgba(255,255,255,0.4) 0%, transparent 70%)"
-                : "radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 70%)",
-            animation: `gradeFlash ${is10 ? "0.9s" : "0.7s"} cubic-bezier(0.22,1,0.36,1) forwards`,
-            pointerEvents: "none",
-          }} />
-        )}
-
-        {/* Expanding rings — 3 for 10, 1 for 9 */}
-        {phase >= 3 && [...Array(is10 ? 3 : is9 ? 1 : 0)].map((_, i) => (
-          <div key={i} style={{
-            position: "absolute", top: "35%", left: "50%",
-            width: is10 ? 90 : 70,
-            height: is10 ? 90 : 70,
-            marginLeft: is10 ? -45 : -35,
-            marginTop: is10 ? -45 : -35,
-            borderRadius: "50%",
-            border: `${is10 ? 2.5 : 1.5}px solid ${is10 ? "rgba(201,168,76,0.8)" : "rgba(255,255,255,0.55)"}`,
-            boxShadow: is10 ? `0 0 8px rgba(201,168,76,0.4)` : "none",
-            animation: `gradeRing ${0.9 + i * 0.25}s cubic-bezier(0.22,1,0.36,1) ${i * 0.15}s forwards`,
-            pointerEvents: "none",
-          }} />
-        ))}
-
-        {/* Starburst rays */}
-        {phase >= 3 && (
-          <div style={{ position: "absolute", top: "35%", left: "50%", width: 0, height: 0 }}>
-            <StarburstRays grade={grade} />
-          </div>
-        )}
-
-        {/* Particle burst */}
-        {phase >= 3 && (
-          <div style={{ position: "absolute", top: "35%", left: "50%", width: 0, height: 0 }}>
-            <GoldParticles grade={grade} />
-          </div>
-        )}
-
-        {/* THE NUMBER */}
-        <div style={{
-          fontSize,
-          fontWeight: 800,
-          lineHeight: 1,
-          letterSpacing: is10 ? "-8px" : "-6px",
-          color: phase >= 2 ? color : "rgba(255,255,255,0.04)",
-          textShadow: glow,
-          fontVariantNumeric: "tabular-nums",
-          fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif",
-          minWidth: is10 ? 260 : 220,
-          transition: "color 0.2s ease",
-          filter: phase >= 3 ? "blur(0)" : phase >= 2 ? "blur(4px)" : "none",
-          animation: phase === 3 ? "revealSlam 0.6s cubic-bezier(0.22,1,0.36,1) forwards" : "none",
-          position: "relative",
-        }}>
-          {phase >= 2 ? displayStr : ""}
-
-          {/* Gold shimmer sweep on the number for PSA 10 */}
-          {is10 && phase >= 3 && (
+          {is10 ? (
             <div style={{
-              position: "absolute", inset: 0,
-              background: "linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.35) 50%, transparent 70%)",
+              fontSize: 11, fontWeight: 800, letterSpacing: "0.35em", textTransform: "uppercase",
+              background: "linear-gradient(90deg, #a07830, #c9a84c, #e8c870, #c9a84c, #a07830)",
               backgroundSize: "200% 100%",
-              animation: "goldShimmer 2.2s ease-in-out 0.3s infinite",
-              WebkitBackgroundClip: "text",
-              pointerEvents: "none",
-              borderRadius: 8,
-            }} />
+              WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+              animation: gradeVisible ? "goldShimmer 2.5s ease-in-out infinite" : "none",
+            }}>{PSA_FULL_NAME[10]}</div>
+          ) : (
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.28em", textTransform: "uppercase", color: `${color}99` }}>
+              {PSA_FULL_NAME[grade] ?? result?.psa?.label ?? ""}
+            </div>
           )}
         </div>
 
-        {/* Grade label below number */}
+        {/* Player name recap */}
         <div style={{
-          color,
-          fontSize: 15,
-          fontWeight: 700, letterSpacing: "0.18em",
-          textTransform: "uppercase", marginTop: 18,
-          opacity: phase >= 3 ? (is10 ? 0 : 0.75) : 0,
-          transition: "opacity 0.5s ease 0.1s",
-        }}>
-          {PSA_FULL_NAME[grade] ?? result?.psa?.label ?? ""}
-        </div>
+          textAlign: "center", marginBottom: 24,
+          opacity: gradeVisible ? 1 : 0,
+          transition: "opacity 0.5s ease 0.15s",
+          color: "rgba(255,255,255,0.55)", fontSize: 15, fontWeight: 600,
+        }}>{result?.player}</div>
 
-        {/* BGS */}
-        {bgsRaw != null && (
+        {/* Grade block */}
+        <div style={{ textAlign: "center", position: "relative" }}>
           <div style={{
-            marginTop: 10,
-            opacity: phase >= 3 ? 0.35 : 0,
-            transition: "opacity 0.6s ease 0.3s",
-            color: "rgba(255,255,255,0.55)", fontSize: 14, fontWeight: 600,
-          }}>
-            BGS {Number(bgsRaw).toFixed(1)}
-          </div>
-        )}
-      </div>
+            color: "rgba(255,255,255,0.18)", fontSize: 11, fontWeight: 700,
+            letterSpacing: "0.22em", textTransform: "uppercase", marginBottom: 4,
+            opacity: gradeVisible ? 1 : 0,
+            transition: "opacity 0.3s ease",
+          }}>PSA</div>
 
-      {/* PSA 10: trophy row below */}
-      {is10 && (
-        <div style={{
-          marginTop: 40,
-          opacity: phase >= 3 ? 1 : 0,
-          transition: "opacity 0.7s ease 0.5s",
-          display: "flex", gap: 32, alignItems: "center",
-        }}>
-          {["Corners", "Edges", "Surface", "Centering"].map((label) => (
-            <div key={label} style={{ textAlign: "center" }}>
-              <div style={{ color: "rgba(201,168,76,0.5)", fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 4 }}>{label}</div>
-              <div style={{ color: "#c9a84c", fontSize: 15, fontWeight: 800 }}>10</div>
-            </div>
+          {gradeVisible && (
+            <div style={{
+              position: "absolute", top: "35%", left: "50%",
+              width: is10 ? 200 : 140, height: is10 ? 200 : 140,
+              marginLeft: is10 ? -100 : -70, marginTop: is10 ? -100 : -70,
+              borderRadius: "50%",
+              background: is10
+                ? "radial-gradient(circle, rgba(201,168,76,0.75) 0%, rgba(201,168,76,0.2) 50%, transparent 72%)"
+                : is9
+                  ? "radial-gradient(circle, rgba(255,255,255,0.4) 0%, transparent 70%)"
+                  : "radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 70%)",
+              animation: `gradeFlash ${is10 ? "0.9s" : "0.7s"} cubic-bezier(0.22,1,0.36,1) forwards`,
+              pointerEvents: "none",
+            }} />
+          )}
+
+          {gradeVisible && [...Array(is10 ? 3 : is9 ? 1 : 0)].map((_, i) => (
+            <div key={i} style={{
+              position: "absolute", top: "35%", left: "50%",
+              width: is10 ? 90 : 70, height: is10 ? 90 : 70,
+              marginLeft: is10 ? -45 : -35, marginTop: is10 ? -45 : -35,
+              borderRadius: "50%",
+              border: `${is10 ? 2.5 : 1.5}px solid ${is10 ? "rgba(201,168,76,0.8)" : "rgba(255,255,255,0.55)"}`,
+              boxShadow: is10 ? "0 0 8px rgba(201,168,76,0.4)" : "none",
+              animation: `gradeRing ${0.9 + i * 0.25}s cubic-bezier(0.22,1,0.36,1) ${i * 0.15}s forwards`,
+              pointerEvents: "none",
+            }} />
           ))}
+
+          {gradeVisible && (
+            <div style={{ position: "absolute", top: "35%", left: "50%", width: 0, height: 0 }}>
+              <StarburstRays grade={grade} />
+            </div>
+          )}
+          {gradeVisible && (
+            <div style={{ position: "absolute", top: "35%", left: "50%", width: 0, height: 0 }}>
+              <GoldParticles grade={grade} />
+            </div>
+          )}
+
+          {/* THE NUMBER */}
+          <div style={{
+            fontSize, fontWeight: 800, lineHeight: 1,
+            letterSpacing: is10 ? "-8px" : "-6px",
+            color: gradeVisible ? color : "rgba(255,255,255,0.04)",
+            textShadow: glow,
+            fontVariantNumeric: "tabular-nums",
+            fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif",
+            minWidth: is10 ? 260 : 220,
+            transition: "color 0.2s ease",
+            animation: gradeVisible ? "revealSlam 0.6s cubic-bezier(0.22,1,0.36,1) forwards" : "none",
+            position: "relative",
+          }}>
+            {gradeVisible ? (grade != null ? String(grade) : "—") : ""}
+            {is10 && gradeVisible && (
+              <div style={{
+                position: "absolute", inset: 0,
+                background: "linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.35) 50%, transparent 70%)",
+                backgroundSize: "200% 100%",
+                animation: "goldShimmer 2.2s ease-in-out 0.3s infinite",
+                WebkitBackgroundClip: "text",
+                pointerEvents: "none", borderRadius: 8,
+              }} />
+            )}
+          </div>
+
+          {bgsRaw != null && (
+            <div style={{
+              marginTop: 10,
+              opacity: gradeVisible ? 0.35 : 0,
+              transition: "opacity 0.6s ease 0.3s",
+              color: "rgba(255,255,255,0.55)", fontSize: 14, fontWeight: 600,
+            }}>
+              BGS {Number(bgsRaw).toFixed(1)}
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Share button */}
       <button
         onClick={async (e) => {
           e.stopPropagation();
-          if (sharing || phase < 3) return;
+          if (sharing || phase < 5) return;
           setSharing(true);
           try { await shareGrade(result); } finally { setSharing(false); }
         }}
@@ -585,9 +633,9 @@ export default function GradeReveal({ result, onDone }) {
           fontSize: 13, fontWeight: 600,
           cursor: sharing ? "default" : "pointer",
           fontFamily: "inherit",
-          opacity: phase >= 3 ? 1 : 0,
+          opacity: gradeVisible ? 1 : 0,
           transition: "opacity 0.6s ease 1.8s",
-          pointerEvents: phase >= 3 ? "auto" : "none",
+          pointerEvents: gradeVisible ? "auto" : "none",
         }}
       >
         {sharing ? (
@@ -612,9 +660,9 @@ export default function GradeReveal({ result, onDone }) {
         position: "absolute", bottom: 52,
         color: "rgba(255,255,255,0.18)", fontSize: 11,
         fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase",
-        opacity: phase >= 3 ? 1 : 0,
+        opacity: gradeVisible ? 1 : 0,
         transition: "opacity 0.7s ease 1.2s",
-        animation: phase >= 3 ? "revealPulse 2.5s ease-in-out 2s infinite" : "none",
+        animation: gradeVisible ? "revealPulse 2.5s ease-in-out 2s infinite" : "none",
       }}>
         Tap anywhere to continue
       </div>
