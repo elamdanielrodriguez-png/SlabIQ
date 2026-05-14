@@ -63,8 +63,8 @@ button {
 }
 
 @keyframes particleFly {
-  0%   { transform: translateX(0)    scale(1.4); opacity: 1; }
-  100% { transform: translateX(72px) scale(0);   opacity: 0; }
+  0%   { transform: translateX(0)   scale(1.4); opacity: 1; }
+  100% { transform: translateX(var(--fly-dist, 100px)) scale(0); opacity: 0; }
 }
 
 @keyframes gradeRing {
@@ -73,10 +73,10 @@ button {
 }
 
 @keyframes revealSlam {
-  0%   { transform: scale(1.18); }
-  55%  { transform: scale(0.94); }
-  78%  { transform: scale(1.04); }
-  100% { transform: scale(1.00); }
+  0%   { transform: scale(1.22); filter: blur(0); }
+  55%  { transform: scale(0.93); }
+  78%  { transform: scale(1.05); }
+  100% { transform: scale(1.00); filter: blur(0); }
 }
 
 @keyframes revealPulse {
@@ -90,8 +90,37 @@ button {
 }
 
 @keyframes confettiFall {
-  0%   { transform: translateY(0)    rotate(0deg);   opacity: 1; }
+  0%   { transform: translateY(0)     rotate(0deg);   opacity: 1; }
   100% { transform: translateY(105vh) rotate(540deg); opacity: 0; }
+}
+
+@keyframes screenFlash {
+  0%   { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes screenShake {
+  0%,100% { transform: translate(0,0) rotate(0deg); }
+  10%     { transform: translate(-6px,-4px) rotate(-0.3deg); }
+  20%     { transform: translate(7px, 3px)  rotate(0.2deg); }
+  30%     { transform: translate(-5px, 6px) rotate(-0.2deg); }
+  40%     { transform: translate(6px,-3px)  rotate(0.3deg); }
+  50%     { transform: translate(-7px, 4px) rotate(-0.1deg); }
+  60%     { transform: translate(4px,-6px)  rotate(0.2deg); }
+  70%     { transform: translate(-3px, 5px) rotate(-0.3deg); }
+  80%     { transform: translate(5px,-3px)  rotate(0.1deg); }
+  90%     { transform: translate(-4px, 2px) rotate(-0.1deg); }
+}
+
+@keyframes rayExpand {
+  0%   { transform: scaleX(0); opacity: 0.9; }
+  60%  { opacity: 0.7; }
+  100% { transform: scaleX(1); opacity: 0; }
+}
+
+@keyframes gradeCountBlur {
+  0%   { filter: blur(6px); opacity: 0.5; }
+  100% { filter: blur(0);   opacity: 1;   }
 }
 
 

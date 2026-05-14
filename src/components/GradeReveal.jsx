@@ -163,32 +163,72 @@ function revealGlow(g) {
   return "none";
 }
 
-// Radial particles scattered in all directions
+// Radial particles — wrapper handles rotation so translateX flies them outward correctly
 function GoldParticles({ grade }) {
   if (grade < 9) return null;
-  const is10 = grade >= 10;
-  const count = is10 ? 22 : 10;
+  const is10  = grade >= 10;
+  const count = is10 ? 36 : 18;
   const color = is10 ? "#c9a84c" : "#e8e8e8";
-  const angles = [...Array(count)].map((_, i) => (360 / count) * i + (Math.random() * 12 - 6));
-  const sizes  = [...Array(count)].map((_, i) => is10 ? (i % 3 === 0 ? 9 : 5) : 4);
-  const dists  = [...Array(count)].map((_, i) => is10 ? (40 + (i % 4) * 30) : 30);
 
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
-      {angles.map((angle, i) => (
-        <div key={i} style={{
-          position: "absolute",
-          top: "50%", left: "50%",
-          width: sizes[i], height: sizes[i],
-          marginLeft: -sizes[i] / 2, marginTop: -sizes[i] / 2,
-          borderRadius: "50%",
-          background: i % 4 === 0 && is10 ? "#fff" : color,
-          boxShadow: `0 0 ${sizes[i] * 2}px ${color}`,
-          transform: `rotate(${angle}deg)`,
-          animation: `particleFly ${0.6 + (i % 5) * 0.1}s cubic-bezier(0.22,1,0.36,1) ${i * 0.03}s both`,
-          "--fly-dist": `${dists[i]}px`,
-        }} />
-      ))}
+      {[...Array(count)].map((_, i) => {
+        const angle = (360 / count) * i + (Math.random() * 10 - 5);
+        const size  = is10 ? (i % 4 === 0 ? 10 : i % 3 === 0 ? 7 : 4) : (i % 3 === 0 ? 6 : 3);
+        const dist  = is10 ? (80 + (i % 5) * 40) : (50 + (i % 4) * 20);
+        const dur   = 0.55 + (i % 6) * 0.08;
+        const delay = i * 0.018;
+        const bg    = i % 5 === 0 && is10 ? "#fff" : i % 3 === 0 ? color : color + "cc";
+        return (
+          <div key={i} style={{
+            position: "absolute", top: "50%", left: "50%",
+            width: 0, height: 0,
+            transform: `rotate(${angle}deg)`,
+            transformOrigin: "0 0",
+          }}>
+            <div style={{
+              width: size, height: size,
+              marginTop: -size / 2,
+              borderRadius: i % 6 === 0 ? "2px" : "50%",
+              background: bg,
+              boxShadow: `0 0 ${size * 2}px ${color}`,
+              "--fly-dist": `${dist}px`,
+              animation: `particleFly ${dur}s cubic-bezier(0.22,1,0.36,1) ${delay}s both`,
+            }} />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Starburst rays shooting outward on grade land
+function StarburstRays({ grade }) {
+  if (grade < 9) return null;
+  const is10  = grade >= 10;
+  const count = is10 ? 16 : 8;
+  const color = is10 ? "rgba(201,168,76," : "rgba(255,255,255,";
+
+  return (
+    <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+      {[...Array(count)].map((_, i) => {
+        const angle  = (360 / count) * i;
+        const length = is10 ? (80 + (i % 3) * 50) : (50 + (i % 3) * 30);
+        const width  = is10 ? (i % 4 === 0 ? 2 : 1) : 1;
+        const alpha  = is10 ? (i % 2 === 0 ? "0.7)" : "0.4)") : "0.35)";
+        const dur    = 0.5 + (i % 4) * 0.1;
+        const delay  = i * 0.02;
+        return (
+          <div key={i} style={{
+            position: "absolute", top: "50%", left: "50%",
+            width: length, height: width,
+            transformOrigin: "0 50%",
+            transform: `rotate(${angle}deg)`,
+            background: `linear-gradient(90deg, ${color}0.9), ${color}0))`,
+            animation: `rayExpand ${dur}s cubic-bezier(0.22,1,0.36,1) ${delay}s both`,
+          }} />
+        );
+      })}
     </div>
   );
 }
@@ -232,6 +272,8 @@ export default function GradeReveal({ result, onDone }) {
   const [display, setDisplay] = useState(null);
   const [exiting, setExiting] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [shaking, setShaking] = useState(false);
+  const [flashing, setFlashing] = useState(false);
 
   const exit = () => {
     if (exiting) return;
@@ -240,20 +282,28 @@ export default function GradeReveal({ result, onDone }) {
   };
 
   useEffect(() => {
-    // identity fades in fast
     const t1 = setTimeout(() => setPhase(1), 200);
-    // counting starts soon after
     const t2 = setTimeout(() => {
       setPhase(2);
       if (grade == null) return;
       setDisplay(isInt ? 0 : 0.0);
-      // Fast sprint to ~80%, then crawl for drama
       const FAST = 16, SLOW = 8, TOTAL = FAST + SLOW;
       let step = 0, tid;
       const tick = () => {
         step++;
         const eased = 1 - Math.pow(1 - step / TOTAL, 3.0);
-        if (step >= TOTAL) { setDisplay(grade); setPhase(3); return; }
+        if (step >= TOTAL) {
+          setDisplay(grade);
+          setPhase(3);
+          // Trigger flash + shake on land
+          if (grade >= 9) {
+            setFlashing(true);
+            setTimeout(() => setFlashing(false), 600);
+            setShaking(true);
+            setTimeout(() => setShaking(false), 500);
+          }
+          return;
+        }
         setDisplay(isInt ? Math.floor(eased * grade) : Math.round(eased * grade * 2) / 2);
         tid = setTimeout(tick, step > FAST ? 200 : 38);
       };
@@ -284,8 +334,20 @@ export default function GradeReveal({ result, onDone }) {
         cursor: phase >= 2 ? "pointer" : "default",
         userSelect: "none",
         overflow: "hidden",
+        animation: shaking ? `screenShake 0.5s cubic-bezier(0.36,0.07,0.19,0.97) forwards` : "none",
       }}
     >
+
+      {/* Screen flash on grade land */}
+      {flashing && (
+        <div style={{
+          position: "absolute", inset: 0, pointerEvents: "none", zIndex: 10,
+          background: is10
+            ? "radial-gradient(ellipse 70% 50% at 50% 50%, rgba(201,168,76,0.7) 0%, rgba(201,168,76,0.2) 50%, transparent 80%)"
+            : "radial-gradient(ellipse 60% 45% at 50% 50%, rgba(255,255,255,0.5) 0%, transparent 70%)",
+          animation: "screenFlash 0.6s cubic-bezier(0.22,1,0.36,1) forwards",
+        }} />
+      )}
 
       {/* PSA 10: full-screen gold wash on land */}
       {is10 && phase >= 3 && (
@@ -417,6 +479,13 @@ export default function GradeReveal({ result, onDone }) {
           }} />
         ))}
 
+        {/* Starburst rays */}
+        {phase >= 3 && (
+          <div style={{ position: "absolute", top: "35%", left: "50%", width: 0, height: 0 }}>
+            <StarburstRays grade={grade} />
+          </div>
+        )}
+
         {/* Particle burst */}
         {phase >= 3 && (
           <div style={{ position: "absolute", top: "35%", left: "50%", width: 0, height: 0 }}>
@@ -436,6 +505,7 @@ export default function GradeReveal({ result, onDone }) {
           fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif",
           minWidth: is10 ? 260 : 220,
           transition: "color 0.2s ease",
+          filter: phase >= 3 ? "blur(0)" : phase >= 2 ? "blur(4px)" : "none",
           animation: phase === 3 ? "revealSlam 0.6s cubic-bezier(0.22,1,0.36,1) forwards" : "none",
           position: "relative",
         }}>
