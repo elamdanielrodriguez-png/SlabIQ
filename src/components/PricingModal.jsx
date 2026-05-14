@@ -168,6 +168,7 @@ const overlay = {
   background: "rgba(0,0,0,0.82)",
   backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
   display: "flex", alignItems: "flex-end", justifyContent: "center",
+  overscrollBehavior: "contain",
 };
 
 const sheet = {
@@ -176,5 +177,8 @@ const sheet = {
   borderRadius: "24px 24px 0 0",
   padding: "20px 20px 44px",
   width: "100%", maxWidth: 480,
+  maxHeight: "90vh",
+  overflowY: "auto",
+  overscrollBehavior: "contain",
   boxShadow: "0 -8px 48px rgba(0,0,0,0.65), 0 -1px 0 rgba(255,255,255,0.06)",
 };
