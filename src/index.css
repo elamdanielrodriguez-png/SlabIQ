@@ -128,6 +128,25 @@ button {
   from { width: 0; }
 }
 
+@keyframes scanLine {
+  0%   { top: 2%; opacity: 0; }
+  5%   { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { top: 98%; opacity: 0; }
+}
+
+@keyframes scanGlow {
+  0%, 100% { opacity: 0.5; }
+  50%       { opacity: 1; }
+}
+
+@keyframes zoneLabel {
+  0%   { opacity: 0; transform: translateY(4px); }
+  15%  { opacity: 1; transform: translateY(0); }
+  80%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
 @keyframes cornerBreathe {
   0%, 100% { opacity: 0.65; transform: scale(1); }
   50%       { opacity: 1;    transform: scale(1.06); }

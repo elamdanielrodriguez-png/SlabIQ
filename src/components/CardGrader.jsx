@@ -33,14 +33,16 @@ import { supabase } from "../lib/supabase";
 const FREE_GRADE_KEY = 'cgon_free_grades_used';
 const FREE_GRADE_LIMIT = 2;
 
-function LoadingOverlay({ message }) {
+function LoadingOverlay({ message, frontImageUrl }) {
   if (!message) return null;
   const mode = message.toLowerCase().includes("identify") ? "identify" : "grade";
-  return <LoadingOverlayInner key={mode} isIdentify={mode === "identify"} />;
+  return <LoadingOverlayInner key={mode} isIdentify={mode === "identify"} frontImageUrl={frontImageUrl} />;
 }
 
-function LoadingOverlayInner({ isIdentify }) {
-  const duration  = isIdentify ? 10000 : 33000;
+const ZONE_LABELS = ["CORNERS", "EDGES", "SURFACE", "CENTERING"];
+
+function LoadingOverlayInner({ isIdentify, frontImageUrl }) {
+  const duration    = isIdentify ? 10000 : 33000;
   const checkpoints = isIdentify
     ? ["Reading image", "Detecting card details", "Identifying set & variant", "Confirming match"]
     : ["Inspecting corners & edges", "Analyzing surface", "Fetching market data", "Computing grades"];
@@ -60,33 +62,106 @@ function LoadingOverlayInner({ isIdentify }) {
     return () => clearInterval(id);
   }, []);
 
-  const activeStep = pcts.findIndex(t => progress < t);
+  const activeStep  = pcts.findIndex(t => progress < t);
+  const zoneLabel   = !isIdentify && activeStep >= 0 && activeStep < 2 ? ZONE_LABELS[activeStep] : null;
+  const bracketColor = (done) => done ? "rgba(48,209,88,0.7)" : "rgba(201,168,76,0.55)";
+  const cornersDown  = progress >= pcts[0];
+  const bc           = bracketColor(cornersDown);
+  const bw           = 14;
 
   return (
     <div style={{
       position: "fixed", inset: 0,
-      background: "rgba(0,0,0,0.94)",
+      background: "rgba(0,0,0,0.96)",
       backdropFilter: "blur(24px)",
       WebkitBackdropFilter: "blur(24px)",
       zIndex: 500,
       display: "flex", flexDirection: "column",
       alignItems: "center", justifyContent: "center",
-      gap: 32,
+      gap: 0,
     }}>
-      <div style={{ position: "relative", width: 72, height: 72 }}>
-        <svg width="72" height="72" style={{ display: "block" }} className="cgon-spin">
-          <circle cx="36" cy="36" r="30" fill="none" stroke="rgba(201,168,76,0.12)" strokeWidth="3" />
-          <circle cx="36" cy="36" r="30" fill="none" stroke="#c9a84c" strokeWidth="3"
-            strokeDasharray="58 130" strokeLinecap="round" transform="rotate(-90 36 36)" />
-        </svg>
-        <div style={{
-          position: "absolute", inset: 0,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          color: "#c9a84c", fontSize: 11, fontWeight: 800, letterSpacing: "0.06em",
-        }}>AI</div>
-      </div>
 
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20, padding: "0 40px" }}>
+      {/* Card image with scan overlay */}
+      {frontImageUrl ? (
+        <div style={{
+          position: "relative",
+          width: 160, height: 224,
+          borderRadius: 10,
+          overflow: "hidden",
+          marginBottom: 28,
+          flexShrink: 0,
+        }}>
+          {/* Dimmed card photo */}
+          <img src={frontImageUrl} alt="" style={{
+            width: "100%", height: "100%", objectFit: "cover",
+            filter: "brightness(0.45) saturate(0.6)",
+            display: "block",
+          }} />
+
+          {/* Scan line */}
+          <div style={{
+            position: "absolute", left: 0, right: 0, height: 2,
+            background: "linear-gradient(90deg, transparent 0%, rgba(201,168,76,0.3) 10%, #c9a84c 50%, rgba(201,168,76,0.3) 90%, transparent 100%)",
+            boxShadow: "0 0 10px rgba(201,168,76,0.9), 0 0 28px rgba(201,168,76,0.4)",
+            animation: "scanLine 2.2s cubic-bezier(0.4,0,0.6,1) infinite",
+          }} />
+
+          {/* Below-scan reveal tint */}
+          <div style={{
+            position: "absolute", left: 0, right: 0, bottom: 0, height: "30%",
+            background: "linear-gradient(to top, rgba(201,168,76,0.04), transparent)",
+            pointerEvents: "none",
+          }} />
+
+          {/* Corner brackets */}
+          {[
+            { top: 7,  left: 7  },
+            { top: 7,  right: 7 },
+            { bottom: 7, left: 7  },
+            { bottom: 7, right: 7 },
+          ].map((pos, i) => (
+            <div key={i} style={{ position: "absolute", width: bw, height: bw, ...pos, transition: "border-color 0.5s ease" }}>
+              <div style={{
+                position: "absolute", inset: 0,
+                borderTop:    (i === 0 || i === 1) ? `1.5px solid ${bc}` : "none",
+                borderBottom: (i === 2 || i === 3) ? `1.5px solid ${bc}` : "none",
+                borderLeft:   (i === 0 || i === 2) ? `1.5px solid ${bc}` : "none",
+                borderRight:  (i === 1 || i === 3) ? `1.5px solid ${bc}` : "none",
+                boxShadow: cornersDown ? `0 0 6px rgba(48,209,88,0.4)` : `0 0 6px rgba(201,168,76,0.3)`,
+                transition: "all 0.5s ease",
+              }} />
+            </div>
+          ))}
+
+          {/* Zone label overlay */}
+          {zoneLabel && (
+            <div key={zoneLabel} style={{
+              position: "absolute", bottom: 10, left: 0, right: 0,
+              textAlign: "center",
+              color: "#c9a84c", fontSize: 9, fontWeight: 800, letterSpacing: "0.22em",
+              textShadow: "0 0 8px rgba(201,168,76,0.8)",
+              animation: "zoneLabel 2.2s ease-in-out both",
+            }}>{zoneLabel}</div>
+          )}
+        </div>
+      ) : (
+        /* Fallback spinner when no image */
+        <div style={{ position: "relative", width: 72, height: 72, marginBottom: 28 }}>
+          <svg width="72" height="72" style={{ display: "block" }} className="cgon-spin">
+            <circle cx="36" cy="36" r="30" fill="none" stroke="rgba(201,168,76,0.12)" strokeWidth="3" />
+            <circle cx="36" cy="36" r="30" fill="none" stroke="#c9a84c" strokeWidth="3"
+              strokeDasharray="58 130" strokeLinecap="round" transform="rotate(-90 36 36)" />
+          </svg>
+          <div style={{
+            position: "absolute", inset: 0,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            color: "#c9a84c", fontSize: 11, fontWeight: 800, letterSpacing: "0.06em",
+          }}>AI</div>
+        </div>
+      )}
+
+      {/* Title + progress + checkpoints */}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, padding: "0 40px" }}>
         <div style={{ color: "#fff", fontSize: 17, fontWeight: 600, letterSpacing: "-0.4px" }}>
           {isIdentify ? "Identifying Card" : "Analyzing Card"}
         </div>
@@ -1054,7 +1129,7 @@ export default function CardGrader() {
         </div>
       )}
 
-      <LoadingOverlay message={loadingMessage} />
+      <LoadingOverlay message={loadingMessage} frontImageUrl={(images.find(i => i.role === "front") ?? images[0])?.objectURL} />
       {toast && <Toast onDone={() => setToast(false)} />}
 
       {legalPage && <LegalModal page={legalPage} onClose={() => setLegalPage(null)} />}
