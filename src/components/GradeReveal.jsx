@@ -264,48 +264,140 @@ function GoldConfetti() {
   );
 }
 
-// Single judge scorecard
-function JudgeCard({ judge, score, visible, fromLeft }) {
-  const color = gradeColor(score);
-  const isGold = score >= 10;
+function DeliberatingDots() {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setN(d => (d + 1) % 4), 380);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <span style={{ color: "rgba(201,168,76,0.6)", letterSpacing: "0.08em", minWidth: 18, display: "inline-block" }}>
+      {"•".repeat(n)}
+    </span>
+  );
+}
+
+const JUDGE_SUBTITLES = ["tip condition", "border integrity", "print quality", "alignment"];
+
+function JudgeCard({ judge, score, visible, idx }) {
+  const [displayScore, setDisplayScore] = useState(0);
+  const [landed,       setLanded]       = useState(false);
+  const [flash,        setFlash]        = useState(false);
+
+  const color  = gradeColor(score);
+  const isGold = score >= 9.5;
   const isGood = score >= 9;
+
+  useEffect(() => {
+    if (!visible) return;
+    setFlash(true);
+    const t1 = setTimeout(() => setFlash(false), 500);
+    const t2 = setTimeout(() => setLanded(true), 520);
+    if (score == null) return () => { clearTimeout(t1); clearTimeout(t2); };
+    const t3 = setTimeout(() => {
+      let step = 0;
+      const STEPS = 22;
+      const id = setInterval(() => {
+        step++;
+        const eased = 1 - Math.pow(1 - step / STEPS, 2.8);
+        setDisplayScore(Math.round(eased * score * 10) / 10);
+        if (step >= STEPS) { clearInterval(id); setDisplayScore(score); }
+      }, 28);
+      return () => clearInterval(id);
+    }, 80);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+  }, [visible]);
 
   return (
     <div style={{
+      position: "relative",
       width: "100%",
-      background: isGold
-        ? "rgba(201,168,76,0.08)"
-        : isGood
-          ? "rgba(255,255,255,0.04)"
-          : "rgba(255,255,255,0.025)",
-      border: `1px solid ${isGold ? "rgba(201,168,76,0.4)" : isGood ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.07)"}`,
-      borderRadius: 14,
-      padding: "12px 16px",
+      background: visible
+        ? (isGold ? "rgba(201,168,76,0.1)" : isGood ? "rgba(255,255,255,0.055)" : "rgba(255,255,255,0.03)")
+        : "rgba(255,255,255,0.018)",
+      border: `1px solid ${
+        visible
+          ? (isGold ? "rgba(201,168,76,0.45)" : isGood ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.08)")
+          : "rgba(255,255,255,0.05)"
+      }`,
+      borderRadius: 16,
+      padding: "13px 16px",
       display: "flex", alignItems: "center", justifyContent: "space-between",
-      opacity: visible ? 1 : 0,
-      transform: visible ? "translateX(0)" : `translateX(${fromLeft ? "-60px" : "60px"})`,
-      transition: "opacity 0.45s cubic-bezier(0.22,1,0.36,1), transform 0.45s cubic-bezier(0.22,1,0.36,1)",
-      boxShadow: isGold && visible ? "0 2px 20px rgba(201,168,76,0.12)" : "none",
+      transform: visible ? "scale(1)" : "scale(0.96)",
+      transition: `background 0.5s ease, border-color 0.5s ease, transform 0.6s cubic-bezier(0.34,1.56,0.64,1), box-shadow ${flash ? "0.05s" : "0.55s"} ease`,
+      boxShadow: flash
+        ? `0 0 50px ${isGold ? "rgba(201,168,76,0.55)" : "rgba(255,255,255,0.22)"}, 0 0 0 1.5px ${isGold ? "rgba(201,168,76,0.35)" : "rgba(255,255,255,0.18)"}`
+        : landed && isGold ? "0 4px 28px rgba(201,168,76,0.18)" : "none",
+      overflow: "hidden",
+      minHeight: 64,
     }}>
-      {/* Left: icon + label */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <span style={{ fontSize: 16, opacity: 0.7 }}>{judge.icon}</span>
+
+      {/* Shimmer while waiting */}
+      {!visible && (
+        <div style={{
+          position: "absolute", inset: 0,
+          background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.025) 50%, transparent 100%)",
+          animation: "scanGlow 2s ease-in-out infinite",
+          animationDelay: `${idx * 0.3}s`,
+        }} />
+      )}
+
+      {/* Radial burst on reveal */}
+      {flash && (
+        <div style={{
+          position: "absolute", inset: 0, pointerEvents: "none",
+          background: isGold
+            ? "radial-gradient(ellipse at center, rgba(201,168,76,0.38) 0%, transparent 70%)"
+            : "radial-gradient(ellipse at center, rgba(255,255,255,0.18) 0%, transparent 70%)",
+          animation: "screenFlash 0.5s ease-out forwards",
+        }} />
+      )}
+
+      {/* Left: icon box + label */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 12,
+        opacity: visible ? 1 : 0,
+        transform: visible ? "translateX(0)" : "translateX(-10px)",
+        transition: "opacity 0.35s ease 0.1s, transform 0.35s ease 0.1s",
+      }}>
+        <div style={{
+          width: 40, height: 40, borderRadius: 11, flexShrink: 0,
+          background: isGold ? "rgba(201,168,76,0.15)" : "rgba(255,255,255,0.07)",
+          border: `1px solid ${isGold ? "rgba(201,168,76,0.3)" : "rgba(255,255,255,0.1)"}`,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 18,
+          boxShadow: landed && isGold ? "0 0 16px rgba(201,168,76,0.4)" : "none",
+          transition: "box-shadow 0.6s ease",
+        }}>{judge.icon}</div>
         <div>
-          <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase" }}>
-            {judge.label}
+          <div style={{
+            color: isGold ? "rgba(201,168,76,0.75)" : "rgba(255,255,255,0.4)",
+            fontSize: 10, fontWeight: 800, letterSpacing: "0.16em",
+            textTransform: "uppercase", marginBottom: 3,
+          }}>{judge.label}</div>
+          <div style={{ color: "rgba(255,255,255,0.18)", fontSize: 10 }}>
+            {JUDGE_SUBTITLES[idx]}
           </div>
         </div>
       </div>
 
-      {/* Right: score */}
+      {/* Score */}
       <div style={{
-        color, fontSize: 28, fontWeight: 800,
-        letterSpacing: "-1px", lineHeight: 1,
-        textShadow: isGold && visible ? "0 0 20px rgba(201,168,76,0.6)" : "none",
+        opacity: visible ? 1 : 0,
+        transition: "opacity 0.3s ease 0.15s",
+        color, fontSize: 46, fontWeight: 800,
+        letterSpacing: "-2.5px", lineHeight: 1,
         fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif",
-        minWidth: 48, textAlign: "right",
+        minWidth: 76, textAlign: "right",
+        textShadow: landed && isGold
+          ? "0 0 32px rgba(201,168,76,0.75), 0 0 64px rgba(201,168,76,0.3)"
+          : landed && isGood
+            ? "0 0 20px rgba(255,255,255,0.3)"
+            : "none",
+        transition: "opacity 0.3s ease 0.15s, text-shadow 0.6s ease",
+        animation: flash ? "gradeCountBlur 0.45s ease both" : "none",
       }}>
-        {score != null ? Number(score).toFixed(1) : "—"}
+        {score != null ? Number(displayScore).toFixed(1) : "—"}
       </div>
     </div>
   );
@@ -347,10 +439,10 @@ export default function GradeReveal({ result, onDone }) {
     const t3 = setTimeout(() => {
       setPhase(3);
       setJudgesRevealed(1);
-      setTimeout(() => setJudgesRevealed(2), 550);
-      setTimeout(() => setJudgesRevealed(3), 1100);
-      setTimeout(() => setJudgesRevealed(4), 1650);
-      setTimeout(() => setPhase(4), 2500);
+      setTimeout(() => setJudgesRevealed(2), 750);
+      setTimeout(() => setJudgesRevealed(3), 1500);
+      setTimeout(() => setJudgesRevealed(4), 2250);
+      setTimeout(() => setPhase(4), 3100);
       setTimeout(() => {
         setPhase(5);
         setGradeVisible(true);
@@ -360,8 +452,8 @@ export default function GradeReveal({ result, onDone }) {
           setShaking(true);
           setTimeout(() => setShaking(false), 500);
         }
-      }, 3300);
-    }, 1200);
+      }, 4000);
+    }, 1000);
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, []);
 
@@ -459,8 +551,10 @@ export default function GradeReveal({ result, onDone }) {
           transition: "opacity 0.45s ease",
           color: "rgba(255,255,255,0.28)", fontSize: 11, fontWeight: 700,
           letterSpacing: "0.2em", textTransform: "uppercase",
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
         }}>
-          The judges have deliberated
+          {phase >= 3 ? "Scores are in" : "Deliberating"}
+          {phase < 3 && <DeliberatingDots />}
         </div>
 
         {/* Judge cards */}
@@ -471,7 +565,7 @@ export default function GradeReveal({ result, onDone }) {
               judge={judge}
               score={getScore(judge.key)}
               visible={judgesRevealed > idx}
-              fromLeft={idx % 2 === 0}
+              idx={idx}
             />
           ))}
         </div>
