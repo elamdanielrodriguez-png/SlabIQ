@@ -553,6 +553,7 @@ function base64ToBlob(b64, mime = 'image/jpeg') {
 }
 
 const DEMO_RESULT = {
+  _isDemo: true,
   player: "Patrick Mahomes", year: "2020", set: "Panini Prizm", variant: "Silver Prizm", cardNumber: "120", sport: "Football", confidence: 98,
   psa: { grade: 9, label: "MINT" },
   bgs: { overall: 9.0, isBlackLabel: false, centering: 9.5, corners: 9.0, edges: 8.5, surface: 9.5 },

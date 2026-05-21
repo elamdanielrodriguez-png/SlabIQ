@@ -1375,20 +1375,31 @@ export default function GradeTab({ images, result, candidates, loading, error, o
         <button
           onClick={onSampleGrade}
           style={{
-            width: "100%", padding: "18px 0",
-            background: "rgba(201,168,76,0.07)",
-            border: "1px solid rgba(201,168,76,0.22)",
+            width: "100%", padding: "20px 18px",
+            background: "rgba(255,255,255,0.03)",
+            border: "1px solid rgba(255,255,255,0.1)",
             borderRadius: 18,
             cursor: "pointer", fontFamily: "inherit",
-            display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
+            display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+            textAlign: "left",
           }}
         >
-          <span style={{ color: "#c9a84c", fontSize: 15, fontWeight: 700, letterSpacing: "-0.2px" }}>
-            See a live demo grade →
-          </span>
-          <span style={{ color: "rgba(255,255,255,0.28)", fontSize: 12 }}>
-            Watch the full reveal — Mahomes 2020 Silver Prizm
-          </span>
+          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{
+                background: "rgba(201,168,76,0.15)", border: "1px solid rgba(201,168,76,0.3)",
+                color: "#c9a84c", fontSize: 9, fontWeight: 800, letterSpacing: "0.12em",
+                textTransform: "uppercase", padding: "3px 8px", borderRadius: 6,
+              }}>Demo</span>
+              <span style={{ color: "rgba(255,255,255,0.55)", fontSize: 13, fontWeight: 600 }}>
+                See what a grade looks like
+              </span>
+            </div>
+            <span style={{ color: "rgba(255,255,255,0.22)", fontSize: 11 }}>
+              Mahomes 2020 Prizm Silver — full reveal, no card needed
+            </span>
+          </div>
+          <span style={{ color: "rgba(255,255,255,0.2)", fontSize: 20, flexShrink: 0 }}>›</span>
         </button>
       )}
 
@@ -1527,6 +1538,29 @@ export default function GradeTab({ images, result, candidates, loading, error, o
       {/* Results */}
       {result && (
         <>
+          {/* Demo banner */}
+          {result._isDemo && (
+            <div style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+              background: "rgba(201,168,76,0.08)", border: "1px solid rgba(201,168,76,0.25)",
+              borderRadius: 14, padding: "12px 16px",
+            }}>
+              <div>
+                <div style={{ color: "#c9a84c", fontSize: 12, fontWeight: 700, letterSpacing: "-0.1px", marginBottom: 2 }}>
+                  Demo grade — not a real card
+                </div>
+                <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 11, lineHeight: 1.4 }}>
+                  Upload your own card above to get an actual grade
+                </div>
+              </div>
+              <div style={{
+                background: "rgba(201,168,76,0.15)", border: "1px solid rgba(201,168,76,0.3)",
+                color: "#c9a84c", fontSize: 9, fontWeight: 800, letterSpacing: "0.12em",
+                textTransform: "uppercase", padding: "4px 10px", borderRadius: 6, flexShrink: 0,
+              }}>Demo</div>
+            </div>
+          )}
+
           {/* Confidence + Card identity in one row */}
           <div className="result-card-0" style={{ ...card, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
