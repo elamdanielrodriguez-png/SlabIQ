@@ -685,6 +685,17 @@ function sanitizeGradingResponse(rawText, measuredCentering) {
         psaWeakest >= 6.0 ?  6 : 5;
       psaGrade = Math.min(psaGrade, psaCapFromWeakest);
 
+      // Also cap PSA by centering — BGS centering maps directly to PSA centering limits
+      // BGS 9.5+ = ≤55/45 → PSA 10 allowed | BGS 9.0 = ≤60/40 → PSA 9 max | etc.
+      const psaCenteringCap =
+        c == null ? 10 :
+        c >= 9.5  ? 10 :
+        c >= 9.0  ?  9 :
+        c >= 8.5  ?  8 :
+        c >= 8.0  ?  7 :
+        c >= 7.5  ?  6 : 5;
+      psaGrade = Math.min(psaGrade, psaCenteringCap);
+
       // Secondary cap: widespread obvious flaws (e.g. PSA 2 vintage with damage everywhere)
       const totalObvious = parsed._totalObvious ?? 0;
       const totalVisible = parsed._totalVisible ?? 0;
