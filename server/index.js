@@ -691,9 +691,9 @@ function sanitizeGradingResponse(rawText, measuredCentering) {
         c == null ? 10 :
         c >= 9.5  ? 10 :
         c >= 9.0  ?  9 :
-        c >= 8.5  ?  8 :
-        c >= 8.0  ?  7 :
-        c >= 7.5  ?  6 : 5;
+        c >= 8.0  ?  8 :
+        c >= 7.5  ?  7 :
+        c >= 7.0  ?  6 : 5;
       psaGrade = Math.min(psaGrade, psaCenteringCap);
 
       // Secondary cap: widespread obvious flaws (e.g. PSA 2 vintage with damage everywhere)
