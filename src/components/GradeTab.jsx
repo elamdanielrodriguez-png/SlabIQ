@@ -1224,7 +1224,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
                 Know If You Should<br />Grade — Or Not
               </div>
               <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 14, lineHeight: 1.5, marginBottom: 22 }}>
-                Get a PSA &amp; BGS estimate in 30 seconds — free to try, no account needed.
+                Get a PSA, BGS, SGC &amp; CGC estimate in 30 seconds — free to try, no account needed.
               </div>
             </div>
 
