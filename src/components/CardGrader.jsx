@@ -552,6 +552,64 @@ function base64ToBlob(b64, mime = 'image/jpeg') {
   return new Blob([arr], { type: mime });
 }
 
+const DEMO_RESULT = {
+  player: "Patrick Mahomes", year: "2020", set: "Panini Prizm", variant: "Silver Prizm", cardNumber: "120", sport: "Football", confidence: 98,
+  psa: { grade: 9, label: "MINT" },
+  bgs: { overall: 9.0, isBlackLabel: false, centering: 9.5, corners: 9.0, edges: 8.5, surface: 9.5 },
+  sgc: { grade: 9, label: "MINT" },
+  cgc: { grade: 9, label: "MINT" },
+  zones: [
+    { zone: "corner-TL", psa10Match: "matches", observation: "Sharp 90° point with full silver color to the very tip", severity: null, description: null },
+    { zone: "corner-TR", psa10Match: "matches", observation: "Clean sharp corner with full color hold", severity: null, description: null },
+    { zone: "corner-BL", psa10Match: "differs", observation: "Microscopic softening at the tip under extreme zoom — barely detectable", severity: "microscopic", description: "soft tip" },
+    { zone: "corner-BR", psa10Match: "matches", observation: "Sharp point with full color, no rounding", severity: null, description: null },
+    { zone: "edge-top", psa10Match: "matches", observation: "Razor-clean straight border with zero interruption", severity: null, description: null },
+    { zone: "edge-right", psa10Match: "differs", observation: "One barely detectable microscopic nick at the lower third — needs loupe to confirm", severity: "microscopic", description: "nick" },
+    { zone: "edge-bottom", psa10Match: "matches", observation: "Clean edge throughout, full color", severity: null, description: null },
+    { zone: "edge-left", psa10Match: "matches", observation: "Clean razor edge, no chips or wear", severity: null, description: null },
+  ],
+  surfaceFlaws: [],
+  positives: ["Pristine gloss with no scratches or haze", "Three perfectly sharp gem-mint corners", "Vibrant silver prizm pattern fully intact"],
+  negatives: ["Microscopic soft tip on corner-BL", "Microscopic nick on edge-right"],
+  verdict: "Excellent card held back from gem mint by two microscopic issues: a barely detectable soft tip on corner-BL and a loupe-only nick on edge-right. Surface and three remaining corners are gem-mint quality. Solid PSA 9 — submit if the math works.",
+  defects: [
+    { label: "Soft tip BL", description: "Microscopic softening at bottom-left corner tip, visible only under extreme zoom.", confidence: 82, x: 0.04, y: 0.93 },
+  ],
+  market: {
+    raw: 45,
+    graded: {
+      psa7: 60, psa8: 90, psa9: 130, psa10: 310,
+      bgs7: 52, bgs8: 78, bgs9: 110, bgs9_5: 240, bgs10: 580, bgsBlackLabel: 2200,
+      sgc8: 80, sgc9: 120, sgc9_5: 185, sgc10: 270,
+      cgc8: 90, cgc9: 130, cgc9_5: 310, cgc10: 680,
+    },
+    trend: "rising", trendPercent: 14,
+    aiAnalysis: "The 2020 Prizm Silver Prizm Mahomes rookie remains one of the most liquid modern cards in the hobby. PSA 9 copies trade consistently in the $120–$140 range with PSA 10 demand staying strong above $300. Rising CGC adoption makes CGC 9.5 (PSA 10 equivalent) an attractive arbitrage play — CGC grades harder but commands PSA 10 prices.",
+  },
+  submission: {
+    psaRecommended: true, bgsRecommended: false, sgcRecommended: true, cgcRecommended: true,
+    psaTier: "Value", bgsTier: "Standard", sgcTier: "Standard", cgcTier: "Economy",
+    psaCost: 33, bgsCost: 25, sgcCost: 25, cgcCost: 20,
+    psaExpectedGrade: 9, bgsExpectedGrade: 9.0, sgcExpectedGrade: 9, cgcExpectedGrade: 9,
+    psaExpectedValue: 130, bgsExpectedValue: 110, sgcExpectedValue: 120, cgcExpectedValue: 130,
+    psaRoi: 116, bgsRoi: 89, sgcRoi: 111, cgcRoi: 144,
+    analysis: "PSA 9 at $33 nets $52 profit on a $45 raw card — 116% ROI, well above the 25% threshold. CGC is the best pick at $20 submission cost with the same $130 expected value and 144% ROI if it lands a 9. BGS is marginal; the $110 expected value at BGS 9 minus $25 cost still returns 89% but PSA and CGC are stronger plays.",
+  },
+  popData: {
+    psa: { total: 61200, gemRate: 34, distribution: [
+      { grade: 10, label: "GEM MT", count: 20808 }, { grade: 9, label: "MINT", count: 18360 },
+      { grade: 8, label: "NM-MT", count: 9792 }, { grade: 7, label: "NM", count: 4896 },
+      { grade: 6, label: "EX-MT", count: 4284 }, { grade: 5, label: "EX", count: 3060 },
+    ]},
+    bgs: { total: 5800, gemRate: 23, distribution: [
+      { grade: "BL", label: "Black Label", count: 46 }, { grade: 10, label: "Pristine", count: 232 },
+      { grade: 9.5, label: "Gem Mint", count: 1334 }, { grade: 9, label: "Mint", count: 1740 },
+      { grade: 8.5, label: "NM-MT+", count: 1160 }, { grade: 8, label: "NM-MT", count: 870 },
+      { grade: 7.5, label: "NM+", count: 290 }, { grade: 7, label: "NM", count: 128 },
+    ]},
+  },
+};
+
 export default function CardGrader() {
   const [activeTab, setActiveTab] = useState("grade");
   const [gradeMode, setGradeMode] = useState("single");
@@ -1069,6 +1127,7 @@ export default function CardGrader() {
                   selectedModel={selectedModel}
                   onSelectModel={setSelectedModel}
                   onRevealAgain={result ? () => setShowReveal(true) : undefined}
+                  onSampleGrade={() => { setResult(DEMO_RESULT); setVisitedTabs(new Set(['grade'])); setShowReveal(true); }}
                   onGradeAnother={resetGrade}
                   onOpenCamera={() => setCameraOpen(true)}
                   onSwitchTab={switchTab}

@@ -980,7 +980,7 @@ function applyDismissals(result, dismissedDefectIndices) {
   };
 }
 
-export default function GradeTab({ images, result, candidates, loading, error, onAddImages, onRemoveImage, onSetRole, onGrade, onConfirmCandidate, onSearch, onUpdateCentering, gradesUsed = 0, gradesTotal = 2, isLoggedIn = false, planName = 'free', onUpgrade, selectedModel = 'claude-sonnet-4-6', onSelectModel, onRevealAgain, onGradeAnother, onOpenCamera, onSwitchTab }) {
+export default function GradeTab({ images, result, candidates, loading, error, onAddImages, onRemoveImage, onSetRole, onGrade, onConfirmCandidate, onSearch, onUpdateCentering, gradesUsed = 0, gradesTotal = 2, isLoggedIn = false, planName = 'free', onUpgrade, selectedModel = 'claude-sonnet-4-6', onSelectModel, onRevealAgain, onGradeAnother, onOpenCamera, onSwitchTab, onSampleGrade }) {
   const [gradePressed, setGradePressed] = useState(false);
   const fileInputRef = useRef(null);
   const [dismissedNegs, setDismissedNegs] = useState([]);
@@ -1370,86 +1370,26 @@ export default function GradeTab({ images, result, candidates, loading, error, o
         </div>
       )}
 
-      {/* Sample grade result — shown only on empty state */}
-      {images.length === 0 && !result && !candidates && !loading && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-
-          {/* Identity row */}
-          <div style={{ ...card, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ color: "#fff", fontSize: 17, fontWeight: 700, letterSpacing: "-0.4px", marginBottom: 4 }}>
-                Patrick Mahomes
-              </div>
-              <div style={{ color: "rgba(255,255,255,0.38)", fontSize: 12, letterSpacing: "-0.1px" }}>
-                2020  ·  Panini Prizm  ·  Base  ·  #120
-              </div>
-            </div>
-            <div style={{ textAlign: "center", flexShrink: 0 }}>
-              <div style={{ color: "rgba(255,255,255,0.15)", fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 3 }}>Preview</div>
-              <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 13, fontWeight: 700 }}>82%</div>
-            </div>
-          </div>
-
-          {/* Grade hero */}
-          <div style={card}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1px 1fr 1px 1fr 1px 1fr" }}>
-              <GradeHalf label="PSA" grade={8} sub="NM-MT" side="left" compact />
-              <div style={{ background: "rgba(255,255,255,0.06)" }} />
-              <GradeHalf label="BGS" grade={8.5} sub="Beckett" compact />
-              <div style={{ background: "rgba(255,255,255,0.06)" }} />
-              <GradeHalf label="SGC" grade={8} sub="NM-MT" compact />
-              <div style={{ background: "rgba(255,255,255,0.06)" }} />
-              <GradeHalf label="CGC" grade={8} sub="NM-MT" side="right" compact />
-            </div>
-            <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", marginTop: 22, paddingTop: 18, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
-              {[
-                { label: "Centering", value: 9.0 },
-                { label: "Corners",   value: 8.5 },
-                { label: "Edges",     value: 8.5 },
-                { label: "Surface",   value: 9.0 },
-              ].map(({ label, value }) => (
-                <div key={label} style={{ textAlign: "center" }}>
-                  <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>{label}</div>
-                  <SubgradeNumber value={value} />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Verdict */}
-          <div style={card}>
-            <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 9, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 10 }}>Expert Verdict</div>
-            <p style={{ color: "rgba(255,255,255,0.5)", margin: 0, fontSize: 14, lineHeight: 1.75, letterSpacing: "-0.1px" }}>
-              Visible whitening on corner-TR and corner-BL. Edge-right shows a faint chip not present on the PSA 10 reference. Surface is clean. Strong candidate for PSA 8 — not gem mint.
-            </p>
-          </div>
-
-          {/* Market + ROI */}
-          <div style={card}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-              {[
-                { label: "Raw",     value: "$18",  color: "#fff" },
-                { label: "PSA 8",   value: "$48",  color: "rgba(255,255,255,0.65)" },
-                { label: "PSA 10",  value: "$220", color: "#c9a84c" },
-                { label: "PSA Fee", value: "$33",  color: "#ff453a" },
-              ].map(({ label, value, color }) => (
-                <div key={label} style={{ textAlign: "center" }}>
-                  <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>{label}</div>
-                  <div style={{ color, fontSize: 16, fontWeight: 700, letterSpacing: "-0.5px" }}>{value}</div>
-                </div>
-              ))}
-            </div>
-            <div style={{
-              background: "rgba(255,69,58,0.08)", border: "1px solid rgba(255,69,58,0.2)",
-              borderRadius: 10, padding: "8px 14px",
-              display: "flex", justifyContent: "space-between", alignItems: "center",
-            }}>
-              <span style={{ color: "#ff453a", fontSize: 13, fontWeight: 700 }}>Don't Submit</span>
-              <span style={{ color: "rgba(255,255,255,0.3)", fontSize: 11 }}>$48 − $18 − $33 PSA = <span style={{ color: "#ff453a", fontWeight: 600 }}>−$3</span></span>
-            </div>
-          </div>
-
-        </div>
+      {/* Demo CTA — shown only on empty state */}
+      {images.length === 0 && !result && !candidates && !loading && onSampleGrade && (
+        <button
+          onClick={onSampleGrade}
+          style={{
+            width: "100%", padding: "18px 0",
+            background: "rgba(201,168,76,0.07)",
+            border: "1px solid rgba(201,168,76,0.22)",
+            borderRadius: 18,
+            cursor: "pointer", fontFamily: "inherit",
+            display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
+          }}
+        >
+          <span style={{ color: "#c9a84c", fontSize: 15, fontWeight: 700, letterSpacing: "-0.2px" }}>
+            See a live demo grade →
+          </span>
+          <span style={{ color: "rgba(255,255,255,0.28)", fontSize: 12 }}>
+            Watch the full reveal — Mahomes 2020 Silver Prizm
+          </span>
+        </button>
       )}
 
 
