@@ -36,7 +36,7 @@ function AnimPct({ value, sign }) {
   return <span>{display == null ? "—" : `${sign}${display}%`}</span>;
 }
 
-export default function MarketTab({ result }) {
+export default function MarketTab({ result, popLoading }) {
   const { popData, market, psa, bgs, player, year, set, variant } = result;
   const psaGrade = psa?.grade;
   const bgsGrade = bgs?.overall;
@@ -72,6 +72,7 @@ export default function MarketTab({ result }) {
           maxCount={psaMax}
           isPsa
           isReal={popData?.psa?.isReal === true}
+          isLoading={popLoading && !popData?.psa?.isReal}
           isNumbered={isNumbered}
           popUrl={psaPopUrl}
         />
@@ -161,7 +162,7 @@ export default function MarketTab({ result }) {
   );
 }
 
-function PopPanel({ title, subtitle, total, gemRate, gemLabel, distribution, highlightGrade, isBlackLabel, maxCount, isPsa, isReal, isNumbered, popUrl }) {
+function PopPanel({ title, subtitle, total, gemRate, gemLabel, distribution, highlightGrade, isBlackLabel, maxCount, isPsa, isReal, isLoading, isNumbered, popUrl }) {
   return (
     <div style={card}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
@@ -183,7 +184,10 @@ function PopPanel({ title, subtitle, total, gemRate, gemLabel, distribution, hig
       </div>
 
       <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 11, marginBottom: isNumbered ? 4 : 14 }}>
-        {total?.toLocaleString()} graded · <span style={{ color: isReal ? "#30d158" : "rgba(255,255,255,0.15)" }}>{isReal ? "live PSA data" : "AI-estimated"}</span>
+        {total?.toLocaleString()} graded · {isLoading
+          ? <span style={{ color: "#c9a84c", opacity: 0.7 }}>fetching live data…</span>
+          : <span style={{ color: isReal ? "#30d158" : "rgba(255,255,255,0.15)" }}>{isReal ? "live PSA data" : "AI-estimated"}</span>
+        }
       </div>
       {isNumbered && (
         <div style={{ color: "rgba(255,165,0,0.6)", fontSize: 10, marginBottom: 14, lineHeight: 1.4 }}>

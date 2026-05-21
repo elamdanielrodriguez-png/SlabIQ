@@ -564,6 +564,7 @@ export default function CardGrader() {
   );
   const [selectedModel, setSelectedModel] = useState('claude-opus-4-7');
   const [purchaseSuccess, setPurchaseSuccess] = useState(null); // null | 'polling' | 'confirmed'
+  const [popLoading, setPopLoading] = useState(false);
 
   // Restore images that were in-flight when OAuth / Stripe redirect happened
   useEffect(() => {
@@ -891,6 +892,24 @@ export default function CardGrader() {
         posthog.capture('grade_completed', { psa_grade: parsed.psa?.grade, player: parsed.player, year: parsed.year, set: parsed.set });
         setToast(true);
         setShowReveal(true);
+
+        // Fetch real PSA pop data in background — updates MarketTab when it lands
+        if (parsed.player) {
+          setPopLoading(true);
+          fetch('/api/pop', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ player: parsed.player, year: parsed.year, set: parsed.set, variant: parsed.variant }),
+          })
+            .then(r => r.ok ? r.json() : null)
+            .then(popData => {
+              if (popData && !popData.error) {
+                setResult(r => r ? { ...r, popData: { ...r.popData, psa: popData } } : r);
+              }
+            })
+            .catch(() => {})
+            .finally(() => setPopLoading(false));
+        }
         // Track usage
         if (usingDeviceFree) {
           const next = freeGradesUsed + 1;
@@ -1053,7 +1072,7 @@ export default function CardGrader() {
               )}
             </div>
           )}
-          {activeTab === "market" && result && <MarketTab result={result} />}
+          {activeTab === "market" && result && <MarketTab result={result} popLoading={popLoading} />}
           {activeTab === "submit" && result && <SubmitTab result={result} />}
           {activeTab === "history" && (
             <HistoryPanel

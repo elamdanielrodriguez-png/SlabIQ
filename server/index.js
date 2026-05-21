@@ -1113,11 +1113,6 @@ app.post('/api/grade', async (req, res) => {
       { type: 'text', text: confirmedPrefix + GRADING_PROMPT },
     ];
 
-    // Kick off real pop fetch in parallel with AI grading (both are slow, run together)
-    const popFetchPromise = confirmedCard?.player
-      ? fetchRealPopData(confirmedCard.player, confirmedCard.year, confirmedCard.set, confirmedCard.variant)
-      : Promise.resolve(null);
-
     const message = await anthropic.messages.create({
       model: gradingModel,
       max_tokens: 4000,
@@ -1320,25 +1315,6 @@ app.post('/api/grade', async (req, res) => {
       console.warn('Submission sync failed:', e.message);
     }
 
-    // Inject real PSA pop data if available — cap wait at 10s so we don't hold the response
-    try {
-      const realPop = await Promise.race([
-        popFetchPromise,
-        new Promise(resolve => setTimeout(() => resolve(null), 10000)),
-      ]);
-      if (realPop) {
-        const parsed = JSON.parse(text);
-        if (!parsed.popData) parsed.popData = {};
-        parsed.popData.psa = { ...realPop, isReal: true };
-        text = JSON.stringify(parsed);
-        console.log('Real PSA pop data injected');
-      } else {
-        console.log('Pop fetch timed out or unavailable — using AI estimate');
-      }
-    } catch (e) {
-      console.warn('Pop injection failed:', e.message);
-    }
-
     // debug
     try {
       const rawParsed = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] ?? '{}');
@@ -1363,6 +1339,19 @@ app.post('/api/grade', async (req, res) => {
   } catch (err) {
     console.error('Anthropic API error:', err.message);
     res.status(502).json({ error: 'Failed to grade card. Please try again.' });
+  }
+});
+
+// Real PSA population data (separate from grading so grade reveals immediately)
+app.post('/api/pop', async (req, res) => {
+  const { player, year, set, variant } = req.body ?? {};
+  if (!player) return res.status(400).json({ error: 'player required' });
+  try {
+    const data = await fetchRealPopData(player, year, set, variant);
+    if (!data) return res.status(404).json({ error: 'No pop data found' });
+    res.json({ ...data, isReal: true });
+  } catch (err) {
+    res.status(502).json({ error: err.message });
   }
 });
 
