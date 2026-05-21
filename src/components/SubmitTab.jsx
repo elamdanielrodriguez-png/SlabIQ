@@ -57,6 +57,7 @@ export default function SubmitTab({ result }) {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           <TierGuide
             company="PSA"
+            activeTier={submission?.psaTier}
             tiers={[
               { name: "Value", cost: "$22", note: "Under $500" },
               { name: "Regular", cost: "$75", note: "Under $1,500" },
@@ -68,6 +69,7 @@ export default function SubmitTab({ result }) {
           />
           <TierGuide
             company="BGS"
+            activeTier={submission?.bgsTier}
             tiers={[
               { name: "Standard", cost: "$25", note: "Under $499" },
               { name: "Express", cost: "$40", note: "Under $999" },
@@ -213,27 +215,35 @@ function MetricRow({ label, value, bold, highlight, blackLabel }) {
   );
 }
 
-function TierGuide({ company, tiers }) {
+function TierGuide({ company, tiers, activeTier }) {
   return (
     <div>
       <div style={{ color: "rgba(255,255,255,0.25)", fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>
         {company}
       </div>
-      {tiers.map((t) => (
-        <div key={t.name} style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          padding: "8px 0",
-          borderBottom: "1px solid rgba(255,255,255,0.05)",
-        }}>
-          <div>
-            <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 12, fontWeight: 500, letterSpacing: "-0.1px" }}>{t.name}</div>
-            <div style={{ color: "rgba(255,255,255,0.22)", fontSize: 11, marginTop: 1 }}>{t.note}</div>
+      {tiers.map((t) => {
+        const active = activeTier && t.name.toLowerCase() === activeTier.toLowerCase();
+        return (
+          <div key={t.name} style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: "7px 10px",
+            margin: "3px 0",
+            borderRadius: 8,
+            border: active ? "1px solid rgba(201,168,76,0.5)" : "1px solid transparent",
+            background: active ? "rgba(201,168,76,0.08)" : "transparent",
+          }}>
+            <div>
+              <div style={{ color: active ? "#c9a84c" : "rgba(255,255,255,0.6)", fontSize: 12, fontWeight: active ? 700 : 500, letterSpacing: "-0.1px" }}>
+                {t.name} {active && <span style={{ fontSize: 10, opacity: 0.7 }}>← your card</span>}
+              </div>
+              <div style={{ color: "rgba(255,255,255,0.22)", fontSize: 11, marginTop: 1 }}>{t.note}</div>
+            </div>
+            <div style={{ color: active ? "#c9a84c" : "rgba(201,168,76,0.6)", fontWeight: active ? 700 : 600, fontSize: 13 }}>{t.cost}</div>
           </div>
-          <div style={{ color: "#c9a84c", fontWeight: 600, fontSize: 13 }}>{t.cost}</div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
