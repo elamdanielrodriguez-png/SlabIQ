@@ -352,7 +352,7 @@ function CenteringEditor({ imageURL, initialLines, onConfirm, onClose }) {
           { label: 'L/R', val: `${leftPct}/${rightPct}` },
           { label: 'T/B', val: `${topPct}/${botPct}` },
           { label: 'Worst', val: `${worst}/${100 - worst}` },
-          { label: 'PSA', val: psaLabel, color: gradeColor },
+          { label: 'PSA Max', val: psaLabel, color: gradeColor },
         ].map(({ label, val, color }) => (
           <div key={label} style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: '8px 4px', textAlign: 'center' }}>
             <div style={{ color: 'rgba(255,255,255,0.25)', fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>{label}</div>
@@ -1674,9 +1674,10 @@ export default function GradeTab({ images, result, candidates, loading, error, o
               );
             })()}
 
-            {/* Centering breakdown — only shown when user has manually set centering */}
+            {/* Centering breakdown — shown for user-confirmed or auto-detected centering */}
             {(() => {
-              const raw = userCentering;
+              const raw = userCentering ?? frontImg?.centering ?? null;
+              const isAutoDetected = !userConfirmed && raw != null;
               if (!raw) return null;
               const f = raw.front ?? raw;
               const b = raw.back ?? null;
@@ -1699,7 +1700,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
               return (
                 <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", marginTop: 18, paddingTop: 16 }}>
                   <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 9, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>
-                    Centering — Measured
+                    {isAutoDetected ? "Centering — AI Detected" : "Centering — Measured"}
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
 

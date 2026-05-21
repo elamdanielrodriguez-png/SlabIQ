@@ -37,7 +37,7 @@ function AnimPct({ value, sign }) {
 }
 
 export default function MarketTab({ result }) {
-  const { popData, market, psa, bgs } = result;
+  const { popData, market, psa, bgs, player, year, set, variant } = result;
   const psaGrade = psa?.grade;
   const bgsGrade = bgs?.overall;
   const bgsBlackLabel = bgs?.isBlackLabel === true;
@@ -50,6 +50,11 @@ export default function MarketTab({ result }) {
 
   const psaMax = Math.max(...(popData?.psa?.distribution?.map((d) => d.count) ?? [1]));
   const bgsMax = Math.max(...(popData?.bgs?.distribution?.map((d) => d.count) ?? [1]));
+
+  const isNumbered = typeof variant === "string" && variant.includes("/");
+  const psaPopUrl = [player, year, set].filter(Boolean).length > 0
+    ? `https://www.psacard.com/pop/index/searchresults?name=${encodeURIComponent([player, year, set].filter(Boolean).join(" "))}`
+    : null;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -66,6 +71,8 @@ export default function MarketTab({ result }) {
           highlightGrade={psaGrade}
           maxCount={psaMax}
           isPsa
+          isNumbered={isNumbered}
+          popUrl={psaPopUrl}
         />
         <PopPanel
           title="BGS"
@@ -77,6 +84,7 @@ export default function MarketTab({ result }) {
           highlightGrade={bgsGrade}
           isBlackLabel={bgsBlackLabel}
           maxCount={bgsMax}
+          isNumbered={isNumbered}
         />
       </div>
 
@@ -152,12 +160,19 @@ export default function MarketTab({ result }) {
   );
 }
 
-function PopPanel({ title, subtitle, total, gemRate, gemLabel, distribution, highlightGrade, isBlackLabel, maxCount, isPsa }) {
+function PopPanel({ title, subtitle, total, gemRate, gemLabel, distribution, highlightGrade, isBlackLabel, maxCount, isPsa, isNumbered, popUrl }) {
   return (
     <div style={card}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
         <div>
-          <div style={{ color: "#fff", fontSize: 15, fontWeight: 600, letterSpacing: "-0.3px" }}>{title}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div style={{ color: "#fff", fontSize: 15, fontWeight: 600, letterSpacing: "-0.3px" }}>{title}</div>
+            {popUrl && (
+              <a href={popUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 10, color: "rgba(201,168,76,0.55)", textDecoration: "none", letterSpacing: "0.02em" }}>
+                pop ↗
+              </a>
+            )}
+          </div>
           <div style={{ color: "rgba(255,255,255,0.25)", fontSize: 11, marginTop: 1 }}>{subtitle}</div>
         </div>
         <div style={{ textAlign: "right" }}>
@@ -166,9 +181,14 @@ function PopPanel({ title, subtitle, total, gemRate, gemLabel, distribution, hig
         </div>
       </div>
 
-      <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 11, marginBottom: 14 }}>
-        {total?.toLocaleString()} graded
+      <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 11, marginBottom: isNumbered ? 4 : 14 }}>
+        {total?.toLocaleString()} graded · <span style={{ color: "rgba(255,255,255,0.15)" }}>AI-estimated</span>
       </div>
+      {isNumbered && (
+        <div style={{ color: "rgba(255,165,0,0.6)", fontSize: 10, marginBottom: 14, lineHeight: 1.4 }}>
+          Numbered card — actual pop may be lower than estimated
+        </div>
+      )}
 
       {distribution?.map((d) => {
         const isBLRow = d.grade === "BL";

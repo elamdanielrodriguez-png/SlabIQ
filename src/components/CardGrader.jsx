@@ -927,7 +927,7 @@ export default function CardGrader() {
         borderBottom: "1px solid rgba(255,255,255,0.07)",
       }}>
         <div style={{
-          maxWidth: 700,
+          maxWidth: 900,
           margin: "0 auto",
           padding: "0 20px",
           height: 52,
@@ -987,7 +987,7 @@ export default function CardGrader() {
       </header>
 
       {/* Main content */}
-      <main style={{ maxWidth: 700, margin: "0 auto", padding: "20px 16px 148px" }}>
+      <main style={{ maxWidth: 900, margin: "0 auto", padding: "20px 16px 148px" }}>
         <div key={tabKey} className="anim-fade-up">
           {activeTab === "grade" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
