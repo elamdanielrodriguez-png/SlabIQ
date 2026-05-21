@@ -1193,22 +1193,24 @@ export default function GradeTab({ images, result, candidates, loading, error, o
             }} />
 
             {/* Mock grade badges */}
-            <div style={{ display: "flex", justifyContent: "center", gap: 14, marginBottom: 28, position: "relative" }}>
+            <div style={{ display: "flex", justifyContent: "center", gap: 10, marginBottom: 28, position: "relative" }}>
               {[
                 { company: "PSA", grade: "10", sub: "GEM MT" },
                 { company: "BGS", grade: "10", sub: "PRISTINE" },
+                { company: "SGC", grade: "10", sub: "PRISTINE" },
+                { company: "CGC", grade: "9.5", sub: "GEM MINT" },
               ].map(({ company, grade, sub }, idx) => (
                 <div key={company} className={`hero-float-${idx}`} style={{
                   background: "linear-gradient(160deg, rgba(32,28,16,0.98) 0%, rgba(18,18,20,0.99) 100%)",
                   border: "1px solid rgba(201,168,76,0.42)",
-                  borderRadius: 20,
-                  padding: "18px 26px",
-                  minWidth: 105,
+                  borderRadius: 18,
+                  padding: "14px 16px",
+                  minWidth: 72,
                   boxShadow: "0 10px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(201,168,76,0.1), inset 0 1px 0 rgba(255,255,255,0.1)",
                 }}>
-                  <div style={{ color: "rgba(201,168,76,0.5)", fontSize: 9, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 8 }}>{company}</div>
-                  <div style={{ color: "#c9a84c", fontSize: 52, fontWeight: 800, lineHeight: 1, letterSpacing: "-3px", textShadow: "0 0 40px rgba(201,168,76,0.85), 0 0 80px rgba(201,168,76,0.3)" }}>{grade}</div>
-                  <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 9, fontWeight: 600, letterSpacing: "0.09em", textTransform: "uppercase", marginTop: 8 }}>{sub}</div>
+                  <div style={{ color: "rgba(201,168,76,0.5)", fontSize: 8, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 6 }}>{company}</div>
+                  <div style={{ color: "#c9a84c", fontSize: 38, fontWeight: 800, lineHeight: 1, letterSpacing: "-2px", textShadow: "0 0 40px rgba(201,168,76,0.85), 0 0 80px rgba(201,168,76,0.3)" }}>{grade}</div>
+                  <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 8, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginTop: 6 }}>{sub}</div>
                 </div>
               ))}
             </div>
