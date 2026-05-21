@@ -11,8 +11,28 @@ import { existsSync, readFileSync } from 'fs';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const app = express();
+app.set('trust proxy', 1); // trust Render's load balancer so req.ip is the real client IP
 const PORT = process.env.PORT || 3001;
 const APP_URL = process.env.APP_URL || 'http://localhost:5173';
+
+// ── IP-based free grade limiter ───────────────────────────────────────────────
+const FREE_LIMIT = 2;
+const FREE_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
+const ipFreeGrades = new Map(); // ip → { count, resetAt }
+
+function checkFreeLimit(ip) {
+  const now = Date.now();
+  const entry = ipFreeGrades.get(ip);
+  if (!entry || now > entry.resetAt) {
+    ipFreeGrades.set(ip, { count: 1, resetAt: now + FREE_WINDOW_MS });
+    return { allowed: true, remaining: FREE_LIMIT - 1 };
+  }
+  if (entry.count >= FREE_LIMIT) {
+    return { allowed: false, remaining: 0 };
+  }
+  entry.count++;
+  return { allowed: true, remaining: FREE_LIMIT - entry.count };
+}
 
 // ── Supabase admin (service key — bypasses RLS) ──────────────────────────────
 const supabaseAdmin = (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY)
@@ -997,6 +1017,16 @@ app.post('/api/grade', async (req, res) => {
         code: 'GRADE_LIMIT_REACHED',
         plan: planRow.plan,
         limit: planRow.grade_limit,
+      });
+    }
+  } else if (!user) {
+    // No account — enforce IP-based free limit so incognito/multi-browser abuse is blocked
+    const ip = req.ip || req.socket?.remoteAddress || 'unknown';
+    const { allowed } = checkFreeLimit(ip);
+    if (!allowed) {
+      return res.status(403).json({
+        error: 'Free limit reached. Sign in to keep grading.',
+        code: 'GRADE_LIMIT_REACHED',
       });
     }
   }
