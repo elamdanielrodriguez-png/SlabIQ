@@ -1198,7 +1198,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
                 { company: "PSA", grade: "10", sub: "GEM MT" },
                 { company: "BGS", grade: "10", sub: "PRISTINE" },
                 { company: "SGC", grade: "10", sub: "PRISTINE" },
-                { company: "CGC", grade: "9.5", sub: "GEM MINT" },
+                { company: "CGC", grade: "10", sub: "PRISTINE" },
               ].map(({ company, grade, sub }, idx) => (
                 <div key={company} className={`hero-float-${idx}`} style={{
                   background: "linear-gradient(160deg, rgba(32,28,16,0.98) 0%, rgba(18,18,20,0.99) 100%)",
