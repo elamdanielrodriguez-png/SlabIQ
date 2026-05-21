@@ -210,7 +210,11 @@ const OVERSIZED_PRONE_VARIANTS = ['downtown', 'stained glass', 'color blast', 's
 async function fetchMarketComps(player, year, set, variant, cardNumber) {
   if (!process.env.EBAY_APP_ID) return null;
 
-  const baseParts = [year, set, player, variant, cardNumber ? `#${cardNumber}` : ''].filter(Boolean);
+  // Quote multi-word variants so eBay phrase-matches them exactly.
+  // "Silver Prizm" unquoted can match "Gold Prizm" or "Base Prizm" listings — wrong card, wrong price.
+  // Single-word variants (Base, Rookie, Refractor) are left unquoted so common shorthand (RC, etc.) still matches.
+  const quotedVariant = variant && variant.trim().includes(' ') ? `"${variant.trim()}"` : variant;
+  const baseParts = [year, set, player, quotedVariant, cardNumber ? `#${cardNumber}` : ''].filter(Boolean);
   const base = baseParts.join(' ');
 
   const variantLower = (variant ?? '').toLowerCase();
@@ -277,8 +281,13 @@ For each tier with at least 1 valid listing, return ALL valid prices sorted asce
 Return ONLY this JSON:
 {
   "raw":           { "prices": [<sorted asc>], "count": <int>, "url": "<representative listing URL or null>" },
+  "psa7":          { "prices": [<sorted asc>], "count": <int>, "url": "<representative listing URL or null>" },
+  "psa8":          { "prices": [<sorted asc>], "count": <int>, "url": "<representative listing URL or null>" },
   "psa9":          { "prices": [<sorted asc>], "count": <int>, "url": "<representative listing URL or null>" },
   "psa10":         { "prices": [<sorted asc>], "count": <int>, "url": "<representative listing URL or null>" },
+  "bgs7":          { "prices": [<sorted asc>], "count": <int>, "url": "<representative listing URL or null>" },
+  "bgs8":          { "prices": [<sorted asc>], "count": <int>, "url": "<representative listing URL or null>" },
+  "bgs9":          { "prices": [<sorted asc>], "count": <int>, "url": "<representative listing URL or null>" },
   "bgs9_5":        { "prices": [<sorted asc>], "count": <int>, "url": "<representative listing URL or null>" },
   "bgs10":         { "prices": [<sorted asc>], "count": <int>, "url": "<representative listing URL or null>" },
   "bgsBlackLabel": { "prices": [<sorted asc>], "count": <int>, "url": "<representative listing URL or null>" },
@@ -289,7 +298,7 @@ Return ONLY this JSON:
   try {
     const msg = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 800,
+      max_tokens: 1200,
       messages: [{ role: 'user', content: prompt }],
     });
     const text = msg.content.find(b => b.type === 'text')?.text ?? '';
@@ -1025,8 +1034,14 @@ app.post('/api/grade', async (req, res) => {
         })()}.`
       : '';
 
+    const printRunMatch = (confirmedCard?.variant ?? '').match(/\/(\d+)/);
+    const printRun = printRunMatch ? parseInt(printRunMatch[1]) : null;
+    const printRunNote = printRun
+      ? ` SERIALIZED CARD — print run is /${printRun}. Only ${printRun} copies of this card exist in the world. The PSA population total CANNOT exceed ${printRun} and will realistically be far less (most copies are never submitted). Use the /25-or-rarer calibration bucket if /${printRun} is ≤25, or /99-/49 if appropriate. Do NOT return a pop total higher than ${printRun}.`
+      : '';
+
     const confirmedPrefix = confirmedCard?.player
-      ? `CONFIRMED CARD IDENTITY (selected by the user — do not second-guess this): ${confirmedCard.player}, ${confirmedCard.year} ${confirmedCard.set}, ${confirmedCard.variant || 'Base'}${confirmedCard.cardNumber ? `, #${confirmedCard.cardNumber}` : ''}.${oversizedNote}${vintageNote}${centeringNote} Set needsClarification to false and candidates to []. Provide complete grading and market data for exactly this card.\n\n`
+      ? `CONFIRMED CARD IDENTITY (selected by the user — do not second-guess this): ${confirmedCard.player}, ${confirmedCard.year} ${confirmedCard.set}, ${confirmedCard.variant || 'Base'}${confirmedCard.cardNumber ? `, #${confirmedCard.cardNumber}` : ''}.${oversizedNote}${vintageNote}${centeringNote}${printRunNote} Set needsClarification to false and candidates to []. Provide complete grading and market data for exactly this card.\n\n`
       : centeringNote ? `${centeringNote}\n\n` : '';
 
     const content = [
@@ -1123,7 +1138,7 @@ app.post('/api/grade', async (req, res) => {
             if (aiEstimate && aiEstimate > 0) {
               prices = prices.filter(p => p >= aiEstimate * 0.30 && p <= aiEstimate * 3.5);
             }
-            if (prices.length < 2) return null;
+            if (prices.length < 3) return null; // need ≥3 comps — median of 2 is too noisy
             const mid = Math.floor(prices.length / 2);
             const median = prices.length % 2 === 0
               ? (prices[mid - 1] + prices[mid]) / 2
@@ -1137,26 +1152,11 @@ app.post('/api/grade', async (req, res) => {
             const p = realPrice(market[tier], aiTierEstimate);
             if (p) parsed.market.graded[tier] = p;
           }
-          const variantForRaw = (confirmedCard.variant ?? '').toLowerCase();
-          const isOversizedProne = OVERSIZED_PRONE_VARIANTS.some(v => variantForRaw.includes(v));
-
-          if (isOversizedProne) {
-            // Raw eBay listings for these variants are unreliable (5x7 oversized cards).
-            // Graded comps (post-$200 floor) are standard-size only. Derive raw mathematically.
-            // Standard-size raw trades at ~45% of PSA 10, ~80% of PSA 9, ~90% of PSA 8.
-            const psa10 = Number(parsed.market.graded?.psa10) || 0;
-            const psa9  = Number(parsed.market.graded?.psa9)  || 0;
-            const psa8  = Number(parsed.market.graded?.psa8)  || 0;
-            if      (psa10 > 0) parsed.market.raw = Math.round(psa10 * 0.45);
-            else if (psa9  > 0) parsed.market.raw = Math.round(psa9  * 0.80);
-            else if (psa8  > 0) parsed.market.raw = Math.round(psa8  * 0.90);
-            // If no graded comps at all, leave AI estimate but enforce $100 floor
-            else if (parsed.market?.raw && Number(parsed.market.raw) < 100) delete parsed.market.raw;
-          } else {
-            const aiRaw = Number(parsed.market.raw) || 0;
-            const rawPrice = realPrice(market.raw, aiRaw);
-            if (rawPrice) parsed.market.raw = rawPrice;
-          }
+          // Oversized-prone variants always have skipEbay=true so this block is only
+          // reached for normal cards. Derive raw directly from eBay sold comps.
+          const aiRaw = Number(parsed.market.raw) || 0;
+          const rawPrice = realPrice(market.raw, aiRaw);
+          if (rawPrice) parsed.market.raw = rawPrice;
 
           parsed.market.dataSource = 'eBay sold prices (median − 10%, AI-estimate floor+ceiling)';
           parsed.market.sampleSize = market.totalValid;
