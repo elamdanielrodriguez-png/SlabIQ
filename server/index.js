@@ -364,6 +364,67 @@ async function fetchEbayReferenceImages(player, year, set, variant) {
 const SYSTEM_PROMPT = readFileSync(join(__dirname, 'prompts', 'system.txt'), 'utf8');
 const GRADING_PROMPT = readFileSync(join(__dirname, 'prompts', 'grading.txt'), 'utf8');
 
+// ── Real PSA pop data via Apify ────────────────────────────────────────────────
+const popCache = new Map(); // key → { data, expires }
+const POP_CACHE_TTL = 24 * 60 * 60 * 1000;
+
+async function fetchRealPopData(player, year, set, variant) {
+  const apifyToken = process.env.APIFY_TOKEN;
+  if (!apifyToken) return null;
+
+  const key = [player, year, set, variant].filter(Boolean).join('|').toLowerCase();
+  const cached = popCache.get(key);
+  if (cached && cached.expires > Date.now()) {
+    console.log(`Pop cache hit: ${key}`);
+    return cached.data;
+  }
+
+  try {
+    const searchQuery = [year, set, player, variant].filter(Boolean).join(' ');
+    console.log(`Fetching PSA pop via Apify: "${searchQuery}"`);
+
+    const res = await fetchWithTimeout(
+      `https://api.apify.com/v2/acts/lulzasaur~psa-pop-scraper/run-sync-get-dataset-items?token=${apifyToken}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ setName: searchQuery, cacheDurationHours: 168 }),
+      },
+      90000
+    );
+
+    if (!res.ok) { console.warn(`Apify pop HTTP ${res.status}`); return null; }
+
+    const items = await res.json();
+    if (!Array.isArray(items) || items.length === 0) return null;
+
+    // Pick best match by last name
+    const lastName = (player ?? '').split(' ').pop().toLowerCase();
+    const best = items.find(i => (i.subject ?? '').toLowerCase().includes(lastName)) ?? items[0];
+    const pop = best?.psaPop;
+    if (!pop) return null;
+
+    const distribution = [
+      { grade: 10, label: 'GEM MT', count: pop.grade10 ?? 0 },
+      { grade: 9,  label: 'MINT',   count: pop.grade9  ?? 0 },
+      { grade: 8,  label: 'NM-MT',  count: pop.grade8  ?? 0 },
+      { grade: 7,  label: 'NM',     count: pop.grade7  ?? 0 },
+      { grade: 6,  label: 'EX-MT',  count: pop.grade6  ?? 0 },
+      { grade: 5,  label: 'EX',     count: pop.grade5  ?? 0 },
+    ];
+    const total = pop.total ?? distribution.reduce((s, d) => s + d.count, 0);
+    const gemRate = total > 0 ? Math.round(((pop.grade10 ?? 0) / total) * 100) : 0;
+    const psaPopData = { total, gemRate, distribution };
+
+    popCache.set(key, { data: psaPopData, expires: Date.now() + POP_CACHE_TTL });
+    console.log(`PSA pop: ${total} total, ${gemRate}% gem rate for ${player}`);
+    return psaPopData;
+  } catch (err) {
+    console.warn('Apify pop fetch failed:', err.message);
+    return null;
+  }
+}
+
 
 function categoryGrade(severities) {
   if (severities.length === 0) return 10.0;
@@ -1052,6 +1113,11 @@ app.post('/api/grade', async (req, res) => {
       { type: 'text', text: confirmedPrefix + GRADING_PROMPT },
     ];
 
+    // Kick off real pop fetch in parallel with AI grading (both are slow, run together)
+    const popFetchPromise = confirmedCard?.player
+      ? fetchRealPopData(confirmedCard.player, confirmedCard.year, confirmedCard.set, confirmedCard.variant)
+      : Promise.resolve(null);
+
     const message = await anthropic.messages.create({
       model: gradingModel,
       max_tokens: 4000,
@@ -1252,6 +1318,20 @@ app.post('/api/grade', async (req, res) => {
       }
     } catch (e) {
       console.warn('Submission sync failed:', e.message);
+    }
+
+    // Inject real PSA pop data if available (replaces AI-estimated popData.psa)
+    try {
+      const realPop = await popFetchPromise;
+      if (realPop) {
+        const parsed = JSON.parse(text);
+        if (!parsed.popData) parsed.popData = {};
+        parsed.popData.psa = { ...realPop, isReal: true };
+        text = JSON.stringify(parsed);
+        console.log('Real PSA pop data injected');
+      }
+    } catch (e) {
+      console.warn('Pop injection failed:', e.message);
     }
 
     // debug
