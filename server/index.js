@@ -1320,15 +1320,20 @@ app.post('/api/grade', async (req, res) => {
       console.warn('Submission sync failed:', e.message);
     }
 
-    // Inject real PSA pop data if available (replaces AI-estimated popData.psa)
+    // Inject real PSA pop data if available — cap wait at 10s so we don't hold the response
     try {
-      const realPop = await popFetchPromise;
+      const realPop = await Promise.race([
+        popFetchPromise,
+        new Promise(resolve => setTimeout(() => resolve(null), 10000)),
+      ]);
       if (realPop) {
         const parsed = JSON.parse(text);
         if (!parsed.popData) parsed.popData = {};
         parsed.popData.psa = { ...realPop, isReal: true };
         text = JSON.stringify(parsed);
         console.log('Real PSA pop data injected');
+      } else {
+        console.log('Pop fetch timed out or unavailable — using AI estimate');
       }
     } catch (e) {
       console.warn('Pop injection failed:', e.message);
