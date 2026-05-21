@@ -495,6 +495,18 @@ function cropZonesFromImageData(imageData, bounds, { width: storedW, height: sto
 }
 
 const PSA_LABELS = { 10: "GEM MT", 9: "MINT", 8: "NM-MT", 7: "NM", 6: "EX-MT", 5: "EX", 4: "VG-EX", 3: "VG", 2: "GOOD", 1: "PR" };
+const SGC_LABELS = { 10: "PRISTINE", 9.5: "MINT+", 9: "MINT", 8.5: "NM-MT+", 8: "NM-MT", 7.5: "NM+", 7: "NM" };
+const CGC_LABELS = { 10: "PRISTINE", 9.5: "GEM MINT", 9: "MINT", 8.5: "NM-MT+", 8: "NM-MT", 7.5: "NM+", 7: "NM" };
+function computeSgcGrade(overall, isBlackLabel) {
+  if (isBlackLabel) return 10;
+  if (overall >= 9.5) return 9.5;
+  if (overall >= 9.0) return 9;
+  if (overall >= 8.5) return 8.5;
+  if (overall >= 8.0) return 8;
+  if (overall >= 7.5) return 7.5;
+  if (overall >= 7.0) return 7;
+  return Math.max(1, Math.round(overall));
+}
 
 function bgsCenteringFromCentering(c) {
   if (!c) return null;
@@ -523,10 +535,13 @@ function recomputeBgsAndPsa(prevResult, centering) {
   const isBlackLabel = subs.every(v => v === 10);
   // PSA: straight round of the 4-subgrade average
   const psaGrade = Math.max(1, Math.min(10, Math.round(avg)));
+  const sgcGrade = computeSgcGrade(overall, isBlackLabel);
   return {
     ...prevResult,
     bgs: { ...prevResult.bgs, overall, isBlackLabel, centering: c },
     psa: { grade: psaGrade, label: PSA_LABELS[psaGrade] ?? prevResult.psa?.label ?? "" },
+    sgc: { grade: sgcGrade, label: SGC_LABELS[sgcGrade] ?? "" },
+    cgc: { grade: sgcGrade, label: CGC_LABELS[sgcGrade] ?? "" },
   };
 }
 

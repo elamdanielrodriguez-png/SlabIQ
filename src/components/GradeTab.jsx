@@ -1392,10 +1392,14 @@ export default function GradeTab({ images, result, candidates, loading, error, o
 
           {/* Grade hero */}
           <div style={card}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1px 1fr" }}>
-              <GradeHalf label="PSA" grade={8} sub="NM-MT" side="left" />
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1px 1fr 1px 1fr 1px 1fr" }}>
+              <GradeHalf label="PSA" grade={8} sub="NM-MT" side="left" compact />
               <div style={{ background: "rgba(255,255,255,0.06)" }} />
-              <GradeHalf label="BGS" grade={8.5} sub="Beckett" side="right" />
+              <GradeHalf label="BGS" grade={8.5} sub="Beckett" compact />
+              <div style={{ background: "rgba(255,255,255,0.06)" }} />
+              <GradeHalf label="SGC" grade={8} sub="NM-MT" compact />
+              <div style={{ background: "rgba(255,255,255,0.06)" }} />
+              <GradeHalf label="CGC" grade={8} sub="NM-MT" side="right" compact />
             </div>
             <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", marginTop: 22, paddingTop: 18, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
               {[
@@ -1613,20 +1617,36 @@ export default function GradeTab({ images, result, candidates, loading, error, o
                 ↺ Replay
               </button>
             )}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1px 1fr" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1px 1fr 1px 1fr 1px 1fr" }}>
               <GradeHalf
                 label="PSA"
                 grade={displayResult.psa?.grade}
                 sub={displayResult.psa?.label}
                 side="left"
+                compact
               />
               <div style={{ background: "rgba(255,255,255,0.06)" }} />
               <GradeHalf
                 label="BGS"
                 grade={displayResult.bgs?.overall}
                 sub={displayResult.bgs?.isBlackLabel ? "Black Label" : displayResult.bgs?.overall === 10 ? "Pristine" : displayResult.bgs?.overall === 9.5 ? "Gem Mint" : "Beckett"}
-                side="right"
                 blackLabel={displayResult.bgs?.isBlackLabel}
+                compact
+              />
+              <div style={{ background: "rgba(255,255,255,0.06)" }} />
+              <GradeHalf
+                label="SGC"
+                grade={displayResult.sgc?.grade}
+                sub={displayResult.sgc?.label}
+                compact
+              />
+              <div style={{ background: "rgba(255,255,255,0.06)" }} />
+              <GradeHalf
+                label="CGC"
+                grade={displayResult.cgc?.grade}
+                sub={displayResult.cgc?.label}
+                side="right"
+                compact
               />
             </div>
 
@@ -2066,7 +2086,7 @@ function gradeGlow(g, blackLabel) {
   return "none";
 }
 
-function GradeHalf({ label, grade: gradeProp, sub, side, blackLabel }) {
+function GradeHalf({ label, grade: gradeProp, sub, side, blackLabel, compact }) {
   const grade = gradeProp != null ? Number(gradeProp) : null;
   const isInt = grade != null && Number.isInteger(grade);
   const [display, setDisplay] = useState(null);
@@ -2092,7 +2112,9 @@ function GradeHalf({ label, grade: gradeProp, sub, side, blackLabel }) {
   }, [grade]);
 
   const color = gradeColor(grade, blackLabel);
-  const pad   = side === "left" ? "12px 20px 12px 0" : "12px 0 12px 20px";
+  const pad   = compact
+    ? (side === "left" ? "10px 8px 10px 0" : side === "right" ? "10px 0 10px 8px" : "10px 8px")
+    : (side === "left" ? "12px 20px 12px 0" : "12px 0 12px 20px");
   const displayStr = display == null ? "—" : isInt ? String(display) : Number(display).toFixed(1);
   const progress   = (grade > 0 && display != null) ? Math.min(1, display / grade) : 0;
   const countScale = 0.3 + 0.7 * progress;
@@ -2145,8 +2167,8 @@ function GradeHalf({ label, grade: gradeProp, sub, side, blackLabel }) {
         <div style={{
           display: "inline-block",
           color,
-          fontSize: 72, fontWeight: 700, lineHeight: 1,
-          letterSpacing: "-3px",
+          fontSize: compact ? 52 : 72, fontWeight: 700, lineHeight: 1,
+          letterSpacing: compact ? "-2px" : "-3px",
           textShadow: landed ? gradeGlow(grade, blackLabel) : "none",
           transform: landed ? undefined : `scale(${countScale})`,
           animation: landed ? "gradeSlam 0.9s cubic-bezier(0.22,1,0.36,1) forwards" : "none",

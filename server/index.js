@@ -242,14 +242,16 @@ async function fetchMarketComps(player, year, set, variant, cardNumber) {
 
   // For oversized-prone variants, exclude 5x7 jumbo keywords in both title AND description
   const sizeExclusion = isOversizedProne ? ' -5x7 -"5 x 7" -jumbo -oversized -"box topper"' : '';
-  const [rawList, psaList, bgsList] = await Promise.all([
+  const [rawList, psaList, bgsList, sgcList, cgcList] = await Promise.all([
     ebayFindingSearch(`${base}${sizeExclusion}`, 25, isOversizedProne),
     ebayFindingSearch(`${base} PSA${sizeExclusion}`, 25, isOversizedProne),
     ebayFindingSearch(`${base} BGS${sizeExclusion}`, 25, isOversizedProne),
+    ebayFindingSearch(`${base} SGC${sizeExclusion}`, 15, isOversizedProne),
+    ebayFindingSearch(`${base} CGC${sizeExclusion}`, 15, isOversizedProne),
   ]);
 
   const seen = new Set();
-  let unique = [...rawList, ...psaList, ...bgsList].filter(l => {
+  let unique = [...rawList, ...psaList, ...bgsList, ...sgcList, ...cgcList].filter(l => {
     if (seen.has(l.url)) return false;
     seen.add(l.url);
     return true;
@@ -275,7 +277,7 @@ async function fetchMarketComps(player, year, set, variant, cardNumber) {
 
 Below are eBay sold listings. Bucket each VALID one into a tier and return its price.
 
-Tiers: raw (no grade), psa7, psa8, psa9, psa10, bgs7, bgs8, bgs9, bgs9_5, bgs10, bgsBlackLabel (BGS Black Label / BGS Pristine)
+Tiers: raw (no grade), psa7, psa8, psa9, psa10, bgs7, bgs8, bgs9, bgs9_5, bgs10, bgsBlackLabel (BGS Black Label / BGS Pristine), sgc8, sgc9, sgc9_5 (SGC Mint+), sgc10 (SGC Pristine), cgc8, cgc9, cgc9_5 (CGC Gem Mint), cgc10 (CGC Pristine)
 
 EXCLUSION — BE AGGRESSIVE. WHEN IN DOUBT, EXCLUDE.
 
@@ -311,6 +313,14 @@ Return ONLY this JSON:
   "bgs9_5":        { "prices": [<sorted asc>], "count": <int>, "url": "<representative listing URL or null>" },
   "bgs10":         { "prices": [<sorted asc>], "count": <int>, "url": "<representative listing URL or null>" },
   "bgsBlackLabel": { "prices": [<sorted asc>], "count": <int>, "url": "<representative listing URL or null>" },
+  "sgc8":          { "prices": [<sorted asc>], "count": <int>, "url": "<representative listing URL or null>" },
+  "sgc9":          { "prices": [<sorted asc>], "count": <int>, "url": "<representative listing URL or null>" },
+  "sgc9_5":        { "prices": [<sorted asc>], "count": <int>, "url": "<representative listing URL or null>" },
+  "sgc10":         { "prices": [<sorted asc>], "count": <int>, "url": "<representative listing URL or null>" },
+  "cgc8":          { "prices": [<sorted asc>], "count": <int>, "url": "<representative listing URL or null>" },
+  "cgc9":          { "prices": [<sorted asc>], "count": <int>, "url": "<representative listing URL or null>" },
+  "cgc9_5":        { "prices": [<sorted asc>], "count": <int>, "url": "<representative listing URL or null>" },
+  "cgc10":         { "prices": [<sorted asc>], "count": <int>, "url": "<representative listing URL or null>" },
   "totalValid": <int>,
   "totalListings": ${unique.length}
 }`;
@@ -495,6 +505,30 @@ function computeSubgradesFromVerifications(verifications) {
 }
 
 const PSA_LABELS = { 10: 'GEM MT', 9: 'MINT', 8: 'NM-MT', 7: 'NM', 6: 'EX-MT', 5: 'EX', 4: 'VG-EX', 3: 'VG', 2: 'GOOD', 1: 'PR' };
+const SGC_LABELS = { 10: 'PRISTINE', 9.5: 'MINT+', 9: 'MINT', 8.5: 'NM-MT+', 8: 'NM-MT', 7.5: 'NM+', 7: 'NM', 6: 'EX-MT', 5: 'EX', 4: 'VG-EX', 3: 'VG', 2: 'GOOD', 1: 'PR' };
+const CGC_LABELS = { 10: 'PRISTINE', 9.5: 'GEM MINT', 9: 'MINT', 8.5: 'NM-MT+', 8: 'NM-MT', 7.5: 'NM+', 7: 'NM', 6: 'EX-MT', 5: 'EX', 4: 'VG-EX', 3: 'VG', 2: 'GOOD', 1: 'PR' };
+
+function computeSgcGrade(bgsOverall, isBlackLabel) {
+  if (isBlackLabel) return 10;
+  if (bgsOverall >= 9.5) return 9.5;
+  if (bgsOverall >= 9.0) return 9;
+  if (bgsOverall >= 8.5) return 8.5;
+  if (bgsOverall >= 8.0) return 8;
+  if (bgsOverall >= 7.5) return 7.5;
+  if (bgsOverall >= 7.0) return 7;
+  return Math.max(1, Math.round(bgsOverall));
+}
+
+function computeCgcGrade(bgsOverall, isBlackLabel) {
+  if (isBlackLabel) return 10;
+  if (bgsOverall >= 9.5) return 9.5;
+  if (bgsOverall >= 9.0) return 9;
+  if (bgsOverall >= 8.5) return 8.5;
+  if (bgsOverall >= 8.0) return 8;
+  if (bgsOverall >= 7.5) return 7.5;
+  if (bgsOverall >= 7.0) return 7;
+  return Math.max(1, Math.round(bgsOverall));
+}
 
 // Second-pass zone review: re-examine only the flagged zones with fresh eyes.
 // Fires when PSA 7–9 or any zone was marked microscopic (both are uncertain territory).
@@ -569,12 +603,16 @@ Return ONLY a JSON array, no prose:
     const psaCap = psaWeakest >= 9.5 ? 10 : psaWeakest >= 9.0 ? 9 : psaWeakest >= 8.0 ? 8 : psaWeakest >= 7.0 ? 7 : psaWeakest >= 6.0 ? 6 : 5;
     const psaGrade = Math.max(1, Math.min(psaCap, Math.round(avg)));
 
+    const sgcGrade2 = computeSgcGrade(overall, isBlackLabel);
+    const cgcGrade2 = computeCgcGrade(overall, isBlackLabel);
     console.log(`2nd pass result: PSA ${parsedResult.psa?.grade} → ${psaGrade}, BGS ${parsedResult.bgs?.overall} → ${overall}`);
     return {
       ...parsedResult,
       zones: updatedZones,
       bgs: { ...parsedResult.bgs, corners, edges, surface, overall, isBlackLabel },
       psa: { grade: psaGrade, label: PSA_LABELS[psaGrade] || '' },
+      sgc: { grade: sgcGrade2, label: SGC_LABELS[sgcGrade2] || '' },
+      cgc: { grade: cgcGrade2, label: CGC_LABELS[cgcGrade2] || '' },
     };
   } catch (err) {
     console.warn('Second pass failed:', err.message);
@@ -731,10 +769,17 @@ function sanitizeGradingResponse(rawText, measuredCentering) {
       parsed.psa.grade = psaGrade;
       parsed.psa.label = PSA_LABELS[psaGrade] || '';
 
+      const sgcGrade = computeSgcGrade(parsed.bgs.overall, parsed.bgs.isBlackLabel);
+      const cgcGrade = computeCgcGrade(parsed.bgs.overall, parsed.bgs.isBlackLabel);
+      parsed.sgc = { grade: sgcGrade, label: SGC_LABELS[sgcGrade] || '' };
+      parsed.cgc = { grade: cgcGrade, label: CGC_LABELS[cgcGrade] || '' };
+
       // Force submission expected grades to match computed grades so both tabs agree
       if (parsed.submission) {
         parsed.submission.psaExpectedGrade = psaGrade;
         parsed.submission.bgsExpectedGrade = parsed.bgs.overall;
+        parsed.submission.sgcExpectedGrade = sgcGrade;
+        parsed.submission.cgcExpectedGrade = cgcGrade;
       }
     }
   }
@@ -1247,7 +1292,7 @@ app.post('/api/grade', async (req, res) => {
             return Math.round(median * (1 - DISCOUNT));
           };
 
-          const TIERS = ['psa7', 'psa8', 'psa9', 'psa10', 'bgs7', 'bgs8', 'bgs9', 'bgs9_5', 'bgs10', 'bgsBlackLabel'];
+          const TIERS = ['psa7', 'psa8', 'psa9', 'psa10', 'bgs7', 'bgs8', 'bgs9', 'bgs9_5', 'bgs10', 'bgsBlackLabel', 'sgc8', 'sgc9', 'sgc9_5', 'sgc10', 'cgc8', 'cgc9', 'cgc9_5', 'cgc10'];
           for (const tier of TIERS) {
             const aiTierEstimate = Number(parsed.market.graded?.[tier]) || 0;
             const p = realPrice(market[tier], aiTierEstimate);
@@ -1261,6 +1306,25 @@ app.post('/api/grade', async (req, res) => {
 
           parsed.market.dataSource = 'eBay sold prices (median − 10%, AI-estimate floor+ceiling)';
           parsed.market.sampleSize = market.totalValid;
+
+          // Derive SGC/CGC prices from PSA ratios when eBay data is thin
+          const psa10 = parsed.market.graded.psa10;
+          const psa9  = parsed.market.graded.psa9;
+          const psa8  = parsed.market.graded.psa8;
+          if (psa10) {
+            if (!parsed.market.graded.sgc10)  parsed.market.graded.sgc10  = Math.round(psa10 * 0.875);
+            if (!parsed.market.graded.sgc9_5) parsed.market.graded.sgc9_5 = Math.round(psa10 * 0.60);
+            if (!parsed.market.graded.cgc10)  parsed.market.graded.cgc10  = Math.round(psa10 * 1.25);
+            if (!parsed.market.graded.cgc9_5) parsed.market.graded.cgc9_5 = Math.round(psa10 * 1.00);
+          }
+          if (psa9) {
+            if (!parsed.market.graded.sgc9) parsed.market.graded.sgc9 = psa9;
+            if (!parsed.market.graded.cgc9) parsed.market.graded.cgc9 = psa9;
+          }
+          if (psa8) {
+            if (!parsed.market.graded.sgc8) parsed.market.graded.sgc8 = psa8;
+            if (!parsed.market.graded.cgc8) parsed.market.graded.cgc8 = psa8;
+          }
 
           // Attach per-tier eBay listing URLs for frontend deep-links
           if (market._urls) {
@@ -1301,6 +1365,19 @@ app.post('/api/grade', async (req, res) => {
           if (v < 2000) return { tier: 'Fast Track',  cost: 100 };
           return               { tier: 'Walk-Through', cost: 300 };
         };
+        const sgcTierFor = (v) => {
+          if (v < 500)  return { tier: 'Standard',     cost: 25  };
+          if (v < 1500) return { tier: 'Express',      cost: 50  };
+          if (v < 3000) return { tier: 'Super Express', cost: 100 };
+          return               { tier: 'Walk-Through', cost: 250 };
+        };
+        const cgcTierFor = (v) => {
+          if (v < 500)  return { tier: 'Economy',    cost: 20  };
+          if (v < 1000) return { tier: 'Standard',   cost: 30  };
+          if (v < 2500) return { tier: 'Express',    cost: 65  };
+          if (v < 10000) return { tier: 'Priority',  cost: 150 };
+          return               { tier: 'Walk-Through', cost: 300 };
+        };
 
         const psaKey = `psa${s.psaExpectedGrade}`;
         if (g[psaKey]) {
@@ -1331,6 +1408,34 @@ app.post('/api/grade', async (req, res) => {
           s.bgsRecommended = profit >= 30 && s.bgsRoi >= 25;
         }
 
+        const sgcGradeKey = s.sgcExpectedGrade === 10 ? 'sgc10'
+          : s.sgcExpectedGrade === 9.5 ? 'sgc9_5'
+          : s.sgcExpectedGrade === 9   ? 'sgc9'
+          : s.sgcExpectedGrade === 8   ? 'sgc8' : null;
+        if (sgcGradeKey && g[sgcGradeKey]) {
+          s.sgcExpectedValue = g[sgcGradeKey];
+          const { tier, cost } = sgcTierFor(s.sgcExpectedValue);
+          s.sgcTier = tier;
+          s.sgcCost = cost;
+          const profit = s.sgcExpectedValue - raw - cost;
+          s.sgcRoi = raw > 0 ? Math.round((profit / raw) * 100) : 0;
+          s.sgcRecommended = profit >= 30 && s.sgcRoi >= 25;
+        }
+
+        const cgcGradeKey = s.cgcExpectedGrade === 10 ? 'cgc10'
+          : s.cgcExpectedGrade === 9.5 ? 'cgc9_5'
+          : s.cgcExpectedGrade === 9   ? 'cgc9'
+          : s.cgcExpectedGrade === 8   ? 'cgc8' : null;
+        if (cgcGradeKey && g[cgcGradeKey]) {
+          s.cgcExpectedValue = g[cgcGradeKey];
+          const { tier, cost } = cgcTierFor(s.cgcExpectedValue);
+          s.cgcTier = tier;
+          s.cgcCost = cost;
+          const profit = s.cgcExpectedValue - raw - cost;
+          s.cgcRoi = raw > 0 ? Math.round((profit / raw) * 100) : 0;
+          s.cgcRecommended = profit >= 30 && s.cgcRoi >= 25;
+        }
+
         text = JSON.stringify(parsed);
       }
     } catch (e) {
@@ -1345,6 +1450,7 @@ app.post('/api/grade', async (req, res) => {
       console.log('zones:', rawParsed.zones?.length ?? 'MISSING', '| surfaceFlaws:', rawParsed.surfaceFlaws?.length ?? 'MISSING');
       console.log('Final bgs: corners=' + outParsed.bgs?.corners + ' edges=' + outParsed.bgs?.edges + ' surface=' + outParsed.bgs?.surface + ' overall=' + outParsed.bgs?.overall);
       console.log('Final psa: grade=' + outParsed.psa?.grade + ' (' + outParsed.psa?.label + ')');
+      console.log('Final sgc: grade=' + outParsed.sgc?.grade + ' | Final cgc: grade=' + outParsed.cgc?.grade);
       console.log('stop_reason:', message.stop_reason);
       console.log('===================');
     } catch (e) { console.log('debug parse error:', e.message); }

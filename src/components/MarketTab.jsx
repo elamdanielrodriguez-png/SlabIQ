@@ -37,10 +37,12 @@ function AnimPct({ value, sign }) {
 }
 
 export default function MarketTab({ result, popLoading }) {
-  const { popData, market, psa, bgs, player, year, set, variant } = result;
+  const { popData, market, psa, bgs, sgc, cgc, player, year, set, variant } = result;
   const psaGrade = psa?.grade;
   const bgsGrade = bgs?.overall;
   const bgsBlackLabel = bgs?.isBlackLabel === true;
+  const sgcGrade = sgc?.grade;
+  const cgcGrade = cgc?.grade;
 
   const trend = market?.trend;
   const up = trend === "rising";
@@ -124,7 +126,7 @@ export default function MarketTab({ result, popLoading }) {
         </div>
 
         {/* Value tables */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
           <ValueTable
             heading="PSA"
             rows={[
@@ -146,6 +148,26 @@ export default function MarketTab({ result, popLoading }) {
             ]}
           />
         </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
+          <ValueTable
+            heading="SGC"
+            rows={[
+              { grade: "SGC 8",        value: market?.graded?.sgc8,   url: market?.gradedUrls?.sgc8,   active: sgcGrade === 8 },
+              { grade: "SGC 9",        value: market?.graded?.sgc9,   url: market?.gradedUrls?.sgc9,   active: sgcGrade === 9 },
+              { grade: "9.5 Mint+",    value: market?.graded?.sgc9_5, url: market?.gradedUrls?.sgc9_5, active: sgcGrade === 9.5 },
+              { grade: "10 Pristine",  value: market?.graded?.sgc10,  url: market?.gradedUrls?.sgc10,  active: sgcGrade === 10, isPristine: true },
+            ]}
+          />
+          <ValueTable
+            heading="CGC"
+            rows={[
+              { grade: "CGC 8",        value: market?.graded?.cgc8,   url: market?.gradedUrls?.cgc8,   active: cgcGrade === 8 },
+              { grade: "CGC 9",        value: market?.graded?.cgc9,   url: market?.gradedUrls?.cgc9,   active: cgcGrade === 9 },
+              { grade: "9.5 Gem Mint", value: market?.graded?.cgc9_5, url: market?.gradedUrls?.cgc9_5, active: cgcGrade === 9.5 },
+              { grade: "10 Pristine",  value: market?.graded?.cgc10,  url: market?.gradedUrls?.cgc10,  active: cgcGrade === 10, isPristine: true },
+            ]}
+          />
+        </div>
 
         {/* AI analysis */}
         <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 18 }}>
@@ -154,7 +176,7 @@ export default function MarketTab({ result, popLoading }) {
             {market?.aiAnalysis}
           </p>
           <p style={{ color: "rgba(255,255,255,0.15)", margin: "12px 0 0", fontSize: 11, lineHeight: 1.6 }}>
-            Prices based on recent eBay sold listings. Tap ↗ on any row to view the sale on eBay.
+            PSA/BGS prices from recent eBay sold listings. SGC/CGC prices estimated from market ratios when eBay data is thin. Tap ↗ on any row to view the sale on eBay.
           </p>
         </div>
       </div>
