@@ -1178,9 +1178,8 @@ app.post('/api/grade', async (req, res) => {
       const yearNum = parseInt(confirmedCard?.year, 10) || 0;
       const variantLowerSkip = (confirmedCard?.variant ?? '').toLowerCase();
       if (yearNum > 0 && yearNum < 1980) { skipEbay = true; skipReason = 'vintage'; }
-      if (!skipEbay && OVERSIZED_PRONE_VARIANTS.some(v => variantLowerSkip.includes(v))) {
-        skipEbay = true; skipReason = 'oversized-prone variant';
-      }
+      // Note: oversized-prone variants (Downtown etc.) are no longer skipped —
+      // fetchMarketComps has $200 graded floor + title exclusions that filter 5x7s.
       if (skipEbay) {
         if (!preParsed.market) preParsed.market = {};
         preParsed.market.dataSource = `AI estimate (${skipReason} — eBay size contamination)`;
@@ -1249,24 +1248,6 @@ app.post('/api/grade', async (req, res) => {
       }
     }
 
-    // For oversized-prone variants, eBay is skipped — derive raw from AI's graded estimates.
-    // Standard-size inserts trade at ~55% of PSA 10, ~85% of PSA 9, ~92% of PSA 8.
-    if (confirmedCard?.variant) {
-      try {
-        const variantLower = confirmedCard.variant.toLowerCase();
-        if (OVERSIZED_PRONE_VARIANTS.some(v => variantLower.includes(v))) {
-          const parsed = JSON.parse(text);
-          const psa10 = Number(parsed.market?.graded?.psa10) || 0;
-          const psa9  = Number(parsed.market?.graded?.psa9)  || 0;
-          const psa8  = Number(parsed.market?.graded?.psa8)  || 0;
-          if      (psa10 > 0) parsed.market.raw = Math.round(psa10 * 0.55);
-          else if (psa9  > 0) parsed.market.raw = Math.round(psa9  * 0.85);
-          else if (psa8  > 0) parsed.market.raw = Math.round(psa8  * 0.92);
-          else if (parsed.market?.raw && Number(parsed.market.raw) < 100) delete parsed.market.raw;
-          text = JSON.stringify(parsed);
-        }
-      } catch {}
-    }
 
     // Sync all submission fields to match computed grades and actual market values.
     try {
