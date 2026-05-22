@@ -87,8 +87,6 @@ function BulkItem({ item, onConfirm, onRemove }) {
 
   const psaGrade  = item.result?.psa?.grade;
   const bgsGrade  = item.result?.bgs?.overall;
-  const sgcGrade  = item.result?.sgc?.grade;
-  const cgcGrade  = item.result?.cgc?.grade;
   const psaRec    = item.result?.submission?.psaRecommended;
   const psa10Val  = item.result?.market?.graded?.psa10;
   const verdict   = item.result?.verdict ?? "";
@@ -128,9 +126,7 @@ function BulkItem({ item, onConfirm, onRemove }) {
         {isDone && (
           <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
             <GradeChip label="PSA" grade={psaGrade} sub={item.result?.psa?.label} />
-            <GradeChip label="BGS" grade={bgsGrade != null ? (Number.isInteger(bgsGrade) ? bgsGrade : bgsGrade) : null} />
-            <GradeChip label="SGC" grade={sgcGrade} />
-            <GradeChip label="CGC" grade={cgcGrade} />
+            <GradeChip label="BGS" grade={bgsGrade != null ? bgsGrade : null} />
           </div>
         )}
 

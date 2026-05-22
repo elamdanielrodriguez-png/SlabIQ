@@ -1307,7 +1307,9 @@ app.post('/api/grade', async (req, res) => {
           parsed.market.dataSource = 'eBay sold prices (median − 10%, AI-estimate floor+ceiling)';
           parsed.market.sampleSize = market.totalValid;
 
-          // Derive SGC/CGC prices from PSA ratios when eBay data is thin
+          // Derive SGC/CGC prices from PSA ratios when eBay data is thin.
+          // CGC 9/8 fallbacks are intentionally omitted — CGC sports cards below 9.5
+          // have no meaningful market premium over raw and aren't worth recommending.
           const psa10 = parsed.market.graded.psa10;
           const psa9  = parsed.market.graded.psa9;
           const psa8  = parsed.market.graded.psa8;
@@ -1318,12 +1320,10 @@ app.post('/api/grade', async (req, res) => {
             if (!parsed.market.graded.cgc9_5) parsed.market.graded.cgc9_5 = Math.round(psa10 * 1.00);
           }
           if (psa9) {
-            if (!parsed.market.graded.sgc9) parsed.market.graded.sgc9 = psa9;
-            if (!parsed.market.graded.cgc9) parsed.market.graded.cgc9 = psa9;
+            if (!parsed.market.graded.sgc9) parsed.market.graded.sgc9 = Math.round(psa9 * 0.90);
           }
           if (psa8) {
-            if (!parsed.market.graded.sgc8) parsed.market.graded.sgc8 = psa8;
-            if (!parsed.market.graded.cgc8) parsed.market.graded.cgc8 = psa8;
+            if (!parsed.market.graded.sgc8) parsed.market.graded.sgc8 = Math.round(psa8 * 0.90);
           }
 
           // Attach per-tier eBay listing URLs for frontend deep-links
@@ -1365,20 +1365,6 @@ app.post('/api/grade', async (req, res) => {
           if (v < 2000) return { tier: 'Fast Track',  cost: 100 };
           return               { tier: 'Walk-Through', cost: 300 };
         };
-        const sgcTierFor = (v) => {
-          if (v < 500)  return { tier: 'Standard',     cost: 25  };
-          if (v < 1500) return { tier: 'Express',      cost: 50  };
-          if (v < 3000) return { tier: 'Super Express', cost: 100 };
-          return               { tier: 'Walk-Through', cost: 250 };
-        };
-        const cgcTierFor = (v) => {
-          if (v < 500)  return { tier: 'Economy',    cost: 20  };
-          if (v < 1000) return { tier: 'Standard',   cost: 30  };
-          if (v < 2500) return { tier: 'Express',    cost: 65  };
-          if (v < 10000) return { tier: 'Priority',  cost: 150 };
-          return               { tier: 'Walk-Through', cost: 300 };
-        };
-
         const psaKey = `psa${s.psaExpectedGrade}`;
         if (g[psaKey]) {
           s.psaExpectedValue = g[psaKey];
@@ -1408,33 +1394,11 @@ app.post('/api/grade', async (req, res) => {
           s.bgsRecommended = profit >= 30 && s.bgsRoi >= 25;
         }
 
-        const sgcGradeKey = s.sgcExpectedGrade === 10 ? 'sgc10'
-          : s.sgcExpectedGrade === 9.5 ? 'sgc9_5'
-          : s.sgcExpectedGrade === 9   ? 'sgc9'
-          : s.sgcExpectedGrade === 8   ? 'sgc8' : null;
-        if (sgcGradeKey && g[sgcGradeKey]) {
-          s.sgcExpectedValue = g[sgcGradeKey];
-          const { tier, cost } = sgcTierFor(s.sgcExpectedValue);
-          s.sgcTier = tier;
-          s.sgcCost = cost;
-          const profit = s.sgcExpectedValue - raw - cost;
-          s.sgcRoi = raw > 0 ? Math.round((profit / raw) * 100) : 0;
-          s.sgcRecommended = profit >= 30 && s.sgcRoi >= 25;
-        }
-
-        const cgcGradeKey = s.cgcExpectedGrade === 10 ? 'cgc10'
-          : s.cgcExpectedGrade === 9.5 ? 'cgc9_5'
-          : s.cgcExpectedGrade === 9   ? 'cgc9'
-          : s.cgcExpectedGrade === 8   ? 'cgc8' : null;
-        if (cgcGradeKey && g[cgcGradeKey]) {
-          s.cgcExpectedValue = g[cgcGradeKey];
-          const { tier, cost } = cgcTierFor(s.cgcExpectedValue);
-          s.cgcTier = tier;
-          s.cgcCost = cost;
-          const profit = s.cgcExpectedValue - raw - cost;
-          s.cgcRoi = raw > 0 ? Math.round((profit / raw) * 100) : 0;
-          s.cgcRecommended = profit >= 30 && s.cgcRoi >= 25;
-        }
+        // SGC and CGC are not included in submission recommendations — neither grader
+        // commands a meaningful premium over PSA for most sports cards, so the ROI math
+        // flatters them without reflecting real market liquidity.
+        s.sgcRecommended = false;
+        s.cgcRecommended = false;
 
         text = JSON.stringify(parsed);
       }

@@ -1,30 +1,22 @@
 import { useState, useEffect } from "react";
 
 export default function SubmitTab({ result }) {
-  const { submission, market, bgs, sgc, cgc } = result;
+  const { submission, market, bgs } = result;
   const bgsIsBlackLabel = bgs?.isBlackLabel === true;
-  const sgcIsBlackLabel = false;
-  const cgcIsBlackLabel = false;
 
   const allRois = [
-    submission?.psaRecommended  ? Number(submission?.psaRoi)  || 0 : -Infinity,
-    submission?.bgsRecommended  ? Number(submission?.bgsRoi)  || 0 : -Infinity,
-    submission?.sgcRecommended  ? Number(submission?.sgcRoi)  || 0 : -Infinity,
-    submission?.cgcRecommended  ? Number(submission?.cgcRoi)  || 0 : -Infinity,
+    submission?.psaRecommended ? Number(submission?.psaRoi) || 0 : -Infinity,
+    submission?.bgsRecommended ? Number(submission?.bgsRoi) || 0 : -Infinity,
   ];
   const bestRoi = Math.max(...allRois);
   const psaRoi = Number(submission?.psaRoi) || 0;
   const bgsRoi = Number(submission?.bgsRoi) || 0;
-  const sgcRoi = Number(submission?.sgcRoi) || 0;
-  const cgcRoi = Number(submission?.cgcRoi) || 0;
-  const psaBestPick  = submission?.psaRecommended  && psaRoi  === bestRoi && bestRoi > -Infinity;
-  const bgsBestPick  = submission?.bgsRecommended  && bgsRoi  === bestRoi && bestRoi > -Infinity && !psaBestPick;
-  const sgcBestPick  = submission?.sgcRecommended  && sgcRoi  === bestRoi && bestRoi > -Infinity && !psaBestPick && !bgsBestPick;
-  const cgcBestPick  = submission?.cgcRecommended  && cgcRoi  === bestRoi && bestRoi > -Infinity && !psaBestPick && !bgsBestPick && !sgcBestPick;
+  const psaBestPick = submission?.psaRecommended && psaRoi === bestRoi && bestRoi > -Infinity;
+  const bgsBestPick = submission?.bgsRecommended && bgsRoi === bestRoi && bestRoi > -Infinity && !psaBestPick;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      {/* Company cards */}
+      {/* Company cards — PSA and BGS only */}
       <div className="result-card-0" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <CompanyCard
           company="PSA"
@@ -51,36 +43,6 @@ export default function SubmitTab({ result }) {
           }
           expectedValue={submission?.bgsExpectedValue}
           roi={submission?.bgsRoi}
-          rawValue={market?.raw}
-        />
-        <CompanyCard
-          company="SGC"
-          recommended={submission?.sgcRecommended}
-          bestPick={sgcBestPick}
-          tier={submission?.sgcTier}
-          cost={submission?.sgcCost}
-          expectedGrade={submission?.sgcExpectedGrade}
-          expectedGradeLabel={
-            submission?.sgcExpectedGrade === 10 ? "Pristine" :
-            submission?.sgcExpectedGrade === 9.5 ? "Mint+" : null
-          }
-          expectedValue={submission?.sgcExpectedValue}
-          roi={submission?.sgcRoi}
-          rawValue={market?.raw}
-        />
-        <CompanyCard
-          company="CGC"
-          recommended={submission?.cgcRecommended}
-          bestPick={cgcBestPick}
-          tier={submission?.cgcTier}
-          cost={submission?.cgcCost}
-          expectedGrade={submission?.cgcExpectedGrade}
-          expectedGradeLabel={
-            submission?.cgcExpectedGrade === 10 ? "Pristine" :
-            submission?.cgcExpectedGrade === 9.5 ? "Gem Mint" : null
-          }
-          expectedValue={submission?.cgcExpectedValue}
-          roi={submission?.cgcRoi}
           rawValue={market?.raw}
         />
       </div>
@@ -117,27 +79,6 @@ export default function SubmitTab({ result }) {
               { name: "Express", cost: "$40", note: "Under $999" },
               { name: "Fast Track", cost: "$100", note: "Under $1,999" },
               { name: "Walk-Through", cost: "$300", note: "High value" },
-            ]}
-          />
-          <TierGuide
-            company="SGC"
-            activeTier={submission?.sgcTier}
-            tiers={[
-              { name: "Standard", cost: "$25", note: "Under $500" },
-              { name: "Express", cost: "$50", note: "Under $1,500" },
-              { name: "Super Express", cost: "$100", note: "Under $3,000" },
-              { name: "Walk-Through", cost: "$250", note: "$3k+" },
-            ]}
-          />
-          <TierGuide
-            company="CGC"
-            activeTier={submission?.cgcTier}
-            tiers={[
-              { name: "Economy", cost: "$20", note: "Under $500" },
-              { name: "Standard", cost: "$30", note: "Under $1,000" },
-              { name: "Express", cost: "$65", note: "Under $2,500" },
-              { name: "Priority", cost: "$150", note: "Under $10,000" },
-              { name: "Walk-Through", cost: "$300", note: "$10k+" },
             ]}
           />
         </div>
