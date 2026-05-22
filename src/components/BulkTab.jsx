@@ -1,164 +1,245 @@
 import { useState, useRef } from "react";
+import { processImageFile, cropZonesFromImageData, extractJSON } from "../lib/imageUtils";
 
 function gradeColor(g) {
   if (g == null) return "rgba(255,255,255,0.3)";
-  if (g >= 10) return "#ffd60a";
-  if (g >= 9)  return "#30d158";
-  if (g >= 8)  return "#4fc3f7";
-  if (g >= 7)  return "#ff9f0a";
-  return "#ff453a";
+  if (g >= 10) return "#c9a84c";
+  if (g >= 9)  return "#f0f0f0";
+  if (g >= 8)  return "rgba(255,255,255,0.65)";
+  return "rgba(255,255,255,0.38)";
 }
 
-function fileToBase64(file) {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        const MAX = 1800;
-        let w = img.width, h = img.height;
-        if (w > MAX || h > MAX) { const r = Math.min(MAX/w, MAX/h); w = Math.round(w*r); h = Math.round(h*r); }
-        const canvas = document.createElement("canvas");
-        canvas.width = w; canvas.height = h;
-        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL("image/jpeg", 0.88).split(",")[1]);
-      };
-      img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
-  });
-}
-
-const CARD = {
-  background: "rgba(255,255,255,0.03)",
-  border: "1px solid rgba(255,255,255,0.07)",
-  borderRadius: 16,
-  padding: "14px",
-};
-
-function Chip({ color, children, onClick }) {
+function GradeChip({ label, grade, sub }) {
+  const color = gradeColor(grade);
+  const isGold = grade >= 10;
   return (
-    <span onClick={onClick} style={{
-      display: "inline-block",
-      background: `${color}18`, border: `1px solid ${color}40`,
-      borderRadius: 6, padding: "2px 8px",
-      color, fontSize: 11, fontWeight: 600,
-      cursor: onClick ? "pointer" : "default",
-    }}>{children}</span>
+    <div style={{
+      display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+      background: isGold ? "rgba(201,168,76,0.08)" : "rgba(255,255,255,0.04)",
+      border: `1px solid ${isGold ? "rgba(201,168,76,0.25)" : "rgba(255,255,255,0.08)"}`,
+      borderRadius: 10, padding: "5px 8px", minWidth: 38,
+    }}>
+      <span style={{ color: "rgba(255,255,255,0.25)", fontSize: 7, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>{label}</span>
+      <span style={{ color, fontSize: 16, fontWeight: 700, lineHeight: 1, letterSpacing: "-0.5px" }}>
+        {grade != null ? (Number.isInteger(grade) ? grade : Number(grade).toFixed(1)) : "—"}
+      </span>
+      {sub && <span style={{ color: "rgba(255,255,255,0.18)", fontSize: 7, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", marginTop: 1 }}>{sub}</span>}
+    </div>
+  );
+}
+
+function SubgradeRow({ bgs }) {
+  if (!bgs) return null;
+  const items = [
+    { label: "Ctr", val: bgs.centering },
+    { label: "Crn", val: bgs.corners },
+    { label: "Edg", val: bgs.edges },
+    { label: "Srf", val: bgs.surface },
+  ];
+  const defined = items.filter(i => i.val != null);
+  if (!defined.length) return null;
+  return (
+    <div style={{ display: "flex", gap: 6 }}>
+      {defined.map(({ label, val }) => (
+        <div key={label} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1,
+          background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
+          borderRadius: 7, padding: "4px 7px", minWidth: 32 }}>
+          <span style={{ color: "rgba(255,255,255,0.2)", fontSize: 7, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>{label}</span>
+          <span style={{ color: gradeColor(val), fontSize: 12, fontWeight: 600, lineHeight: 1 }}>
+            {Number(val).toFixed(1)}
+          </span>
+        </div>
+      ))}
+    </div>
   );
 }
 
 function BulkItem({ item, onConfirm, onRemove }) {
   const cardName = item.confirmedCard
-    ? `${item.confirmedCard.player}`
+    ? item.confirmedCard.player
     : item.candidates?.[0]?.player ?? "Identifying…";
 
   const cardSub = item.confirmedCard
-    ? `${item.confirmedCard.year} ${item.confirmedCard.set} · ${item.confirmedCard.variant ?? "Base"}`
+    ? `${item.confirmedCard.year} · ${item.confirmedCard.set} · ${item.confirmedCard.variant ?? "Base"}`
     : item.candidates?.[0]
-      ? `${item.candidates[0].year} ${item.candidates[0].set}`
+      ? `${item.candidates[0].year} · ${item.candidates[0].set}`
       : "";
 
-  const statusChip = () => {
-    switch (item.status) {
-      case 'loading':
-      case 'identifying': return <Chip color="rgba(255,255,255,0.25)">Identifying…</Chip>;
-      case 'pending_confirm': return <Chip color="#ff9f0a">Confirm card ↓</Chip>;
-      case 'confirmed': return <Chip color="rgba(255,255,255,0.25)">Ready to grade</Chip>;
-      case 'grading':   return <Chip color="#c9a84c">Grading…</Chip>;
-      case 'done':      return (
-        <div style={{ display: "flex", gap: 6 }}>
-          <Chip color={gradeColor(item.result?.psa?.grade)}>PSA {item.result?.psa?.grade ?? "—"}</Chip>
-          <Chip color={gradeColor(item.result?.bgs?.overall)}>BGS {item.result?.bgs?.overall ?? "—"}</Chip>
-        </div>
-      );
-      case 'error': return <Chip color="#ff453a">{item.error}</Chip>;
-      default: return null;
-    }
+  const isPending = item.status === 'pending_confirm';
+  const isGrading = item.status === 'grading';
+  const isDone    = item.status === 'done';
+  const isError   = item.status === 'error';
+  const isWorking = ['loading', 'identifying', 'grading'].includes(item.status);
+
+  const statusBadge = () => {
+    if (item.status === 'identifying' || item.status === 'loading')
+      return <span style={badge('#c9a84c')}>Identifying…</span>;
+    if (item.status === 'pending_confirm')
+      return <span style={badge('#ff9f0a')}>Select card ↓</span>;
+    if (item.status === 'confirmed')
+      return <span style={badge('rgba(255,255,255,0.3)')}>Ready</span>;
+    if (item.status === 'grading')
+      return <span style={badge('#c9a84c')}>Grading…</span>;
+    if (isError)
+      return <span style={badge('#ff453a')}>{item.error}</span>;
+    return null;
   };
 
+  const psaGrade  = item.result?.psa?.grade;
+  const bgsGrade  = item.result?.bgs?.overall;
+  const sgcGrade  = item.result?.sgc?.grade;
+  const cgcGrade  = item.result?.cgc?.grade;
+  const psaRec    = item.result?.submission?.psaRecommended;
+  const psa10Val  = item.result?.market?.graded?.psa10;
+  const verdict   = item.result?.verdict ?? "";
+
   return (
-    <div style={CARD}>
-      {/* Row */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        {item.thumb && (
+    <div style={{
+      background: "#1c1c1e",
+      border: `1px solid ${isDone ? "rgba(255,255,255,0.1)" : isPending ? "rgba(255,159,10,0.2)" : "rgba(255,255,255,0.07)"}`,
+      borderRadius: 20,
+      overflow: "hidden",
+      boxShadow: "0 2px 20px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.07)",
+    }}>
+      {/* Main row */}
+      <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "16px 18px" }}>
+        {item.thumb ? (
           <img src={item.thumb} alt="" style={{
-            width: 44, height: 60, objectFit: "cover", borderRadius: 6,
-            flexShrink: 0, opacity: item.status === 'error' ? 0.3 : 1,
+            width: 42, height: 58, objectFit: "cover", borderRadius: 8,
+            flexShrink: 0, opacity: isError ? 0.3 : 1,
+            boxShadow: "0 2px 8px rgba(0,0,0,0.5)",
           }} />
+        ) : (
+          <div style={{ width: 42, height: 58, borderRadius: 8, background: "rgba(255,255,255,0.05)", flexShrink: 0 }} />
         )}
+
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ color: "rgba(255,255,255,0.8)", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          <div style={{ color: isError ? "rgba(255,255,255,0.3)" : "#fff", fontSize: 14, fontWeight: 700, letterSpacing: "-0.3px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginBottom: 3 }}>
             {cardName}
           </div>
           {cardSub && (
-            <div style={{ color: "rgba(255,255,255,0.28)", fontSize: 11, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{cardSub}</div>
+            <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11, marginBottom: isDone ? 0 : 7, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {cardSub}
+            </div>
           )}
-          <div style={{ marginTop: 7 }}>{statusChip()}</div>
+          {!isDone && statusBadge()}
         </div>
-        {!['grading', 'identifying', 'loading'].includes(item.status) && (
+
+        {isDone && (
+          <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
+            <GradeChip label="PSA" grade={psaGrade} sub={item.result?.psa?.label} />
+            <GradeChip label="BGS" grade={bgsGrade != null ? (Number.isInteger(bgsGrade) ? bgsGrade : bgsGrade) : null} />
+            <GradeChip label="SGC" grade={sgcGrade} />
+            <GradeChip label="CGC" grade={cgcGrade} />
+          </div>
+        )}
+
+        {!isWorking && (
           <button onClick={() => onRemove(item.id)} style={{
-            background: "none", border: "none", color: "rgba(255,255,255,0.2)",
-            fontSize: 20, cursor: "pointer", padding: "0 2px", lineHeight: 1, flexShrink: 0,
+            background: "none", border: "none", color: "rgba(255,255,255,0.15)",
+            fontSize: 22, cursor: "pointer", padding: "0 2px", lineHeight: 1, flexShrink: 0,
+            fontFamily: "inherit",
           }}>×</button>
         )}
       </div>
 
       {/* Candidate picker */}
-      {item.status === 'pending_confirm' && item.candidates.length > 0 && (
-        <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", gap: 6 }}>
+      {isPending && item.candidates.length > 0 && (
+        <div style={{ padding: "0 18px 16px", display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 9, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>
+            Which card is this?
+          </div>
           {item.candidates.map((c, i) => (
             <button key={i} onClick={() => onConfirm(item.id, c)} style={{
-              background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
-              borderRadius: 10, padding: "8px 12px", textAlign: "left",
+              background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)",
+              borderRadius: 12, padding: "10px 14px", textAlign: "left",
               cursor: "pointer", fontFamily: "inherit",
+              transition: "border-color 0.15s",
             }}>
-              <div style={{ color: "#fff", fontSize: 13, fontWeight: 600 }}>{c.player}</div>
-              <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 11, marginTop: 2 }}>{c.year} {c.set} · {c.variant}</div>
+              <div style={{ color: "#fff", fontSize: 13, fontWeight: 600, marginBottom: 2 }}>{c.player}</div>
+              <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 11 }}>{c.year} · {c.set} · {c.variant}</div>
             </button>
           ))}
         </div>
       )}
 
-      {/* Result snippet */}
-      {item.status === 'done' && item.result && (
-        <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-          {item.result.verdict && (
-            <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 11, lineHeight: 1.55, marginBottom: 10 }}>
-              {item.result.verdict.length > 130 ? item.result.verdict.slice(0, 130) + "…" : item.result.verdict}
-            </div>
+      {/* Done — expanded result */}
+      {isDone && item.result && (
+        <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", padding: "14px 18px", display: "flex", flexDirection: "column", gap: 10 }}>
+          {/* BGS subgrades */}
+          {item.result.bgs && (
+            <SubgradeRow bgs={item.result.bgs} />
           )}
-          <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
-            {item.result.market?.raw != null && (
+
+          {/* Verdict */}
+          {verdict && (
+            <p style={{ color: "rgba(255,255,255,0.32)", fontSize: 11, lineHeight: 1.65, margin: 0 }}>
+              {verdict.length > 220 ? verdict.slice(0, 220) + "…" : verdict}
+            </p>
+          )}
+
+          {/* Market + submission */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+            {psa10Val ? (
               <div>
-                <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 2 }}>Raw</div>
-                <div style={{ color: "#fff", fontSize: 13, fontWeight: 700 }}>${item.result.market.raw}</div>
-              </div>
-            )}
-            {item.result.market?.graded?.psa10 && (
-              <div>
-                <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 2 }}>PSA 10</div>
-                <div style={{ color: "#c9a84c", fontSize: 13, fontWeight: 700 }}>${item.result.market.graded.psa10}</div>
-              </div>
-            )}
-            {item.result.submission && (
-              <div style={{ marginLeft: "auto" }}>
-                <div style={{
-                  background: item.result.submission.psaRecommended ? "rgba(48,209,88,0.1)" : "rgba(255,69,58,0.1)",
-                  border: `1px solid ${item.result.submission.psaRecommended ? "rgba(48,209,88,0.3)" : "rgba(255,69,58,0.3)"}`,
-                  borderRadius: 8, padding: "5px 10px",
-                  color: item.result.submission.psaRecommended ? "#30d158" : "#ff453a",
-                  fontSize: 11, fontWeight: 700,
-                }}>
-                  {item.result.submission.psaRecommended ? "Submit ✓" : "Don't Submit"}
+                <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 8, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 2 }}>PSA 10</div>
+                <div style={{ color: "#c9a84c", fontSize: 15, fontWeight: 700, letterSpacing: "-0.3px" }}>
+                  ${psa10Val.toLocaleString()}
                 </div>
+              </div>
+            ) : <div />}
+            {item.result.submission != null && (
+              <div style={{
+                background: psaRec ? "rgba(48,209,88,0.1)" : "rgba(255,69,58,0.08)",
+                border: `1px solid ${psaRec ? "rgba(48,209,88,0.25)" : "rgba(255,69,58,0.2)"}`,
+                borderRadius: 8, padding: "5px 12px",
+                color: psaRec ? "#30d158" : "#ff453a",
+                fontSize: 12, fontWeight: 700,
+              }}>
+                {psaRec ? "✓ Submit" : "✗ Skip"}
               </div>
             )}
           </div>
         </div>
       )}
+
+      {/* Grading progress bar */}
+      {isGrading && (
+        <div style={{ height: 2, background: "rgba(255,255,255,0.05)" }}>
+          <div className="bulk-progress-bar" style={{ height: "100%", background: "#c9a84c", borderRadius: 1 }} />
+        </div>
+      )}
     </div>
   );
+}
+
+function badge(color) {
+  return {
+    display: "inline-block",
+    background: `${color}18`, border: `1px solid ${color}35`,
+    borderRadius: 6, padding: "3px 8px",
+    color, fontSize: 10, fontWeight: 700, letterSpacing: "0.02em",
+  };
+}
+
+function saveGrading(parsed) {
+  try {
+    const existing = JSON.parse(localStorage.getItem('cgon_history') || '[]');
+    const entry = {
+      id: Date.now().toString(),
+      savedAt: new Date().toISOString(),
+      player: parsed.player,
+      year: parsed.year,
+      set_name: parsed.set,
+      variant: parsed.variant,
+      card_number: parsed.cardNumber ?? null,
+      psa_grade: parsed.psa?.grade ?? null,
+      bgs_overall: parsed.bgs?.overall ?? null,
+      raw_value: parsed.market?.raw ?? null,
+      result: parsed,
+    };
+    localStorage.setItem('cgon_history', JSON.stringify([entry, ...existing].slice(0, 50)));
+  } catch {}
 }
 
 export default function BulkTab({ session, userPlan, onUpgrade, isLoggedIn, onOpenCamera }) {
@@ -167,12 +248,8 @@ export default function BulkTab({ session, userPlan, onUpgrade, isLoggedIn, onOp
   const fileInputRef = useRef();
 
   const authHeaders = () => session ? { Authorization: `Bearer ${session.access_token}` } : {};
-
   const openCamera = () => onOpenCamera?.((file) => addImages([file]));
-
-  const tokensLeft = userPlan
-    ? Math.max(0, userPlan.grade_limit - userPlan.grades_used)
-    : 0;
+  const tokensLeft = userPlan ? Math.max(0, userPlan.grade_limit - userPlan.grades_used) : 0;
 
   const addImages = async (files) => {
     const fileArr = Array.from(files).slice(0, 20);
@@ -180,6 +257,11 @@ export default function BulkTab({ session, userPlan, onUpgrade, isLoggedIn, onOp
       id: Math.random().toString(36).slice(2),
       thumb: URL.createObjectURL(f),
       imageData: null,
+      cardBounds: null,
+      centering: null,
+      width: null,
+      height: null,
+      originalObjectURL: null,
       status: 'loading',
       candidates: [],
       confirmedCard: null,
@@ -190,23 +272,33 @@ export default function BulkTab({ session, userPlan, onUpgrade, isLoggedIn, onOp
 
     await Promise.all(fileArr.map(async (file, idx) => {
       const id = newItems[idx].id;
-      const imageData = await fileToBase64(file);
-      setItems(prev => prev.map(i => i.id === id ? { ...i, imageData, status: 'identifying' } : i));
       try {
+        const processed = await processImageFile(file);
+        setItems(prev => prev.map(i => i.id === id ? {
+          ...i,
+          imageData: processed.imageData,
+          cardBounds: processed.cardBounds,
+          centering: processed.centering,
+          width: processed.width,
+          height: processed.height,
+          originalObjectURL: processed.originalObjectURL,
+          status: 'identifying',
+        } : i));
+
         const res = await fetch('/api/identify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ images: [imageData] }),
+          body: JSON.stringify({ images: [processed.imageData] }),
         });
         const data = await res.json();
         const candidates = data.candidates ?? [];
         if (data.confidence >= 98 && candidates.length === 1) {
           setItems(prev => prev.map(i => i.id === id
-            ? { ...i, imageData, status: 'confirmed', candidates, confirmedCard: candidates[0] }
+            ? { ...i, status: 'confirmed', candidates, confirmedCard: candidates[0] }
             : i));
         } else {
           setItems(prev => prev.map(i => i.id === id
-            ? { ...i, imageData, status: 'pending_confirm', candidates }
+            ? { ...i, status: 'pending_confirm', candidates }
             : i));
         }
       } catch {
@@ -225,14 +317,30 @@ export default function BulkTab({ session, userPlan, onUpgrade, isLoggedIn, onOp
     const toGrade = items.filter(i => i.status === 'confirmed');
     if (!toGrade.length) return;
     setGrading(true);
-
     for (const item of toGrade) {
       setItems(prev => prev.map(i => i.id === item.id ? { ...i, status: 'grading' } : i));
       try {
+        let zoneCrops = null;
+        if (item.cardBounds && item.imageData) {
+          try {
+            zoneCrops = await cropZonesFromImageData(item.imageData, item.cardBounds, {
+              width: item.width,
+              height: item.height,
+              originalObjectURL: item.originalObjectURL,
+            });
+          } catch {}
+        }
+
         const res = await fetch('/api/grade', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...authHeaders() },
-          body: JSON.stringify({ images: [item.imageData], confirmedCard: item.confirmedCard }),
+          body: JSON.stringify({
+            images: [item.imageData],
+            confirmedCard: item.confirmedCard,
+            zoneCrops,
+            measuredCentering: item.centering ?? null,
+            gradingModel: 'claude-opus-4-7',
+          }),
         });
         if (res.status === 403) {
           setItems(prev => prev.map(i =>
@@ -244,9 +352,14 @@ export default function BulkTab({ session, userPlan, onUpgrade, isLoggedIn, onOp
           break;
         }
         const data = await res.json();
-        let result = null;
-        try { result = JSON.parse(data.content?.[0]?.text ?? '{}'); } catch {}
+        if (data.code === 'GRADE_LIMIT_REACHED') {
+          setItems(prev => prev.map(i => i.id === item.id ? { ...i, status: 'error', error: 'Out of tokens' } : i));
+          onUpgrade?.();
+          break;
+        }
+        const result = extractJSON(data.content?.[0]?.text ?? '');
         setItems(prev => prev.map(i => i.id === item.id ? { ...i, status: 'done', result } : i));
+        if (result) saveGrading(result);
       } catch {
         setItems(prev => prev.map(i => i.id === item.id ? { ...i, status: 'error', error: 'Grade failed' } : i));
       }
@@ -256,14 +369,24 @@ export default function BulkTab({ session, userPlan, onUpgrade, isLoggedIn, onOp
 
   const confirmedCount = items.filter(i => i.status === 'confirmed').length;
   const pendingCount   = items.filter(i => i.status === 'pending_confirm').length;
-  const gradingCount   = items.filter(i => i.status === 'grading').length;
   const doneCount      = items.filter(i => i.status === 'done').length;
+  const gradingCount   = items.filter(i => i.status === 'grading').length;
 
   if (!isLoggedIn) {
     return (
-      <div style={{ ...CARD, textAlign: "center", padding: "48px 24px" }}>
-        <div style={{ color: "#fff", fontSize: 16, fontWeight: 700, marginBottom: 8 }}>Sign in to use Bulk Grading</div>
-        <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 13 }}>Grade up to 20 cards at once — each uses 1 token</div>
+      <div style={{
+        background: "#1c1c1e", border: "1px solid rgba(255,255,255,0.08)",
+        borderRadius: 24, padding: "48px 28px", textAlign: "center",
+        boxShadow: "0 2px 20px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.09)",
+      }}>
+        <div style={{ fontSize: 36, marginBottom: 16 }}>🃏</div>
+        <div style={{ color: "#fff", fontSize: 17, fontWeight: 700, letterSpacing: "-0.4px", marginBottom: 8 }}>
+          Bulk Grading
+        </div>
+        <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 13, lineHeight: 1.6, marginBottom: 24, maxWidth: 260, margin: "0 auto 24px" }}>
+          Grade up to 20 cards at once. Sign in to get started — each card uses 1 token.
+        </div>
+        <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 11 }}>Sign in from the top right</div>
       </div>
     );
   }
@@ -271,75 +394,72 @@ export default function BulkTab({ session, userPlan, onUpgrade, isLoggedIn, onOp
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
 
-      {/* Upload area */}
-      {items.length === 0 ? (
+      {/* Empty state */}
+      {items.length === 0 && (
         <div style={{
-          ...CARD,
-          padding: "32px 24px", textAlign: "center",
-          borderStyle: "dashed", borderColor: "rgba(201,168,76,0.3)",
+          background: "#1c1c1e", border: "1px solid rgba(255,255,255,0.08)",
+          borderRadius: 24, padding: "32px 22px",
+          boxShadow: "0 2px 20px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.09)",
         }}>
-          <div style={{ color: "#fff", fontSize: 15, fontWeight: 700, marginBottom: 4 }}>Add Card Photos</div>
-          <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 13, marginBottom: 6 }}>One photo per card — up to 20 at once</div>
-          <div style={{ color: "rgba(201,168,76,0.55)", fontSize: 12, marginBottom: 20 }}>{tokensLeft} token{tokensLeft !== 1 ? "s" : ""} available · 1 per grade</div>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ textAlign: "center", marginBottom: 24 }}>
+            <div style={{ color: "#fff", fontSize: 17, fontWeight: 700, letterSpacing: "-0.4px", marginBottom: 6 }}>
+              Grade Multiple Cards
+            </div>
+            <div style={{ color: "rgba(255,255,255,0.32)", fontSize: 13, lineHeight: 1.5 }}>
+              One photo per card · up to 20 at once
+            </div>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 12,
+              background: "rgba(48,209,88,0.08)", border: "1px solid rgba(48,209,88,0.2)",
+              borderRadius: 100, padding: "5px 14px" }}>
+              <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#30d158" }} />
+              <span style={{ color: "#30d158", fontSize: 11, fontWeight: 700 }}>
+                {tokensLeft} token{tokensLeft !== 1 ? "s" : ""} available
+              </span>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 10 }}>
             <button onClick={() => fileInputRef.current?.click()} style={{
-              flex: 1, padding: "12px 0",
-              background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: 12, cursor: "pointer", fontFamily: "inherit",
-              display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
-            }}>
-              <svg width="22" height="22" viewBox="0 0 32 32" fill="none">
-                <rect x="2" y="6" width="28" height="20" rx="3" stroke="rgba(255,255,255,0.4)" strokeWidth="1.6" fill="none"/>
-                <line x1="16" y1="12" x2="16" y2="22" stroke="rgba(255,255,255,0.4)" strokeWidth="1.6" strokeLinecap="round"/>
-                <line x1="11" y1="17" x2="21" y2="17" stroke="rgba(255,255,255,0.4)" strokeWidth="1.6" strokeLinecap="round"/>
-                <path d="M10 6 L12 2 L20 2 L22 6" stroke="rgba(255,255,255,0.4)" strokeWidth="1.6" fill="none" strokeLinejoin="round"/>
-              </svg>
-              <span style={{ color: "rgba(255,255,255,0.55)", fontSize: 12, fontWeight: 600 }}>Upload</span>
-            </button>
+              flex: 1, padding: "16px 0",
+              background: "linear-gradient(180deg, #dfc055 0%, #c9a84c 55%, #b89040 100%)",
+              color: "#000", border: "none", borderRadius: 16,
+              fontSize: 14, fontWeight: 700, letterSpacing: "-0.2px",
+              cursor: "pointer", fontFamily: "inherit",
+              boxShadow: "0 4px 24px rgba(201,168,76,0.45), inset 0 1px 0 rgba(255,255,255,0.25)",
+            }}>Upload Photos</button>
             {onOpenCamera && (
               <button onClick={openCamera} style={{
-                flex: 1, padding: "12px 0",
-                background: "rgba(201,168,76,0.06)", border: "1px solid rgba(201,168,76,0.25)",
-                borderRadius: 12, cursor: "pointer", fontFamily: "inherit",
-                display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
-              }}>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" stroke="rgba(201,168,76,0.7)" strokeWidth="1.6" fill="none" strokeLinejoin="round"/>
-                  <circle cx="12" cy="13" r="4" stroke="rgba(201,168,76,0.7)" strokeWidth="1.6" fill="none"/>
-                </svg>
-                <span style={{ color: "rgba(201,168,76,0.8)", fontSize: 12, fontWeight: 600 }}>Camera</span>
-              </button>
+                flex: 1, padding: "16px 0",
+                background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.7)",
+                border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16,
+                fontSize: 14, fontWeight: 600, letterSpacing: "-0.2px",
+                cursor: "pointer", fontFamily: "inherit",
+              }}>Take Photo</button>
             )}
           </div>
         </div>
-      ) : (
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 13 }}>
+      )}
+
+      {/* Header row when items exist */}
+      {items.length > 0 && (
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 2px" }}>
+          <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 13 }}>
             {items.length} card{items.length !== 1 ? "s" : ""}
-            {doneCount > 0 && <span style={{ color: "#30d158" }}> · {doneCount} graded</span>}
-          </span>
-          <div style={{ display: "flex", gap: 6 }}>
+            {doneCount > 0 && <span style={{ color: "#30d158", fontWeight: 600 }}> · {doneCount} graded</span>}
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
             {onOpenCamera && (
               <button onClick={openCamera} style={{
-                background: "none", border: "1px solid rgba(201,168,76,0.2)",
-                borderRadius: 8, padding: "5px 10px",
-                color: "rgba(201,168,76,0.65)", fontSize: 12,
+                background: "none", border: "1px solid rgba(201,168,76,0.22)", borderRadius: 10,
+                padding: "6px 12px", color: "rgba(201,168,76,0.7)", fontSize: 12, fontWeight: 600,
                 cursor: "pointer", fontFamily: "inherit",
-                display: "flex", alignItems: "center", gap: 5,
-              }}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" stroke="currentColor" strokeWidth="1.8" fill="none" strokeLinejoin="round"/>
-                  <circle cx="12" cy="13" r="4" stroke="currentColor" strokeWidth="1.8" fill="none"/>
-                </svg>
-                Camera
-              </button>
+              }}>Camera</button>
             )}
             <button onClick={() => fileInputRef.current?.click()} style={{
-              background: "none", border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: 8, padding: "5px 12px",
-              color: "rgba(255,255,255,0.45)", fontSize: 12,
+              background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10,
+              padding: "6px 12px", color: "rgba(255,255,255,0.4)", fontSize: 12, fontWeight: 600,
               cursor: "pointer", fontFamily: "inherit",
-            }}>+ Add More</button>
+            }}>+ Add</button>
           </div>
         </div>
       )}
@@ -347,27 +467,31 @@ export default function BulkTab({ session, userPlan, onUpgrade, isLoggedIn, onOp
       <input ref={fileInputRef} type="file" accept="image/*" multiple style={{ display: "none" }}
         onChange={e => { if (e.target.files?.length) addImages(e.target.files); e.target.value = ''; }} />
 
-      {/* Item list */}
+      {/* Card list */}
       {items.map(item => (
         <BulkItem key={item.id} item={item} onConfirm={confirmItem} onRemove={removeItem} />
       ))}
 
       {/* Pending notice */}
       {pendingCount > 0 && !grading && (
-        <div style={{ color: "#ff9f0a", fontSize: 12, textAlign: "center", opacity: 0.8 }}>
+        <div style={{
+          background: "rgba(255,159,10,0.08)", border: "1px solid rgba(255,159,10,0.2)",
+          borderRadius: 12, padding: "10px 16px", textAlign: "center",
+          color: "#ff9f0a", fontSize: 12, fontWeight: 600,
+        }}>
           {pendingCount} card{pendingCount !== 1 ? "s" : ""} need{pendingCount === 1 ? "s" : ""} confirmation above
         </div>
       )}
 
-      {/* Grade all */}
+      {/* Grade all button */}
       {confirmedCount > 0 && !grading && (
         <button onClick={gradeAll} style={{
-          width: "100%", padding: "14px 0",
-          background: "#c9a84c", color: "#000",
-          border: "none", borderRadius: 14,
-          fontSize: 15, fontWeight: 700,
+          width: "100%", padding: "16px 0",
+          background: "linear-gradient(180deg, #dfc055 0%, #c9a84c 55%, #b89040 100%)",
+          color: "#000", border: "none", borderRadius: 18,
+          fontSize: 15, fontWeight: 800, letterSpacing: "-0.2px",
           cursor: "pointer", fontFamily: "inherit",
-          boxShadow: "0 4px 24px rgba(201,168,76,0.35)",
+          boxShadow: "0 6px 32px rgba(201,168,76,0.5), inset 0 1px 0 rgba(255,255,255,0.25)",
         }}>
           Grade {confirmedCount} Card{confirmedCount !== 1 ? "s" : ""} — {confirmedCount} Token{confirmedCount !== 1 ? "s" : ""}
         </button>
@@ -375,11 +499,23 @@ export default function BulkTab({ session, userPlan, onUpgrade, isLoggedIn, onOp
 
       {/* Grading progress */}
       {grading && (
-        <div style={{ textAlign: "center", padding: "8px 0" }}>
-          <div style={{ color: "#c9a84c", fontSize: 13, fontWeight: 600 }}>
+        <div style={{
+          background: "#1c1c1e", border: "1px solid rgba(255,255,255,0.08)",
+          borderRadius: 16, padding: "16px 20px", textAlign: "center",
+          boxShadow: "0 2px 16px rgba(0,0,0,0.3)",
+        }}>
+          <div style={{ color: "#c9a84c", fontSize: 14, fontWeight: 700, letterSpacing: "-0.2px", marginBottom: 4 }}>
             Grading {doneCount + 1} of {doneCount + confirmedCount + gradingCount}…
           </div>
-          <div style={{ color: "rgba(255,255,255,0.25)", fontSize: 11, marginTop: 4 }}>This takes ~30 seconds per card</div>
+          <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 11 }}>~30 seconds per card</div>
+          <div style={{ marginTop: 12, height: 3, background: "rgba(255,255,255,0.06)", borderRadius: 99, overflow: "hidden" }}>
+            <div style={{
+              height: "100%", borderRadius: 99,
+              background: "linear-gradient(90deg, #c9a84c, #e8c870)",
+              width: `${Math.round((doneCount / (doneCount + confirmedCount + gradingCount)) * 100)}%`,
+              transition: "width 0.4s ease",
+            }} />
+          </div>
         </div>
       )}
 
@@ -387,8 +523,9 @@ export default function BulkTab({ session, userPlan, onUpgrade, isLoggedIn, onOp
       {items.length > 0 && !grading && (
         <button onClick={() => setItems([])} style={{
           background: "none", border: "none",
-          color: "rgba(255,255,255,0.18)", fontSize: 12,
+          color: "rgba(255,255,255,0.15)", fontSize: 12,
           cursor: "pointer", fontFamily: "inherit", padding: "2px 0",
+          textAlign: "center",
         }}>Clear all</button>
       )}
     </div>
