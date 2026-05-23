@@ -1197,8 +1197,6 @@ export default function GradeTab({ images, result, candidates, loading, error, o
               {[
                 { company: "PSA", grade: "10", sub: "GEM MT" },
                 { company: "BGS", grade: "10", sub: "PRISTINE" },
-                { company: "SGC", grade: "10", sub: "PRISTINE" },
-                { company: "CGC", grade: "10", sub: "PRISTINE" },
               ].map(({ company, grade, sub }, idx) => (
                 <div key={company} className={`hero-float-${idx}`} style={{
                   flex: 1,
@@ -1224,7 +1222,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
                 Know If You Should<br />Grade — Or Not
               </div>
               <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 14, lineHeight: 1.5, marginBottom: 22 }}>
-                Get a PSA, BGS, SGC &amp; CGC estimate in 30 seconds — free to try, no account needed.
+                Get a PSA &amp; BGS estimate in 30 seconds — free to try, no account needed.
               </div>
             </div>
 
@@ -1607,21 +1605,6 @@ export default function GradeTab({ images, result, candidates, loading, error, o
                 grade={displayResult.bgs?.overall}
                 sub={displayResult.bgs?.isBlackLabel ? "Black Label" : displayResult.bgs?.overall === 10 ? "Pristine" : displayResult.bgs?.overall === 9.5 ? "Gem Mint" : "Beckett"}
                 blackLabel={displayResult.bgs?.isBlackLabel}
-                compact
-              />
-              <div style={{ background: "rgba(255,255,255,0.06)" }} />
-              <GradeHalf
-                label="SGC"
-                grade={displayResult.sgc?.grade}
-                sub={displayResult.sgc?.label}
-                compact
-              />
-              <div style={{ background: "rgba(255,255,255,0.06)" }} />
-              <GradeHalf
-                label="CGC"
-                grade={displayResult.cgc?.grade}
-                sub={displayResult.cgc?.label}
-                side="right"
                 compact
               />
             </div>

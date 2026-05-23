@@ -246,19 +246,6 @@ const TABS = [
 ];
 
 const PSA_LABELS = { 10: "GEM MT", 9: "MINT", 8: "NM-MT", 7: "NM", 6: "EX-MT", 5: "EX", 4: "VG-EX", 3: "VG", 2: "GOOD", 1: "PR" };
-const SGC_LABELS = { 10: "PRISTINE", 9.5: "MINT+", 9: "MINT", 8.5: "NM-MT+", 8: "NM-MT", 7.5: "NM+", 7: "NM" };
-const CGC_LABELS = { 10: "PRISTINE", 9.5: "GEM MINT", 9: "MINT", 8.5: "NM-MT+", 8: "NM-MT", 7.5: "NM+", 7: "NM" };
-function computeSgcGrade(overall, isBlackLabel) {
-  if (isBlackLabel) return 10;
-  if (overall >= 9.5) return 9.5;
-  if (overall >= 9.0) return 9;
-  if (overall >= 8.5) return 8.5;
-  if (overall >= 8.0) return 8;
-  if (overall >= 7.5) return 7.5;
-  if (overall >= 7.0) return 7;
-  return Math.max(1, Math.round(overall));
-}
-
 function bgsCenteringFromCentering(c) {
   if (!c) return null;
   const lr = Math.max(c.leftPct ?? 50, c.rightPct ?? 50);
@@ -286,13 +273,10 @@ function recomputeBgsAndPsa(prevResult, centering) {
   const isBlackLabel = subs.every(v => v === 10);
   // PSA: straight round of the 4-subgrade average
   const psaGrade = Math.max(1, Math.min(10, Math.round(avg)));
-  const sgcGrade = computeSgcGrade(overall, isBlackLabel);
   return {
     ...prevResult,
     bgs: { ...prevResult.bgs, overall, isBlackLabel, centering: c },
     psa: { grade: psaGrade, label: PSA_LABELS[psaGrade] ?? prevResult.psa?.label ?? "" },
-    sgc: { grade: sgcGrade, label: SGC_LABELS[sgcGrade] ?? "" },
-    cgc: { grade: sgcGrade, label: CGC_LABELS[sgcGrade] ?? "" },
   };
 }
 
@@ -308,8 +292,6 @@ const DEMO_RESULT = {
   player: "Patrick Mahomes", year: "2020", set: "Panini Prizm", variant: "Silver Prizm", cardNumber: "120", sport: "Football", confidence: 98,
   psa: { grade: 9, label: "MINT" },
   bgs: { overall: 9.0, isBlackLabel: false, centering: 9.5, corners: 9.0, edges: 8.5, surface: 9.5 },
-  sgc: { grade: 9, label: "MINT" },
-  cgc: { grade: 9, label: "MINT" },
   zones: [
     { zone: "corner-TL", psa10Match: "matches", observation: "Sharp 90° point with full silver color to the very tip", severity: null, description: null },
     { zone: "corner-TR", psa10Match: "matches", observation: "Clean sharp corner with full color hold", severity: null, description: null },
@@ -332,20 +314,19 @@ const DEMO_RESULT = {
     graded: {
       psa7: 60, psa8: 90, psa9: 130, psa10: 310,
       bgs7: 52, bgs8: 78, bgs9: 110, bgs9_5: 240, bgs10: 580, bgsBlackLabel: 2200,
-      sgc8: 80, sgc9: 120, sgc9_5: 185, sgc10: 270,
-      cgc8: 90, cgc9: 130, cgc9_5: 310, cgc10: 680,
+
     },
     trend: "rising", trendPercent: 14,
-    aiAnalysis: "The 2020 Prizm Silver Prizm Mahomes rookie remains one of the most liquid modern cards in the hobby. PSA 9 copies trade consistently in the $120–$140 range with PSA 10 demand staying strong above $300. Rising CGC adoption makes CGC 9.5 (PSA 10 equivalent) an attractive arbitrage play — CGC grades harder but commands PSA 10 prices.",
+    aiAnalysis: "The 2020 Prizm Silver Prizm Mahomes rookie remains one of the most liquid modern cards in the hobby. PSA 9 copies trade consistently in the $120–$140 range with PSA 10 demand staying strong above $300.",
   },
   submission: {
-    psaRecommended: true, bgsRecommended: false, sgcRecommended: true, cgcRecommended: true,
-    psaTier: "Value", bgsTier: "Standard", sgcTier: "Standard", cgcTier: "Economy",
-    psaCost: 33, bgsCost: 25, sgcCost: 25, cgcCost: 20,
-    psaExpectedGrade: 9, bgsExpectedGrade: 9.0, sgcExpectedGrade: 9, cgcExpectedGrade: 9,
-    psaExpectedValue: 130, bgsExpectedValue: 110, sgcExpectedValue: 120, cgcExpectedValue: 130,
-    psaRoi: 116, bgsRoi: 89, sgcRoi: 111, cgcRoi: 144,
-    analysis: "PSA 9 at $33 nets $52 profit on a $45 raw card — 116% ROI, well above the 25% threshold. CGC is the best pick at $20 submission cost with the same $130 expected value and 144% ROI if it lands a 9. BGS is marginal; the $110 expected value at BGS 9 minus $25 cost still returns 89% but PSA and CGC are stronger plays.",
+    psaRecommended: true, bgsRecommended: false,
+    psaTier: "Value", bgsTier: "Standard",
+    psaCost: 33, bgsCost: 25,
+    psaExpectedGrade: 9, bgsExpectedGrade: 9.0,
+    psaExpectedValue: 130, bgsExpectedValue: 110,
+    psaRoi: 116, bgsRoi: 89,
+    analysis: "PSA 9 at $33 nets $52 profit on a $45 raw card — 116% ROI, well above the 25% threshold. BGS is marginal; the $110 expected value at BGS 9 minus $25 cost still returns 89% but PSA is the stronger play.",
   },
   popData: {
     psa: { total: 61200, gemRate: 34, distribution: [

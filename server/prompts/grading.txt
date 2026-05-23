@@ -110,12 +110,10 @@ This is an INITIAL estimate. The user may override it after grading.
 
 OVERSIZED INSERT PRICING RULE: Downtown, Stained Glass, Color Blast, Sparkle, and similar inserts exist in BOTH standard 2.5×3.5 AND oversized 5×7 formats. The 5×7 version is a cheap product that sells raw for $5-30 and PSA 10 for $50-150. The standard 2.5×3.5 version is the valuable collectible. ALL market values you provide must reflect the STANDARD 2.5×3.5 size only. NEVER quote 5×7 oversized prices. When in doubt, your raw estimate should be at least $80 for a premium standard insert.
 
-Market ratios: PSA10=100% | PSA9=20-40% | BGS BL=200-1000% | BGS10=100-150% | BGS9.5=50-75% | BGS9=40-60% | SGC10=80-95% of PSA10 | SGC9.5=50-70% of PSA10 | SGC9=PSA9 equivalent | CGC10=BGS Pristine equivalent | CGC9.5=PSA10 equivalent | CGC9=PSA9 equivalent
+Market ratios: PSA10=100% | PSA9=20-40% | BGS BL=200-1000% | BGS10=100-150% | BGS9.5=50-75% | BGS9=40-60%
 Submission threshold: net profit ≥ $30 AND ROI ≥ 25%
 PSA tiers: Value $33(<$500), Regular $75(<$1500), Express $150(<$2500), Super Express $250(<$5000), Walk-Through $600(<$10000), Premium ≥$10000 ($1000 per $25k declared value, e.g. $10k card=$1000, $26k card=$2000)
 BGS tiers: Standard $25(<$499), Express $40(<$999), Fast Track $100(<$2000), Walk-Through $300
-SGC tiers: Standard $25(<$500), Express $50(<$1500), Super Express $100(<$3000), Walk-Through $250(<$10000)
-CGC tiers: Economy $20(<$500), Standard $30(<$1000), Express $65(<$2500), Priority $150, Walk-Through $300
 
 POP REPORT CALIBRATION — real anchors for accurate popData estimates:
 
@@ -177,17 +175,16 @@ Return ONLY raw JSON. If card identity uncertain: needsClarification:true with c
     "bgs": { "total": <int>, "gemRate": <pct>, "distribution": [{"grade":"BL","label":"Black Label","count":<int>},{"grade":10,"label":"Pristine","count":<int>},{"grade":9.5,"label":"Gem Mint","count":<int>},{"grade":9,"label":"Mint","count":<int>},{"grade":8.5,"label":"NM-MT+","count":<int>},{"grade":8,"label":"NM-MT","count":<int>},{"grade":7.5,"label":"NM+","count":<int>},{"grade":7,"label":"NM","count":<int>}] }
   },
   "market": {
-    "raw": <USD>, "graded": { "psa7":<USD>,"psa8":<USD>,"psa9":<USD>,"psa10":<USD>,"bgs7":<USD>,"bgs8":<USD>,"bgs9":<USD>,"bgs9_5":<USD>,"bgs10":<USD>,"bgsBlackLabel":<USD>,"sgc8":<USD>,"sgc9":<USD>,"sgc9_5":<USD>,"sgc10":<USD>,"cgc8":<USD>,"cgc9":<USD>,"cgc9_5":<USD>,"cgc10":<USD> },
+    "raw": <USD>, "graded": { "psa7":<USD>,"psa8":<USD>,"psa9":<USD>,"psa10":<USD>,"bgs7":<USD>,"bgs8":<USD>,"bgs9":<USD>,"bgs9_5":<USD>,"bgs10":<USD>,"bgsBlackLabel":<USD> },
     "trend": "rising|stable|falling", "trendPercent": <num>, "aiAnalysis": "2-3 sentences."
   },
   "submission": {
-    "psaRecommended": <bool>, "bgsRecommended": <bool>, "sgcRecommended": <bool>, "cgcRecommended": <bool>,
+    "psaRecommended": <bool>, "bgsRecommended": <bool>,
     "psaTier": "Value|Regular|Express|Super Express|Walk-Through|Premium", "bgsTier": "Standard|Express|Fast Track|Walk-Through",
-    "sgcTier": "Standard|Express|Super Express|Walk-Through", "cgcTier": "Economy|Standard|Express|Priority|Walk-Through",
-    "psaCost": <USD>, "bgsCost": <USD>, "sgcCost": <USD>, "cgcCost": <USD>,
-    "psaExpectedGrade": <num>, "bgsExpectedGrade": <num>, "sgcExpectedGrade": <num>, "cgcExpectedGrade": <num>,
-    "psaExpectedValue": <USD>, "bgsExpectedValue": <USD>, "sgcExpectedValue": <USD>, "cgcExpectedValue": <USD>,
-    "psaRoi": <num>, "bgsRoi": <num>, "sgcRoi": <num>, "cgcRoi": <num>,
-    "analysis": "2-3 sentences covering all four grading companies with dollar math."
+    "psaCost": <USD>, "bgsCost": <USD>,
+    "psaExpectedGrade": <num>, "bgsExpectedGrade": <num>,
+    "psaExpectedValue": <USD>, "bgsExpectedValue": <USD>,
+    "psaRoi": <num>, "bgsRoi": <num>,
+    "analysis": "2-3 sentences covering PSA and BGS with dollar math."
   }
 }

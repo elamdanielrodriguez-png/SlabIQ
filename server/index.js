@@ -242,16 +242,14 @@ async function fetchMarketComps(player, year, set, variant, cardNumber) {
 
   // For oversized-prone variants, exclude 5x7 jumbo keywords in both title AND description
   const sizeExclusion = isOversizedProne ? ' -5x7 -"5 x 7" -jumbo -oversized -"box topper"' : '';
-  const [rawList, psaList, bgsList, sgcList, cgcList] = await Promise.all([
+  const [rawList, psaList, bgsList] = await Promise.all([
     ebayFindingSearch(`${base}${sizeExclusion}`, 25, isOversizedProne),
     ebayFindingSearch(`${base} PSA${sizeExclusion}`, 25, isOversizedProne),
     ebayFindingSearch(`${base} BGS${sizeExclusion}`, 25, isOversizedProne),
-    ebayFindingSearch(`${base} SGC${sizeExclusion}`, 15, isOversizedProne),
-    ebayFindingSearch(`${base} CGC${sizeExclusion}`, 15, isOversizedProne),
   ]);
 
   const seen = new Set();
-  let unique = [...rawList, ...psaList, ...bgsList, ...sgcList, ...cgcList].filter(l => {
+  let unique = [...rawList, ...psaList, ...bgsList].filter(l => {
     if (seen.has(l.url)) return false;
     seen.add(l.url);
     return true;
@@ -264,7 +262,7 @@ async function fetchMarketComps(player, year, set, variant, cardNumber) {
   if (isOversizedProne) {
     const before = unique.length;
     unique = unique.filter(l => {
-      const isGraded = /\b(PSA|BGS|SGC|CGC)\b/i.test(l.title);
+      const isGraded = /\b(PSA|BGS)\b/i.test(l.title);
       return isGraded ? l.price >= 200 : l.price >= 100;
     });
     console.log(`Oversized filter: removed ${before - unique.length} listings below floor for "${variant}"`);
@@ -505,30 +503,6 @@ function computeSubgradesFromVerifications(verifications) {
 }
 
 const PSA_LABELS = { 10: 'GEM MT', 9: 'MINT', 8: 'NM-MT', 7: 'NM', 6: 'EX-MT', 5: 'EX', 4: 'VG-EX', 3: 'VG', 2: 'GOOD', 1: 'PR' };
-const SGC_LABELS = { 10: 'PRISTINE', 9.5: 'MINT+', 9: 'MINT', 8.5: 'NM-MT+', 8: 'NM-MT', 7.5: 'NM+', 7: 'NM', 6: 'EX-MT', 5: 'EX', 4: 'VG-EX', 3: 'VG', 2: 'GOOD', 1: 'PR' };
-const CGC_LABELS = { 10: 'PRISTINE', 9.5: 'GEM MINT', 9: 'MINT', 8.5: 'NM-MT+', 8: 'NM-MT', 7.5: 'NM+', 7: 'NM', 6: 'EX-MT', 5: 'EX', 4: 'VG-EX', 3: 'VG', 2: 'GOOD', 1: 'PR' };
-
-function computeSgcGrade(bgsOverall, isBlackLabel) {
-  if (isBlackLabel) return 10;
-  if (bgsOverall >= 9.5) return 9.5;
-  if (bgsOverall >= 9.0) return 9;
-  if (bgsOverall >= 8.5) return 8.5;
-  if (bgsOverall >= 8.0) return 8;
-  if (bgsOverall >= 7.5) return 7.5;
-  if (bgsOverall >= 7.0) return 7;
-  return Math.max(1, Math.round(bgsOverall));
-}
-
-function computeCgcGrade(bgsOverall, isBlackLabel) {
-  if (isBlackLabel) return 10;
-  if (bgsOverall >= 9.5) return 9.5;
-  if (bgsOverall >= 9.0) return 9;
-  if (bgsOverall >= 8.5) return 8.5;
-  if (bgsOverall >= 8.0) return 8;
-  if (bgsOverall >= 7.5) return 7.5;
-  if (bgsOverall >= 7.0) return 7;
-  return Math.max(1, Math.round(bgsOverall));
-}
 
 // Second-pass zone review: re-examine only the flagged zones with fresh eyes.
 // Fires when PSA 7–9 or any zone was marked microscopic (both are uncertain territory).
@@ -603,16 +577,12 @@ Return ONLY a JSON array, no prose:
     const psaCap = psaWeakest >= 9.5 ? 10 : psaWeakest >= 9.0 ? 9 : psaWeakest >= 8.0 ? 8 : psaWeakest >= 7.0 ? 7 : psaWeakest >= 6.0 ? 6 : 5;
     const psaGrade = Math.max(1, Math.min(psaCap, Math.round(avg)));
 
-    const sgcGrade2 = computeSgcGrade(overall, isBlackLabel);
-    const cgcGrade2 = computeCgcGrade(overall, isBlackLabel);
     console.log(`2nd pass result: PSA ${parsedResult.psa?.grade} → ${psaGrade}, BGS ${parsedResult.bgs?.overall} → ${overall}`);
     return {
       ...parsedResult,
       zones: updatedZones,
       bgs: { ...parsedResult.bgs, corners, edges, surface, overall, isBlackLabel },
       psa: { grade: psaGrade, label: PSA_LABELS[psaGrade] || '' },
-      sgc: { grade: sgcGrade2, label: SGC_LABELS[sgcGrade2] || '' },
-      cgc: { grade: cgcGrade2, label: CGC_LABELS[cgcGrade2] || '' },
     };
   } catch (err) {
     console.warn('Second pass failed:', err.message);
@@ -769,17 +739,10 @@ function sanitizeGradingResponse(rawText, measuredCentering) {
       parsed.psa.grade = psaGrade;
       parsed.psa.label = PSA_LABELS[psaGrade] || '';
 
-      const sgcGrade = computeSgcGrade(parsed.bgs.overall, parsed.bgs.isBlackLabel);
-      const cgcGrade = computeCgcGrade(parsed.bgs.overall, parsed.bgs.isBlackLabel);
-      parsed.sgc = { grade: sgcGrade, label: SGC_LABELS[sgcGrade] || '' };
-      parsed.cgc = { grade: cgcGrade, label: CGC_LABELS[cgcGrade] || '' };
-
       // Force submission expected grades to match computed grades so both tabs agree
       if (parsed.submission) {
         parsed.submission.psaExpectedGrade = psaGrade;
         parsed.submission.bgsExpectedGrade = parsed.bgs.overall;
-        parsed.submission.sgcExpectedGrade = sgcGrade;
-        parsed.submission.cgcExpectedGrade = cgcGrade;
       }
     }
   }
@@ -1292,7 +1255,7 @@ app.post('/api/grade', async (req, res) => {
             return Math.round(median * (1 - DISCOUNT));
           };
 
-          const TIERS = ['psa7', 'psa8', 'psa9', 'psa10', 'bgs7', 'bgs8', 'bgs9', 'bgs9_5', 'bgs10', 'bgsBlackLabel', 'sgc8', 'sgc9', 'sgc9_5', 'sgc10', 'cgc8', 'cgc9', 'cgc9_5', 'cgc10'];
+          const TIERS = ['psa7', 'psa8', 'psa9', 'psa10', 'bgs7', 'bgs8', 'bgs9', 'bgs9_5', 'bgs10', 'bgsBlackLabel'];
           for (const tier of TIERS) {
             const aiTierEstimate = Number(parsed.market.graded?.[tier]) || 0;
             const p = realPrice(market[tier], aiTierEstimate);
@@ -1306,25 +1269,6 @@ app.post('/api/grade', async (req, res) => {
 
           parsed.market.dataSource = 'eBay sold prices (median − 10%, AI-estimate floor+ceiling)';
           parsed.market.sampleSize = market.totalValid;
-
-          // Derive SGC/CGC prices from PSA ratios when eBay data is thin.
-          // CGC 9/8 fallbacks are intentionally omitted — CGC sports cards below 9.5
-          // have no meaningful market premium over raw and aren't worth recommending.
-          const psa10 = parsed.market.graded.psa10;
-          const psa9  = parsed.market.graded.psa9;
-          const psa8  = parsed.market.graded.psa8;
-          if (psa10) {
-            if (!parsed.market.graded.sgc10)  parsed.market.graded.sgc10  = Math.round(psa10 * 0.875);
-            if (!parsed.market.graded.sgc9_5) parsed.market.graded.sgc9_5 = Math.round(psa10 * 0.60);
-            if (!parsed.market.graded.cgc10)  parsed.market.graded.cgc10  = Math.round(psa10 * 1.25);
-            if (!parsed.market.graded.cgc9_5) parsed.market.graded.cgc9_5 = Math.round(psa10 * 1.00);
-          }
-          if (psa9) {
-            if (!parsed.market.graded.sgc9) parsed.market.graded.sgc9 = Math.round(psa9 * 0.90);
-          }
-          if (psa8) {
-            if (!parsed.market.graded.sgc8) parsed.market.graded.sgc8 = Math.round(psa8 * 0.90);
-          }
 
           // Attach per-tier eBay listing URLs for frontend deep-links
           if (market._urls) {
@@ -1394,12 +1338,6 @@ app.post('/api/grade', async (req, res) => {
           s.bgsRecommended = profit >= 30 && s.bgsRoi >= 25;
         }
 
-        // SGC and CGC are not included in submission recommendations — neither grader
-        // commands a meaningful premium over PSA for most sports cards, so the ROI math
-        // flatters them without reflecting real market liquidity.
-        s.sgcRecommended = false;
-        s.cgcRecommended = false;
-
         text = JSON.stringify(parsed);
       }
     } catch (e) {
@@ -1414,7 +1352,6 @@ app.post('/api/grade', async (req, res) => {
       console.log('zones:', rawParsed.zones?.length ?? 'MISSING', '| surfaceFlaws:', rawParsed.surfaceFlaws?.length ?? 'MISSING');
       console.log('Final bgs: corners=' + outParsed.bgs?.corners + ' edges=' + outParsed.bgs?.edges + ' surface=' + outParsed.bgs?.surface + ' overall=' + outParsed.bgs?.overall);
       console.log('Final psa: grade=' + outParsed.psa?.grade + ' (' + outParsed.psa?.label + ')');
-      console.log('Final sgc: grade=' + outParsed.sgc?.grade + ' | Final cgc: grade=' + outParsed.cgc?.grade);
       console.log('stop_reason:', message.stop_reason);
       console.log('===================');
     } catch (e) { console.log('debug parse error:', e.message); }
