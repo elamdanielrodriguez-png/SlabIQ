@@ -7,6 +7,7 @@ import { createClient } from '@supabase/supabase-js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { existsSync, readFileSync } from 'fs';
+import nodemailer from 'nodemailer';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -1384,6 +1385,202 @@ app.post('/api/pop', async (req, res) => {
   }
 });
 
+// ── Price Alerts ─────────────────────────────────────────────────────────────
+
+// Maps grade tier keys to eBay search terms
+const GRADE_SEARCH_TERMS = {
+  psa7: 'PSA 7', psa8: 'PSA 8', psa9: 'PSA 9', psa10: 'PSA 10',
+  bgs9: 'BGS 9', bgs9_5: 'BGS 9.5', bgs10: 'BGS 10', bgsBlackLabel: 'BGS Black Label',
+};
+
+const GRADE_LABELS = {
+  psa7: 'PSA 7', psa8: 'PSA 8', psa9: 'PSA 9', psa10: 'PSA 10',
+  bgs9: 'BGS 9', bgs9_5: 'BGS 9.5', bgs10: 'BGS 10', bgsBlackLabel: 'BGS Black Label',
+};
+
+// Nodemailer transporter — configured via env vars
+const mailTransporter = (
+  process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS
+) ? nodemailer.createTransport({
+  host:   process.env.SMTP_HOST,
+  port:   parseInt(process.env.SMTP_PORT || '587'),
+  secure: process.env.SMTP_PORT === '465',
+  auth:   { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+}) : null;
+
+// Fetch median sold price for a specific card + grade tier from eBay
+async function fetchCurrentGradePrice(player, year, set, variant, cardNumber, gradeTier) {
+  const gradeSearch = GRADE_SEARCH_TERMS[gradeTier];
+  if (!gradeSearch) return null;
+  const quotedVariant = variant && variant.trim().includes(' ') ? `"${variant.trim()}"` : variant;
+  const parts = [year, set, player, quotedVariant, cardNumber ? `#${cardNumber}` : '', `"${gradeSearch}"`].filter(Boolean);
+  const listings = await ebayFindingSearch(parts.join(' '), 20);
+  if (!listings.length) return null;
+  const prices = listings.map(l => l.price).sort((a, b) => a - b);
+  return Math.round(prices[Math.floor(prices.length * 0.5)]);
+}
+
+// Send an alert trigger email
+async function sendAlertEmail(alert, currentPrice) {
+  if (!mailTransporter) return;
+  const from    = process.env.SMTP_FROM || process.env.SMTP_USER;
+  const appUrl  = process.env.APP_URL || 'https://cardgradeornot.com';
+  const unsubUrl = `${appUrl}/api/alerts/unsubscribe/${alert.unsubscribe_token}`;
+  const label   = GRADE_LABELS[alert.grade_tier] ?? alert.grade_tier;
+  const card    = [alert.player, alert.year, alert.set_name, alert.variant].filter(Boolean).join(' ');
+  const dir     = alert.direction === 'below' ? 'dropped below' : 'risen above';
+
+  const html = `
+<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#0f0f0f;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#0f0f0f;padding:32px 16px;">
+<tr><td align="center">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;">
+  <tr><td style="background:linear-gradient(90deg,#c9a84c,#e8c97a);border-radius:12px 12px 0 0;height:4px;font-size:0;">&nbsp;</td></tr>
+  <tr><td style="background:#1a1a1a;border:1px solid rgba(201,168,76,0.2);border-top:none;padding:32px 28px 24px;border-radius:0 0 12px 12px;">
+    <div style="color:#c9a84c;font-size:10px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;margin-bottom:12px;">CardGradeOrNot · Price Alert</div>
+    <div style="color:#fff;font-size:22px;font-weight:700;letter-spacing:-0.5px;margin-bottom:6px;">🔔 Your alert triggered</div>
+    <div style="color:rgba(255,255,255,0.45);font-size:14px;margin-bottom:28px;">${card}</div>
+    <div style="background:#111;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:20px 22px;margin-bottom:24px;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:12px;">
+        <span style="color:rgba(255,255,255,0.4);font-size:13px;">Grade tier</span>
+        <span style="color:#fff;font-size:13px;font-weight:600;">${label}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:12px;">
+        <span style="color:rgba(255,255,255,0.4);font-size:13px;">Current price</span>
+        <span style="color:#30d158;font-size:13px;font-weight:700;">$${currentPrice}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;">
+        <span style="color:rgba(255,255,255,0.4);font-size:13px;">Your threshold</span>
+        <span style="color:#c9a84c;font-size:13px;font-weight:600;">$${alert.threshold_price} (${alert.direction})</span>
+      </div>
+    </div>
+    <div style="color:rgba(255,255,255,0.5);font-size:14px;margin-bottom:24px;">
+      The <strong style="color:#fff;">${label}</strong> price for this card has ${dir} your alert of <strong style="color:#c9a84c;">$${alert.threshold_price}</strong>.
+    </div>
+    <a href="${appUrl}" style="display:inline-block;background:#c9a84c;color:#000;font-size:14px;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;margin-bottom:28px;">Grade Another Card →</a>
+    <div style="border-top:1px solid rgba(255,255,255,0.06);padding-top:18px;">
+      <a href="${unsubUrl}" style="color:rgba(255,255,255,0.25);font-size:11px;text-decoration:none;">Unsubscribe from this alert</a>
+    </div>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>`;
+
+  await mailTransporter.sendMail({
+    from,
+    to:      alert.email,
+    subject: `🔔 ${label} ${card} has ${dir} $${alert.threshold_price}`,
+    html,
+    text:    `Your CardGradeOrNot price alert triggered.\n\n${card}\n${label}: $${currentPrice} (your threshold: $${alert.threshold_price} ${alert.direction})\n\nUnsubscribe: ${unsubUrl}`,
+  });
+  console.log(`Alert email sent to ${alert.email} for ${card} ${label}`);
+}
+
+// Daily checker — runs every 6 hours, checks all active alerts
+async function runAlertChecker() {
+  if (!supabaseAdmin || !process.env.EBAY_APP_ID) return;
+  console.log('[alerts] Running price alert check...');
+  try {
+    const SIX_HOURS = 6 * 60 * 60 * 1000;
+    const cutoff = new Date(Date.now() - SIX_HOURS).toISOString();
+    const { data: alerts } = await supabaseAdmin
+      .from('price_alerts')
+      .select('*')
+      .eq('is_active', true)
+      .or(`last_checked_at.is.null,last_checked_at.lt.${cutoff}`);
+
+    if (!alerts?.length) { console.log('[alerts] No alerts to check.'); return; }
+    console.log(`[alerts] Checking ${alerts.length} alert(s)...`);
+
+    for (const alert of alerts) {
+      try {
+        const price = await fetchCurrentGradePrice(
+          alert.player, alert.year, alert.set_name,
+          alert.variant, alert.card_number, alert.grade_tier
+        );
+        if (!price) continue;
+
+        const triggered = alert.direction === 'below'
+          ? price <= alert.threshold_price
+          : price >= alert.threshold_price;
+
+        // Don't spam — only notify once per 24 hours even if still triggered
+        const notifiedRecently = alert.last_notified_at &&
+          (Date.now() - new Date(alert.last_notified_at).getTime()) < 24 * 60 * 60 * 1000;
+
+        if (triggered && !notifiedRecently) {
+          await sendAlertEmail(alert, price);
+          await supabaseAdmin.from('price_alerts').update({
+            last_price: price, last_checked_at: new Date().toISOString(),
+            last_notified_at: new Date().toISOString(),
+          }).eq('id', alert.id);
+        } else {
+          await supabaseAdmin.from('price_alerts').update({
+            last_price: price, last_checked_at: new Date().toISOString(),
+          }).eq('id', alert.id);
+        }
+        console.log(`[alerts] ${alert.player} ${alert.grade_tier}: $${price} (threshold $${alert.threshold_price} ${alert.direction}) — ${triggered ? 'TRIGGERED' : 'ok'}`);
+      } catch (err) {
+        console.warn(`[alerts] Failed checking alert ${alert.id}:`, err.message);
+      }
+    }
+  } catch (err) {
+    console.warn('[alerts] Checker error:', err.message);
+  }
+}
+
+// POST /api/alerts — create a price alert
+app.post('/api/alerts', async (req, res) => {
+  if (!supabaseAdmin) return res.status(503).json({ error: 'Alerts not configured' });
+  const { email, player, year, set_name, variant, card_number, grade_tier, direction, threshold_price } = req.body ?? {};
+  if (!email || !player || !grade_tier || !direction || !threshold_price) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+  if (!['below', 'above'].includes(direction)) return res.status(400).json({ error: 'Invalid direction' });
+  if (!GRADE_LABELS[grade_tier]) return res.status(400).json({ error: 'Invalid grade tier' });
+
+  // Check for existing identical alert for this email
+  const { data: existing } = await supabaseAdmin
+    .from('price_alerts')
+    .select('id')
+    .eq('email', email)
+    .eq('player', player)
+    .eq('grade_tier', grade_tier)
+    .eq('direction', direction)
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (existing) return res.status(409).json({ error: 'You already have this alert set up' });
+
+  const { data, error } = await supabaseAdmin.from('price_alerts').insert({
+    email, player, year, set_name, variant, card_number,
+    grade_tier, direction, threshold_price: Math.round(threshold_price),
+  }).select().single();
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true, id: data.id });
+});
+
+// GET /api/alerts/unsubscribe/:token — cancel a specific alert via email link
+app.get('/api/alerts/unsubscribe/:token', async (req, res) => {
+  if (!supabaseAdmin) return res.status(503).send('Alerts not configured');
+  const { error } = await supabaseAdmin
+    .from('price_alerts')
+    .update({ is_active: false })
+    .eq('unsubscribe_token', req.params.token);
+  if (error) return res.status(500).send('Something went wrong. Please try again.');
+  res.send(`
+    <html><body style="font-family:sans-serif;background:#0f0f0f;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
+      <div style="text-align:center;">
+        <div style="font-size:32px;margin-bottom:16px;">✅</div>
+        <div style="font-size:20px;font-weight:600;margin-bottom:8px;">Alert cancelled</div>
+        <div style="color:rgba(255,255,255,0.45);font-size:14px;">You won't receive any more emails for this alert.</div>
+      </div>
+    </body></html>
+  `);
+});
+
 // SPA fallback — serve index.html for any non-API route
 if (existsSync(distPath)) {
   app.use((req, res, next) => {
@@ -1394,4 +1591,11 @@ if (existsSync(distPath)) {
 
 app.listen(PORT, () => {
   console.log(`CardGradeOrNot server running on http://localhost:${PORT}`);
+  // Start the alert checker 1 minute after boot, then every 6 hours
+  if (supabaseAdmin && process.env.EBAY_APP_ID) {
+    setTimeout(() => {
+      runAlertChecker();
+      setInterval(runAlertChecker, 6 * 60 * 60 * 1000);
+    }, 60_000);
+  }
 });

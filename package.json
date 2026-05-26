@@ -20,6 +20,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
+    "nodemailer": "^8.0.8",
     "posthog-js": "^1.372.10",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
