@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import PriceAlertModal from "./PriceAlertModal";
 
-export default function SubmitTab({ result }) {
+export default function SubmitTab({ result, session, onNeedAuth }) {
   const { submission, market, bgs } = result;
   const [showAlert, setShowAlert] = useState(false);
   const bgsIsBlackLabel = bgs?.isBlackLabel === true;
@@ -88,7 +88,7 @@ export default function SubmitTab({ result }) {
 
       {/* Price alert button */}
       <button
-        onClick={() => setShowAlert(true)}
+        onClick={() => session ? setShowAlert(true) : onNeedAuth?.()}
         style={{
           width: "100%", padding: "13px 0", border: "1px solid rgba(201,168,76,0.3)",
           borderRadius: 14, cursor: "pointer",
@@ -97,7 +97,7 @@ export default function SubmitTab({ result }) {
           letterSpacing: "-0.1px",
         }}
       >
-        🔔 Set Price Alert
+        🔔 {session ? "Set Price Alert" : "Sign in to Set Price Alert"}
       </button>
 
       {showAlert && (

@@ -880,7 +880,7 @@ export default function CardGrader() {
             </div>
           )}
           {activeTab === "market" && result && <MarketTab result={result} popLoading={popLoading} />}
-          {activeTab === "submit" && result && <SubmitTab result={result} />}
+          {activeTab === "submit" && result && <SubmitTab result={result} session={session} onNeedAuth={() => setShowAuth(true)} />}
           {activeTab === "history" && (
             <HistoryPanel
               onRestore={(savedResult) => {
