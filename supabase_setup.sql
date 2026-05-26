@@ -27,9 +27,12 @@ CREATE TABLE IF NOT EXISTS price_alerts (
   set_name          TEXT,
   variant           TEXT,
   card_number       TEXT,
-  grade_tier        TEXT NOT NULL,   -- 'psa9', 'psa10', 'bgs9_5', etc.
-  direction         TEXT NOT NULL,   -- 'below' or 'above'
-  threshold_price   INTEGER NOT NULL, -- USD
+  grade_tier        TEXT NOT NULL,      -- 'raw', 'psa9', 'psa10', 'bgs9_5', etc.
+  direction         TEXT NOT NULL,      -- 'below' or 'above'
+  threshold_type    TEXT NOT NULL DEFAULT 'price', -- 'price' or 'percent'
+  threshold_price   INTEGER,            -- USD — used when threshold_type = 'price'
+  threshold_percent INTEGER,            -- 1-999 — used when threshold_type = 'percent'
+  baseline_price    INTEGER,            -- price at creation time — used for percent alerts
   last_price        INTEGER,
   unsubscribe_token TEXT NOT NULL DEFAULT gen_random_uuid()::text,
   is_active         BOOLEAN DEFAULT true,
@@ -38,4 +41,14 @@ CREATE TABLE IF NOT EXISTS price_alerts (
   last_notified_at  TIMESTAMPTZ
 );
 
+ALTER TABLE price_alerts ENABLE ROW LEVEL SECURITY;
+
 CREATE INDEX IF NOT EXISTS price_alerts_active ON price_alerts (is_active, last_checked_at);
+
+-- ── If you already created price_alerts and need to add the new columns ───────
+-- Run these separately if the table already exists:
+--
+-- ALTER TABLE price_alerts ADD COLUMN IF NOT EXISTS threshold_type TEXT NOT NULL DEFAULT 'price';
+-- ALTER TABLE price_alerts ADD COLUMN IF NOT EXISTS threshold_percent INTEGER;
+-- ALTER TABLE price_alerts ADD COLUMN IF NOT EXISTS baseline_price INTEGER;
+-- ALTER TABLE price_alerts ALTER COLUMN threshold_price DROP NOT NULL;

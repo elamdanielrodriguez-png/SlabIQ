@@ -1389,11 +1389,13 @@ app.post('/api/pop', async (req, res) => {
 
 // Maps grade tier keys to eBay search terms
 const GRADE_SEARCH_TERMS = {
+  raw:          null, // no grade qualifier — raw/ungraded listings only
   psa7: 'PSA 7', psa8: 'PSA 8', psa9: 'PSA 9', psa10: 'PSA 10',
   bgs9: 'BGS 9', bgs9_5: 'BGS 9.5', bgs10: 'BGS 10', bgsBlackLabel: 'BGS Black Label',
 };
 
 const GRADE_LABELS = {
+  raw:          'Raw (ungraded)',
   psa7: 'PSA 7', psa8: 'PSA 8', psa9: 'PSA 9', psa10: 'PSA 10',
   bgs9: 'BGS 9', bgs9_5: 'BGS 9.5', bgs10: 'BGS 10', bgsBlackLabel: 'BGS Black Label',
 };
@@ -1410,11 +1412,14 @@ const mailTransporter = (
 
 // Fetch median sold price for a specific card + grade tier from eBay
 async function fetchCurrentGradePrice(player, year, set, variant, cardNumber, gradeTier) {
-  const gradeSearch = GRADE_SEARCH_TERMS[gradeTier];
-  if (!gradeSearch) return null;
+  const gradeSearch = GRADE_SEARCH_TERMS[gradeTier]; // null for 'raw'
+  if (!(gradeTier in GRADE_SEARCH_TERMS)) return null;
   const quotedVariant = variant && variant.trim().includes(' ') ? `"${variant.trim()}"` : variant;
-  const parts = [year, set, player, quotedVariant, cardNumber ? `#${cardNumber}` : '', `"${gradeSearch}"`].filter(Boolean);
-  const listings = await ebayFindingSearch(parts.join(' '), 20);
+  const parts = [year, set, player, quotedVariant, cardNumber ? `#${cardNumber}` : ''];
+  if (gradeSearch) parts.push(`"${gradeSearch}"`);
+  // For raw listings, exclude graded copies to avoid polluting the price
+  if (gradeTier === 'raw') parts.push('-PSA -BGS -SGC -CGC -graded');
+  const listings = await ebayFindingSearch(parts.filter(Boolean).join(' '), 20);
   if (!listings.length) return null;
   const prices = listings.map(l => l.price).sort((a, b) => a - b);
   return Math.round(prices[Math.floor(prices.length * 0.5)]);
@@ -1423,12 +1428,34 @@ async function fetchCurrentGradePrice(player, year, set, variant, cardNumber, gr
 // Send an alert trigger email
 async function sendAlertEmail(alert, currentPrice) {
   if (!mailTransporter) return;
-  const from    = process.env.SMTP_FROM || process.env.SMTP_USER;
-  const appUrl  = process.env.APP_URL || 'https://cardgradeornot.com';
+  const from     = process.env.SMTP_FROM || process.env.SMTP_USER;
+  const appUrl   = process.env.APP_URL || 'https://cardgradeornot.com';
   const unsubUrl = `${appUrl}/api/alerts/unsubscribe/${alert.unsubscribe_token}`;
-  const label   = GRADE_LABELS[alert.grade_tier] ?? alert.grade_tier;
-  const card    = [alert.player, alert.year, alert.set_name, alert.variant].filter(Boolean).join(' ');
-  const dir     = alert.direction === 'below' ? 'dropped below' : 'risen above';
+  const label    = GRADE_LABELS[alert.grade_tier] ?? alert.grade_tier;
+  const card     = [alert.player, alert.year, alert.set_name, alert.variant].filter(Boolean).join(' ');
+  const isPercent = alert.threshold_type === 'percent';
+  const dir       = alert.direction === 'below' ? 'dropped' : 'risen';
+
+  // Build threshold description for the email
+  let thresholdDesc, thresholdRow;
+  if (isPercent) {
+    const pct      = alert.threshold_percent;
+    const baseline = alert.baseline_price;
+    const target   = alert.direction === 'above'
+      ? Math.round(baseline * (1 + pct / 100))
+      : Math.round(baseline * (1 - pct / 100));
+    thresholdDesc = `${dir} ${pct}% ${alert.direction === 'above' ? 'above' : 'below'} its baseline of $${baseline} (target: $${target})`;
+    thresholdRow  = `<div style="display:flex;justify-content:space-between;margin-bottom:12px;">
+        <span style="color:rgba(255,255,255,0.4);font-size:13px;">Your alert</span>
+        <span style="color:#c9a84c;font-size:13px;font-weight:600;">${alert.direction === 'above' ? '↑' : '↓'} ${pct}% from $${baseline}</span>
+      </div>`;
+  } else {
+    thresholdDesc = `${dir} ${alert.direction === 'above' ? 'above' : 'below'} your threshold of $${alert.threshold_price}`;
+    thresholdRow  = `<div style="display:flex;justify-content:space-between;margin-bottom:12px;">
+        <span style="color:rgba(255,255,255,0.4);font-size:13px;">Your threshold</span>
+        <span style="color:#c9a84c;font-size:13px;font-weight:600;">$${alert.threshold_price} (${alert.direction})</span>
+      </div>`;
+  }
 
   const html = `
 <!DOCTYPE html><html><head><meta charset="UTF-8"></head>
@@ -1443,20 +1470,17 @@ async function sendAlertEmail(alert, currentPrice) {
     <div style="color:rgba(255,255,255,0.45);font-size:14px;margin-bottom:28px;">${card}</div>
     <div style="background:#111;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:20px 22px;margin-bottom:24px;">
       <div style="display:flex;justify-content:space-between;margin-bottom:12px;">
-        <span style="color:rgba(255,255,255,0.4);font-size:13px;">Grade tier</span>
+        <span style="color:rgba(255,255,255,0.4);font-size:13px;">Grade</span>
         <span style="color:#fff;font-size:13px;font-weight:600;">${label}</span>
       </div>
       <div style="display:flex;justify-content:space-between;margin-bottom:12px;">
         <span style="color:rgba(255,255,255,0.4);font-size:13px;">Current price</span>
         <span style="color:#30d158;font-size:13px;font-weight:700;">$${currentPrice}</span>
       </div>
-      <div style="display:flex;justify-content:space-between;">
-        <span style="color:rgba(255,255,255,0.4);font-size:13px;">Your threshold</span>
-        <span style="color:#c9a84c;font-size:13px;font-weight:600;">$${alert.threshold_price} (${alert.direction})</span>
-      </div>
+      ${thresholdRow}
     </div>
     <div style="color:rgba(255,255,255,0.5);font-size:14px;margin-bottom:24px;">
-      The <strong style="color:#fff;">${label}</strong> price for this card has ${dir} your alert of <strong style="color:#c9a84c;">$${alert.threshold_price}</strong>.
+      The <strong style="color:#fff;">${label}</strong> price has ${thresholdDesc}.
     </div>
     <a href="${appUrl}" style="display:inline-block;background:#c9a84c;color:#000;font-size:14px;font-weight:700;padding:12px 24px;border-radius:8px;text-decoration:none;margin-bottom:28px;">Grade Another Card →</a>
     <div style="border-top:1px solid rgba(255,255,255,0.06);padding-top:18px;">
@@ -1467,12 +1491,13 @@ async function sendAlertEmail(alert, currentPrice) {
 </td></tr></table>
 </body></html>`;
 
+  const subject = isPercent
+    ? `🔔 ${label} ${card} has ${dir} ${alert.threshold_percent}%`
+    : `🔔 ${label} ${card} has ${dir} ${alert.direction === 'above' ? 'above' : 'below'} $${alert.threshold_price}`;
+
   await mailTransporter.sendMail({
-    from,
-    to:      alert.email,
-    subject: `🔔 ${label} ${card} has ${dir} $${alert.threshold_price}`,
-    html,
-    text:    `Your CardGradeOrNot price alert triggered.\n\n${card}\n${label}: $${currentPrice} (your threshold: $${alert.threshold_price} ${alert.direction})\n\nUnsubscribe: ${unsubUrl}`,
+    from, to: alert.email, subject, html,
+    text: `Your CardGradeOrNot price alert triggered.\n\n${card}\n${label}: $${currentPrice}\n${thresholdDesc}\n\nUnsubscribe: ${unsubUrl}`,
   });
   console.log(`Alert email sent to ${alert.email} for ${card} ${label}`);
 }
@@ -1501,9 +1526,20 @@ async function runAlertChecker() {
         );
         if (!price) continue;
 
-        const triggered = alert.direction === 'below'
-          ? price <= alert.threshold_price
-          : price >= alert.threshold_price;
+        let triggered = false;
+        if (alert.threshold_type === 'percent') {
+          const baseline = alert.baseline_price;
+          if (!baseline) continue; // can't evaluate without baseline
+          const pct    = alert.threshold_percent;
+          const target = alert.direction === 'above'
+            ? Math.round(baseline * (1 + pct / 100))
+            : Math.round(baseline * (1 - pct / 100));
+          triggered = alert.direction === 'above' ? price >= target : price <= target;
+        } else {
+          triggered = alert.direction === 'above'
+            ? price >= alert.threshold_price
+            : price <= alert.threshold_price;
+        }
 
         // Don't spam — only notify once per 24 hours even if still triggered
         const notifiedRecently = alert.last_notified_at &&
@@ -1520,7 +1556,10 @@ async function runAlertChecker() {
             last_price: price, last_checked_at: new Date().toISOString(),
           }).eq('id', alert.id);
         }
-        console.log(`[alerts] ${alert.player} ${alert.grade_tier}: $${price} (threshold $${alert.threshold_price} ${alert.direction}) — ${triggered ? 'TRIGGERED' : 'ok'}`);
+        const thresholdInfo = alert.threshold_type === 'percent'
+          ? `${alert.threshold_percent}% ${alert.direction} baseline $${alert.baseline_price}`
+          : `$${alert.threshold_price} ${alert.direction}`;
+        console.log(`[alerts] ${alert.player} ${alert.grade_tier}: $${price} (${thresholdInfo}) — ${triggered ? 'TRIGGERED' : 'ok'}`);
       } catch (err) {
         console.warn(`[alerts] Failed checking alert ${alert.id}:`, err.message);
       }
@@ -1533,12 +1572,24 @@ async function runAlertChecker() {
 // POST /api/alerts — create a price alert
 app.post('/api/alerts', async (req, res) => {
   if (!supabaseAdmin) return res.status(503).json({ error: 'Alerts not configured' });
-  const { email, player, year, set_name, variant, card_number, grade_tier, direction, threshold_price } = req.body ?? {};
-  if (!email || !player || !grade_tier || !direction || !threshold_price) {
+  const {
+    email, player, year, set_name, variant, card_number,
+    grade_tier, direction,
+    threshold_type = 'price', threshold_price, threshold_percent,
+  } = req.body ?? {};
+
+  if (!email || !player || !grade_tier || !direction)
     return res.status(400).json({ error: 'Missing required fields' });
-  }
-  if (!['below', 'above'].includes(direction)) return res.status(400).json({ error: 'Invalid direction' });
-  if (!GRADE_LABELS[grade_tier]) return res.status(400).json({ error: 'Invalid grade tier' });
+  if (!['below', 'above'].includes(direction))
+    return res.status(400).json({ error: 'Invalid direction' });
+  if (!['price', 'percent'].includes(threshold_type))
+    return res.status(400).json({ error: 'Invalid threshold_type' });
+  if (!GRADE_LABELS[grade_tier])
+    return res.status(400).json({ error: 'Invalid grade tier' });
+  if (threshold_type === 'price' && !threshold_price)
+    return res.status(400).json({ error: 'threshold_price required for price alerts' });
+  if (threshold_type === 'percent' && !threshold_percent)
+    return res.status(400).json({ error: 'threshold_percent required for percent alerts' });
 
   // Check for existing identical alert for this email
   const { data: existing } = await supabaseAdmin
@@ -1553,9 +1604,20 @@ app.post('/api/alerts', async (req, res) => {
 
   if (existing) return res.status(409).json({ error: 'You already have this alert set up' });
 
+  // For % alerts, fetch current price now to use as baseline
+  let baseline_price = null;
+  if (threshold_type === 'percent') {
+    try {
+      baseline_price = await fetchCurrentGradePrice(player, year, set_name, variant, card_number, grade_tier);
+    } catch { /* baseline stays null — checker will skip this alert until price is available */ }
+  }
+
   const { data, error } = await supabaseAdmin.from('price_alerts').insert({
     email, player, year, set_name, variant, card_number,
-    grade_tier, direction, threshold_price: Math.round(threshold_price),
+    grade_tier, direction, threshold_type,
+    threshold_price: threshold_type === 'price' ? Math.round(threshold_price) : null,
+    threshold_percent: threshold_type === 'percent' ? Math.round(threshold_percent) : null,
+    baseline_price,
   }).select().single();
 
   if (error) return res.status(500).json({ error: error.message });
