@@ -1591,7 +1591,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
                 ↺ Replay
               </button>
             )}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1px 1fr 1px 1fr 1px 1fr" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1px 1fr" }}>
               <GradeHalf
                 label="PSA"
                 grade={displayResult.psa?.grade}
