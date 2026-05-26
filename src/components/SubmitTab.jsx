@@ -87,18 +87,30 @@ export default function SubmitTab({ result, session, onNeedAuth }) {
       </div>
 
       {/* Price alert button */}
-      <button
-        onClick={() => session ? setShowAlert(true) : onNeedAuth?.()}
-        style={{
-          width: "100%", padding: "13px 0", border: "1px solid rgba(201,168,76,0.3)",
-          borderRadius: 14, cursor: "pointer",
-          background: "rgba(201,168,76,0.07)",
-          color: "#c9a84c", fontWeight: 700, fontSize: 14,
-          letterSpacing: "-0.1px",
-        }}
-      >
-        🔔 {session ? "Set Price Alert" : "Sign in to Set Price Alert"}
-      </button>
+      {result._isDemo ? (
+        <div style={{
+          width: "100%", padding: "13px 0", border: "1px solid rgba(255,255,255,0.07)",
+          borderRadius: 14, textAlign: "center",
+          background: "rgba(255,255,255,0.03)",
+          color: "rgba(255,255,255,0.25)", fontSize: 14,
+          letterSpacing: "-0.1px", boxSizing: "border-box",
+        }}>
+          🔔 Price alerts not available for demo — grade a real card first
+        </div>
+      ) : (
+        <button
+          onClick={() => session ? setShowAlert(true) : onNeedAuth?.()}
+          style={{
+            width: "100%", padding: "13px 0", border: "1px solid rgba(201,168,76,0.3)",
+            borderRadius: 14, cursor: "pointer",
+            background: "rgba(201,168,76,0.07)",
+            color: "#c9a84c", fontWeight: 700, fontSize: 14,
+            letterSpacing: "-0.1px",
+          }}
+        >
+          🔔 {session ? "Set Price Alert" : "Sign in to Set Price Alert"}
+        </button>
+      )}
 
       {showAlert && (
         <PriceAlertModal result={result} onClose={() => setShowAlert(false)} />
