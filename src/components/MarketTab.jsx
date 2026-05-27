@@ -36,8 +36,13 @@ function AnimPct({ value, sign }) {
   return <span>{display == null ? "—" : `${sign}${display}%`}</span>;
 }
 
+function buildEbaySoldUrl(player, year, set, variant, cardNumber, gradeLabel) {
+  const parts = [year, set, player, variant, cardNumber ? `#${cardNumber}` : '', gradeLabel].filter(Boolean);
+  return `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(parts.join(' '))}&LH_Sold=1&LH_Complete=1&_sop=13`;
+}
+
 export default function MarketTab({ result, popLoading }) {
-  const { popData, market, psa, bgs, player, year, set, variant } = result;
+  const { popData, market, psa, bgs, player, year, set, variant, cardNumber } = result;
   const psaGrade = psa?.grade;
   const bgsGrade = bgs?.overall;
   const bgsBlackLabel = bgs?.isBlackLabel === true;
@@ -152,9 +157,41 @@ export default function MarketTab({ result, popLoading }) {
           <p style={{ color: "rgba(255,255,255,0.45)", margin: 0, fontSize: 14, lineHeight: 1.75, letterSpacing: "-0.1px" }}>
             {market?.aiAnalysis}
           </p>
-          <p style={{ color: "rgba(255,255,255,0.15)", margin: "12px 0 0", fontSize: 11, lineHeight: 1.6 }}>
-            PSA/BGS prices from recent eBay sold listings. Tap ↗ on any row to view the sale on eBay.
-          </p>
+        </div>
+
+        {/* eBay sold listings buttons */}
+        <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", marginTop: 18, paddingTop: 16 }}>
+          <div style={{ ...sectionLabel, marginBottom: 10 }}>Search eBay Sold Listings</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {psa?.grade && (
+              <a
+                href={buildEbaySoldUrl(player, year, set, variant, cardNumber, `PSA ${psa.grade}`)}
+                target="_blank" rel="noopener noreferrer"
+                style={ebayBtnStyle}
+              >
+                PSA {psa.grade} ↗
+              </a>
+            )}
+            {bgs?.overall && (
+              <a
+                href={buildEbaySoldUrl(player, year, set, variant, cardNumber, `BGS ${bgs.overall}`)}
+                target="_blank" rel="noopener noreferrer"
+                style={ebayBtnStyle}
+              >
+                BGS {bgs.overall} ↗
+              </a>
+            )}
+            <a
+              href={buildEbaySoldUrl(player, year, set, variant, cardNumber, '-PSA -BGS -SGC -graded')}
+              target="_blank" rel="noopener noreferrer"
+              style={{ ...ebayBtnStyle, color: "rgba(255,255,255,0.35)", borderColor: "rgba(255,255,255,0.1)" }}
+            >
+              Raw ↗
+            </a>
+          </div>
+          <div style={{ color: "rgba(255,255,255,0.15)", fontSize: 11, marginTop: 10 }}>
+            Opens eBay · sorted by most recently sold
+          </div>
         </div>
       </div>
     </div>
@@ -298,4 +335,17 @@ const ebayLinkStyle = {
   textDecoration: "none",
   letterSpacing: "0.02em",
   lineHeight: 1,
+};
+
+const ebayBtnStyle = {
+  display: "inline-block",
+  padding: "8px 16px",
+  borderRadius: 10,
+  border: "1px solid rgba(201,168,76,0.3)",
+  background: "rgba(201,168,76,0.07)",
+  color: "#c9a84c",
+  fontSize: 13,
+  fontWeight: 600,
+  textDecoration: "none",
+  letterSpacing: "-0.1px",
 };
