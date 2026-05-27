@@ -1370,6 +1370,62 @@ export default function GradeTab({ images, result, candidates, loading, error, o
         </div>
       )}
 
+      {/* Price alert promo */}
+      {images.length === 0 && !result && !candidates && !loading && (
+        <div style={{
+          background: "linear-gradient(135deg, rgba(28,22,8,0.98) 0%, rgba(18,18,20,0.99) 100%)",
+          border: "1px solid rgba(201,168,76,0.3)",
+          borderRadius: 18,
+          padding: "20px 18px",
+          boxShadow: "0 0 32px rgba(201,168,76,0.07), inset 0 1px 0 rgba(255,255,255,0.07)",
+          position: "relative",
+          overflow: "hidden",
+        }}>
+          {/* Glow */}
+          <div style={{
+            position: "absolute", top: 0, right: 0,
+            width: 160, height: 160,
+            background: "radial-gradient(ellipse at top right, rgba(201,168,76,0.12) 0%, transparent 70%)",
+            pointerEvents: "none",
+          }} />
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+            <div style={{
+              fontSize: 26, lineHeight: 1,
+              flexShrink: 0, marginTop: 2,
+            }}>🔔</div>
+            <div>
+              <div style={{ color: "rgba(201,168,76,0.65)", fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 5 }}>
+                New Feature
+              </div>
+              <div style={{ color: "#fff", fontSize: 16, fontWeight: 800, letterSpacing: "-0.4px", marginBottom: 8, lineHeight: 1.2 }}>
+                Price Alerts — Know the Second to Sell
+              </div>
+              <div style={{ color: "rgba(255,255,255,0.42)", fontSize: 13, lineHeight: 1.6, marginBottom: 14 }}>
+                Grade your card, set a target price, and we'll email you the moment it hits. Track raw, PSA, or BGS — checked every 6 hours against live eBay sales.
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                {[
+                  "Grade your card to get market comps",
+                  "Set a price or % threshold on any grade",
+                  "Get an email the instant the market moves",
+                ].map((step, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{
+                      width: 18, height: 18, borderRadius: "50%",
+                      background: "rgba(201,168,76,0.12)", border: "1px solid rgba(201,168,76,0.3)",
+                      color: "#c9a84c", fontSize: 9, fontWeight: 800,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      flexShrink: 0,
+                    }}>{i + 1}</div>
+                    <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 12 }}>{step}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Demo CTA — shown only on empty state */}
       {images.length === 0 && !result && !candidates && !loading && onSampleGrade && (
         <button
