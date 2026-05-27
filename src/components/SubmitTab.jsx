@@ -305,11 +305,18 @@ const sectionLabel = {
 
 // ── Flip Calculator ───────────────────────────────────────────────────────────
 
-const PSA_COSTS  = { Value: 33, Regular: 75, Express: 150, "Super Express": 250, "Walk-Through": 600, Premium: 1000 };
-const BGS_COSTS  = { Standard: 25, Express: 40, "Fast Track": 100, "Walk-Through": 300 };
+const PSA_COSTS = { Value: 33, Regular: 75, Express: 150, "Super Express": 250, "Walk-Through": 600, Premium: 1000 };
+const BGS_COSTS = { Standard: 25, Express: 40, "Fast Track": 100, "Walk-Through": 300 };
+
+function calcRow({ grade, key, isExpected }, graded, buy, fee) {
+  const sell   = graded[key] ?? null;
+  const profit = sell != null ? sell - buy - fee : null;
+  const roi    = sell != null && buy + fee > 0 ? Math.round((profit / (buy + fee)) * 100) : null;
+  return { grade, key, isExpected, sell, profit, roi };
+}
 
 function FlipCalculator({ result }) {
-  const { market, submission } = result;
+  const { market, submission, psa, bgs } = result;
   const graded = market?.graded ?? {};
 
   const [buyPrice, setBuyPrice] = useState(String(market?.raw ?? ""));
@@ -317,138 +324,196 @@ function FlipCalculator({ result }) {
   const [bgsTier,  setBgsTier]  = useState(submission?.bgsTier  ?? "Standard");
 
   const buy     = Number(buyPrice) || 0;
-  const psaCost = PSA_COSTS[psaTier]  ?? 33;
-  const bgsCost = BGS_COSTS[bgsTier]  ?? 25;
+  const psaCost = PSA_COSTS[psaTier] ?? 33;
+  const bgsCost = BGS_COSTS[bgsTier] ?? 25;
 
   const psaRows = [
-    { grade: "PSA 7",  key: "psa7"  },
-    { grade: "PSA 8",  key: "psa8"  },
-    { grade: "PSA 9",  key: "psa9"  },
-    { grade: "PSA 10", key: "psa10" },
+    { grade: "PSA 7",  key: "psa7",  isExpected: psa?.grade === 7  },
+    { grade: "PSA 8",  key: "psa8",  isExpected: psa?.grade === 8  },
+    { grade: "PSA 9",  key: "psa9",  isExpected: psa?.grade === 9  },
+    { grade: "PSA 10", key: "psa10", isExpected: psa?.grade === 10 },
   ].map(r => calcRow(r, graded, buy, psaCost));
 
   const bgsRows = [
-    { grade: "BGS 9",       key: "bgs9"         },
-    { grade: "9.5 Gem Mint",key: "bgs9_5"       },
-    { grade: "10 Pristine", key: "bgs10"        },
-    { grade: "Black Label", key: "bgsBlackLabel" },
+    { grade: "BGS 9",        key: "bgs9",          isExpected: bgs?.overall === 9   && !bgs?.isBlackLabel },
+    { grade: "BGS 9.5",      key: "bgs9_5",        isExpected: bgs?.overall === 9.5 && !bgs?.isBlackLabel },
+    { grade: "BGS 10",       key: "bgs10",         isExpected: bgs?.overall === 10  && !bgs?.isBlackLabel },
+    { grade: "Black Label",  key: "bgsBlackLabel",  isExpected: !!bgs?.isBlackLabel },
   ].map(r => calcRow(r, graded, buy, bgsCost));
+
+  const bestPsaProfit = Math.max(-Infinity, ...psaRows.filter(r => r.profit != null).map(r => r.profit));
+  const bestBgsProfit = Math.max(-Infinity, ...bgsRows.filter(r => r.profit != null).map(r => r.profit));
 
   return (
     <div style={card}>
-      <div style={{ ...sectionLabel, marginBottom: 16 }}>Flip Calculator</div>
+      {/* Header */}
+      <div style={{ ...sectionLabel, marginBottom: 20 }}>Flip Calculator</div>
 
-      {/* Buy price */}
-      <div style={{ marginBottom: 18 }}>
-        <div style={{ color: "rgba(255,255,255,0.28)", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 7 }}>
-          Your buy price
+      {/* ── Buy price hero input ── */}
+      <div style={{
+        background: "rgba(255,255,255,0.03)",
+        border: "1px solid rgba(255,255,255,0.08)",
+        borderRadius: 16, padding: "16px 18px", marginBottom: 20,
+      }}>
+        <div style={{ color: "rgba(255,255,255,0.22)", fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>
+          What did you pay?
         </div>
-        <div style={{ position: "relative" }}>
-          <span style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "rgba(255,255,255,0.3)", fontSize: 15, pointerEvents: "none" }}>$</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ color: "rgba(255,255,255,0.2)", fontSize: 30, fontWeight: 300, lineHeight: 1 }}>$</span>
           <input
             type="number"
             value={buyPrice}
             onChange={e => setBuyPrice(e.target.value)}
             placeholder={String(market?.raw ?? "0")}
             style={{
-              width: "100%", boxSizing: "border-box",
-              background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: 10, padding: "11px 14px 11px 26px",
-              color: "#fff", fontSize: 15, fontWeight: 700,
-              outline: "none", fontFamily: "inherit",
+              flex: 1, background: "none", border: "none", outline: "none",
+              color: "#fff", fontSize: 36, fontWeight: 800, letterSpacing: "-1.5px",
+              fontFamily: "inherit", padding: 0, minWidth: 0,
             }}
           />
+          {market?.raw && Number(buyPrice) !== market.raw && (
+            <button
+              onClick={() => setBuyPrice(String(market.raw))}
+              style={{
+                flexShrink: 0, background: "rgba(255,255,255,0.06)",
+                border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8,
+                padding: "5px 10px", color: "rgba(255,255,255,0.3)",
+                fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+              }}
+            >
+              market ${market.raw}
+            </button>
+          )}
         </div>
-        {market?.raw && Number(buyPrice) !== market.raw && (
-          <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 11, marginTop: 5 }}>
-            Market raw: ${market.raw.toLocaleString()}
-          </div>
-        )}
       </div>
 
-      {/* PSA table */}
+      {/* ── PSA ── */}
       <FlipSection
         company="PSA"
+        accentColor="#c9a84c"
         rows={psaRows}
         tier={psaTier}
         costs={PSA_COSTS}
         onTierChange={setPsaTier}
+        bestProfit={bestPsaProfit}
       />
 
-      {/* BGS table */}
+      {/* ── BGS ── */}
       <FlipSection
         company="BGS"
+        accentColor="#a8c4e0"
         rows={bgsRows}
         tier={bgsTier}
         costs={BGS_COSTS}
         onTierChange={setBgsTier}
+        bestProfit={bestBgsProfit}
       />
 
-      <div style={{ color: "rgba(255,255,255,0.15)", fontSize: 11, marginTop: 4 }}>
-        Prices from recent eBay sold listings · green = profitable flip
+      <div style={{ color: "rgba(255,255,255,0.13)", fontSize: 11 }}>
+        eBay sold medians · grading fee already deducted from profit
       </div>
     </div>
   );
 }
 
-function calcRow({ grade, key }, graded, buy, fee) {
-  const sell   = graded[key] ?? null;
-  const profit = sell != null ? sell - buy - fee : null;
-  const roi    = (sell != null && buy + fee > 0) ? Math.round((profit / (buy + fee)) * 100) : null;
-  return { grade, sell, profit, roi };
-}
-
-function FlipSection({ company, rows, tier, costs, onTierChange }) {
+function FlipSection({ company, accentColor, rows, tier, costs, onTierChange, bestProfit }) {
+  const fee = costs[tier];
   return (
-    <div style={{ marginBottom: 16 }}>
-      {/* Company header + tier picker */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <span style={{ color: "rgba(255,255,255,0.25)", fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>
-          {company}
-        </span>
+    <div style={{ marginBottom: 20 }}>
+      {/* Section header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+          <span style={{ color: accentColor, fontSize: 13, fontWeight: 700, letterSpacing: "0.02em" }}>{company}</span>
+          <span style={{ color: "rgba(255,255,255,0.2)", fontSize: 11 }}>${fee} fee</span>
+        </div>
         <select
           value={tier}
           onChange={e => onTierChange(e.target.value)}
           style={{
             background: "#1c1c1e", border: "1px solid rgba(255,255,255,0.1)",
-            borderRadius: 8, padding: "4px 10px", color: "rgba(255,255,255,0.55)",
-            fontSize: 11, outline: "none", cursor: "pointer",
+            borderRadius: 8, padding: "4px 10px",
+            color: "rgba(255,255,255,0.45)", fontSize: 11,
+            outline: "none", cursor: "pointer",
           }}
         >
           {Object.entries(costs).map(([t, c]) => (
-            <option key={t} value={t}>{t} — ${c} fee</option>
+            <option key={t} value={t}>{t} — ${c}</option>
           ))}
         </select>
       </div>
 
-      {/* Table */}
-      <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, overflow: "hidden" }}>
-        {/* Header */}
-        <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr 0.9fr", padding: "7px 12px", borderBottom: "1px solid rgba(255,255,255,0.06)", gap: 4 }}>
-          {["Grade", "Sell", "Profit", "ROI"].map((h, i) => (
-            <div key={h} style={{ color: "rgba(255,255,255,0.18)", fontSize: 9, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", textAlign: i === 0 ? "left" : "right" }}>{h}</div>
-          ))}
-        </div>
-        {rows.map((row, i) => {
-          const good = row.profit != null && row.profit > 0;
-          const breakeven = row.profit != null && Math.abs(row.profit) <= 5;
-          const profitColor = breakeven ? "#ffd60a" : good ? "#30d158" : "#ff453a";
+      {/* Grade rows */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+        {rows.map(row => {
+          const hasData  = row.profit != null;
+          const good     = hasData && row.profit > 0;
+          const isBest   = hasData && row.profit === bestProfit && bestProfit > 0;
+          const color    = !hasData ? "rgba(255,255,255,0.15)" : good ? "#30d158" : "#ff453a";
+
           return (
             <div key={row.grade} style={{
-              display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr 0.9fr",
-              padding: "9px 12px", gap: 4,
-              borderBottom: i < rows.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none",
-              background: good ? "rgba(48,209,88,0.04)" : "transparent",
+              display: "flex", alignItems: "center",
+              padding: "13px 16px",
+              borderRadius: 14,
+              background: isBest
+                ? "rgba(201,168,76,0.08)"
+                : good
+                ? "rgba(48,209,88,0.04)"
+                : "rgba(255,255,255,0.02)",
+              border: isBest
+                ? "1px solid rgba(201,168,76,0.3)"
+                : row.isExpected
+                ? "1px solid rgba(255,255,255,0.1)"
+                : "1px solid transparent",
+              position: "relative", overflow: "hidden",
             }}>
-              <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 12 }}>{row.grade}</div>
-              <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, textAlign: "right" }}>
-                {row.sell != null ? `$${row.sell.toLocaleString()}` : "—"}
+              {/* Best pick ribbon */}
+              {isBest && (
+                <div style={{
+                  position: "absolute", top: 8, right: -22,
+                  background: "linear-gradient(90deg,#a07830,#c9a84c)",
+                  color: "#000", fontSize: 8, fontWeight: 800, letterSpacing: "0.1em",
+                  textTransform: "uppercase", padding: "3px 30px",
+                  transform: "rotate(35deg)",
+                }}>Best</div>
+              )}
+
+              {/* Left: grade name + sell price */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                  <span style={{
+                    color: row.isExpected ? "#fff" : "rgba(255,255,255,0.55)",
+                    fontSize: 14, fontWeight: row.isExpected ? 700 : 400,
+                  }}>
+                    {row.grade}
+                  </span>
+                  {row.isExpected && (
+                    <span style={{
+                      background: "rgba(201,168,76,0.15)", border: "1px solid rgba(201,168,76,0.3)",
+                      color: "#c9a84c", fontSize: 8, fontWeight: 800, letterSpacing: "0.1em",
+                      textTransform: "uppercase", padding: "2px 6px", borderRadius: 5,
+                    }}>expected</span>
+                  )}
+                </div>
+                <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 11, marginTop: 2 }}>
+                  {row.sell != null ? `sell $${row.sell.toLocaleString()}` : "no data"}
+                </div>
               </div>
-              <div style={{ color: row.profit != null ? profitColor : "rgba(255,255,255,0.2)", fontSize: 12, fontWeight: 600, textAlign: "right" }}>
-                {row.profit != null ? `${row.profit >= 0 ? "+" : ""}$${row.profit.toLocaleString()}` : "—"}
+
+              {/* Middle: profit */}
+              <div style={{ textAlign: "right", marginRight: 20 }}>
+                <div style={{ color: "rgba(255,255,255,0.18)", fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 3 }}>Profit</div>
+                <div style={{ color, fontSize: 14, fontWeight: 700, letterSpacing: "-0.3px" }}>
+                  {hasData ? `${row.profit >= 0 ? "+" : ""}$${row.profit.toLocaleString()}` : "—"}
+                </div>
               </div>
-              <div style={{ color: row.roi != null ? profitColor : "rgba(255,255,255,0.2)", fontSize: 12, fontWeight: 700, textAlign: "right" }}>
-                {row.roi != null ? `${row.roi >= 0 ? "+" : ""}${row.roi}%` : "—"}
+
+              {/* Right: ROI (hero number) */}
+              <div style={{ textAlign: "right", minWidth: 58 }}>
+                <div style={{ color: "rgba(255,255,255,0.18)", fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 3 }}>ROI</div>
+                <div style={{ color, fontSize: 24, fontWeight: 800, letterSpacing: "-1px", lineHeight: 1 }}>
+                  {row.roi != null ? `${row.roi >= 0 ? "+" : ""}${row.roi}%` : "—"}
+                </div>
               </div>
             </div>
           );
