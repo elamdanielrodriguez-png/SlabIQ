@@ -1353,7 +1353,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
             { num: "01", title: "Graded Against Real 10s",     desc: "Every zone compared to actual PSA 10 sold listings" },
             { num: "02", title: "Catches What You Can't See",  desc: "Microscopic scratches spotted before you pay $33"   },
             { num: "03", title: "Never Fakes a Flaw",          desc: "Prizm & holo patterns never mistaken for damage"    },
-            { num: "04", title: "Exact ROI Before You Decide", desc: "Live eBay prices + dollar profit at every grade"    },
+            { num: "04", title: "Built-In Flip Calculator",    desc: "Enter your buy price — see profit & ROI at every grade instantly" },
           ].map(({ num, title, desc }, i) => (
             <div key={title} className={`result-card-${i} card-hover`} style={{
               background: "rgba(255,255,255,0.035)",

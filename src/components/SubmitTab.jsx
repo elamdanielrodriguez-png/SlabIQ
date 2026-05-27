@@ -57,6 +57,9 @@ export default function SubmitTab({ result, session, onNeedAuth }) {
         </p>
       </div>
 
+      {/* Flip calculator */}
+      <FlipCalculator result={result} />
+
       {/* Tier guide */}
       <div className="result-card-2" style={card}>
         <div style={{ ...sectionLabel, marginBottom: 16 }}>Submission Tier Reference</div>
@@ -299,3 +302,158 @@ const sectionLabel = {
   textTransform: "uppercase",
   color: "rgba(255,255,255,0.28)",
 };
+
+// ── Flip Calculator ───────────────────────────────────────────────────────────
+
+const PSA_COSTS  = { Value: 33, Regular: 75, Express: 150, "Super Express": 250, "Walk-Through": 600, Premium: 1000 };
+const BGS_COSTS  = { Standard: 25, Express: 40, "Fast Track": 100, "Walk-Through": 300 };
+
+function FlipCalculator({ result }) {
+  const { market, submission } = result;
+  const graded = market?.graded ?? {};
+
+  const [buyPrice, setBuyPrice] = useState(String(market?.raw ?? ""));
+  const [psaTier,  setPsaTier]  = useState(submission?.psaTier  ?? "Value");
+  const [bgsTier,  setBgsTier]  = useState(submission?.bgsTier  ?? "Standard");
+
+  const buy     = Number(buyPrice) || 0;
+  const psaCost = PSA_COSTS[psaTier]  ?? 33;
+  const bgsCost = BGS_COSTS[bgsTier]  ?? 25;
+
+  const psaRows = [
+    { grade: "PSA 7",  key: "psa7"  },
+    { grade: "PSA 8",  key: "psa8"  },
+    { grade: "PSA 9",  key: "psa9"  },
+    { grade: "PSA 10", key: "psa10" },
+  ].map(r => calcRow(r, graded, buy, psaCost));
+
+  const bgsRows = [
+    { grade: "BGS 9",       key: "bgs9"         },
+    { grade: "9.5 Gem Mint",key: "bgs9_5"       },
+    { grade: "10 Pristine", key: "bgs10"        },
+    { grade: "Black Label", key: "bgsBlackLabel" },
+  ].map(r => calcRow(r, graded, buy, bgsCost));
+
+  return (
+    <div style={card}>
+      <div style={{ ...sectionLabel, marginBottom: 16 }}>Flip Calculator</div>
+
+      {/* Buy price */}
+      <div style={{ marginBottom: 18 }}>
+        <div style={{ color: "rgba(255,255,255,0.28)", fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 7 }}>
+          Your buy price
+        </div>
+        <div style={{ position: "relative" }}>
+          <span style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "rgba(255,255,255,0.3)", fontSize: 15, pointerEvents: "none" }}>$</span>
+          <input
+            type="number"
+            value={buyPrice}
+            onChange={e => setBuyPrice(e.target.value)}
+            placeholder={String(market?.raw ?? "0")}
+            style={{
+              width: "100%", boxSizing: "border-box",
+              background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 10, padding: "11px 14px 11px 26px",
+              color: "#fff", fontSize: 15, fontWeight: 700,
+              outline: "none", fontFamily: "inherit",
+            }}
+          />
+        </div>
+        {market?.raw && Number(buyPrice) !== market.raw && (
+          <div style={{ color: "rgba(255,255,255,0.2)", fontSize: 11, marginTop: 5 }}>
+            Market raw: ${market.raw.toLocaleString()}
+          </div>
+        )}
+      </div>
+
+      {/* PSA table */}
+      <FlipSection
+        company="PSA"
+        rows={psaRows}
+        tier={psaTier}
+        costs={PSA_COSTS}
+        onTierChange={setPsaTier}
+      />
+
+      {/* BGS table */}
+      <FlipSection
+        company="BGS"
+        rows={bgsRows}
+        tier={bgsTier}
+        costs={BGS_COSTS}
+        onTierChange={setBgsTier}
+      />
+
+      <div style={{ color: "rgba(255,255,255,0.15)", fontSize: 11, marginTop: 4 }}>
+        Prices from recent eBay sold listings · green = profitable flip
+      </div>
+    </div>
+  );
+}
+
+function calcRow({ grade, key }, graded, buy, fee) {
+  const sell   = graded[key] ?? null;
+  const profit = sell != null ? sell - buy - fee : null;
+  const roi    = (sell != null && buy + fee > 0) ? Math.round((profit / (buy + fee)) * 100) : null;
+  return { grade, sell, profit, roi };
+}
+
+function FlipSection({ company, rows, tier, costs, onTierChange }) {
+  return (
+    <div style={{ marginBottom: 16 }}>
+      {/* Company header + tier picker */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <span style={{ color: "rgba(255,255,255,0.25)", fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+          {company}
+        </span>
+        <select
+          value={tier}
+          onChange={e => onTierChange(e.target.value)}
+          style={{
+            background: "#1c1c1e", border: "1px solid rgba(255,255,255,0.1)",
+            borderRadius: 8, padding: "4px 10px", color: "rgba(255,255,255,0.55)",
+            fontSize: 11, outline: "none", cursor: "pointer",
+          }}
+        >
+          {Object.entries(costs).map(([t, c]) => (
+            <option key={t} value={t}>{t} — ${c} fee</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Table */}
+      <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, overflow: "hidden" }}>
+        {/* Header */}
+        <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr 0.9fr", padding: "7px 12px", borderBottom: "1px solid rgba(255,255,255,0.06)", gap: 4 }}>
+          {["Grade", "Sell", "Profit", "ROI"].map((h, i) => (
+            <div key={h} style={{ color: "rgba(255,255,255,0.18)", fontSize: 9, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", textAlign: i === 0 ? "left" : "right" }}>{h}</div>
+          ))}
+        </div>
+        {rows.map((row, i) => {
+          const good = row.profit != null && row.profit > 0;
+          const breakeven = row.profit != null && Math.abs(row.profit) <= 5;
+          const profitColor = breakeven ? "#ffd60a" : good ? "#30d158" : "#ff453a";
+          return (
+            <div key={row.grade} style={{
+              display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr 0.9fr",
+              padding: "9px 12px", gap: 4,
+              borderBottom: i < rows.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none",
+              background: good ? "rgba(48,209,88,0.04)" : "transparent",
+            }}>
+              <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 12 }}>{row.grade}</div>
+              <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, textAlign: "right" }}>
+                {row.sell != null ? `$${row.sell.toLocaleString()}` : "—"}
+              </div>
+              <div style={{ color: row.profit != null ? profitColor : "rgba(255,255,255,0.2)", fontSize: 12, fontWeight: 600, textAlign: "right" }}>
+                {row.profit != null ? `${row.profit >= 0 ? "+" : ""}$${row.profit.toLocaleString()}` : "—"}
+              </div>
+              <div style={{ color: row.roi != null ? profitColor : "rgba(255,255,255,0.2)", fontSize: 12, fontWeight: 700, textAlign: "right" }}>
+                {row.roi != null ? `${row.roi >= 0 ? "+" : ""}${row.roi}%` : "—"}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
