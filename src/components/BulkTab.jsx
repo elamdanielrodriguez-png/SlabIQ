@@ -1,5 +1,7 @@
-import { useState, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { processImageFile, cropZonesFromImageData, extractJSON } from "../lib/imageUtils";
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function gradeColor(g) {
   if (g == null) return "rgba(255,255,255,0.3)";
@@ -54,7 +56,239 @@ function SubgradeRow({ bgs }) {
   );
 }
 
-function BulkItem({ item, onConfirm, onRemove }) {
+// ── Scan animation on thumbnail while grading ─────────────────────────────────
+
+function BulkScanThumb({ thumb }) {
+  const bw = 7;
+  const bc = "rgba(201,168,76,0.75)";
+  return (
+    <div style={{
+      position: "relative", width: 42, height: 58,
+      borderRadius: 8, overflow: "hidden", flexShrink: 0,
+      boxShadow: "0 2px 8px rgba(0,0,0,0.5)",
+    }}>
+      <img src={thumb} alt="" style={{
+        width: "100%", height: "100%", objectFit: "cover",
+        filter: "brightness(0.38) saturate(0.5)",
+        display: "block",
+      }} />
+
+      {/* Scan line */}
+      <div style={{
+        position: "absolute", left: 0, right: 0, height: 1.5,
+        background: "linear-gradient(90deg, transparent, rgba(201,168,76,0.35) 15%, #c9a84c 50%, rgba(201,168,76,0.35) 85%, transparent)",
+        boxShadow: "0 0 7px rgba(201,168,76,0.9), 0 0 18px rgba(201,168,76,0.35)",
+        animation: "scanLine 1.9s cubic-bezier(0.4,0,0.6,1) infinite",
+      }} />
+
+      {/* Corner brackets */}
+      {[
+        { top: 4, left: 4 },
+        { top: 4, right: 4 },
+        { bottom: 4, left: 4 },
+        { bottom: 4, right: 4 },
+      ].map((pos, i) => (
+        <div key={i} style={{ position: "absolute", width: bw, height: bw, ...pos }}>
+          <div style={{
+            position: "absolute", inset: 0,
+            borderTop:    (i === 0 || i === 1) ? `1.5px solid ${bc}` : "none",
+            borderBottom: (i === 2 || i === 3) ? `1.5px solid ${bc}` : "none",
+            borderLeft:   (i === 0 || i === 2) ? `1.5px solid ${bc}` : "none",
+            borderRight:  (i === 1 || i === 3) ? `1.5px solid ${bc}` : "none",
+            boxShadow: `0 0 4px rgba(201,168,76,0.35)`,
+          }} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Inline grade reveal ───────────────────────────────────────────────────────
+
+const REVEAL_SUBGRADES = [
+  { key: "corners",   label: "CRN" },
+  { key: "edges",     label: "EDG" },
+  { key: "surface",   label: "SRF" },
+  { key: "centering", label: "CTR" },
+];
+
+function CountUp({ target, active }) {
+  const [val, setVal] = useState(0);
+  useEffect(() => {
+    if (!active || target == null) return;
+    let step = 0;
+    const STEPS = 20;
+    const id = setInterval(() => {
+      step++;
+      const eased = 1 - Math.pow(1 - step / STEPS, 3);
+      setVal(Math.round(eased * target * 10) / 10);
+      if (step >= STEPS) { clearInterval(id); setVal(target); }
+    }, 28);
+    return () => clearInterval(id);
+  }, [active, target]);
+  return <>{target != null ? Number(val).toFixed(1) : "—"}</>;
+}
+
+function BulkGradeReveal({ result, onDone }) {
+  const [step,  setStep]  = useState(0); // 1–4 = subgrades revealed; 5 = PSA in
+  const [psaIn, setPsaIn] = useState(false);
+
+  const bgs      = result?.bgs ?? {};
+  const psaGrade = result?.psa?.grade != null ? Number(result.psa.grade) : null;
+  const psaLabel = result?.psa?.label ?? "";
+  const color    = gradeColor(psaGrade);
+  const isGold   = psaGrade >= 10;
+  const isHigh   = psaGrade >= 9;
+
+  const getScore = (key) => bgs[key] != null ? Number(bgs[key]) : null;
+
+  useEffect(() => {
+    const timers = [
+      setTimeout(() => setStep(1), 120),
+      setTimeout(() => setStep(2), 620),
+      setTimeout(() => setStep(3), 1120),
+      setTimeout(() => setStep(4), 1620),
+      setTimeout(() => { setStep(5); setTimeout(() => setPsaIn(true), 60); }, 2300),
+      setTimeout(onDone, 4800),
+    ];
+    return () => timers.forEach(clearTimeout);
+  }, []);
+
+  return (
+    <div style={{
+      borderTop: "1px solid rgba(255,255,255,0.06)",
+      padding: "14px 18px 16px",
+      display: "flex", flexDirection: "column", gap: 10,
+      position: "relative", overflow: "hidden",
+    }}>
+
+      {/* Gold glow behind grade number for high grades */}
+      {isGold && psaIn && (
+        <div style={{
+          position: "absolute", bottom: 0, left: "50%", transform: "translateX(-50%)",
+          width: 160, height: 80,
+          background: "radial-gradient(ellipse at center bottom, rgba(201,168,76,0.22) 0%, transparent 70%)",
+          pointerEvents: "none",
+        }} />
+      )}
+
+      {/* Subgrade chips — appear one by one */}
+      <div style={{ display: "flex", gap: 5 }}>
+        {REVEAL_SUBGRADES.map(({ key, label }, i) => {
+          const visible = step > i;
+          const score   = getScore(key);
+          const c       = gradeColor(score);
+          const gold    = score != null && score >= 9.5;
+          return (
+            <div key={key} style={{
+              flex: 1,
+              display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+              background: visible
+                ? (gold ? "rgba(201,168,76,0.1)" : "rgba(255,255,255,0.05)")
+                : "rgba(255,255,255,0.02)",
+              border: `1px solid ${visible
+                ? (gold ? "rgba(201,168,76,0.38)" : "rgba(255,255,255,0.1)")
+                : "rgba(255,255,255,0.04)"}`,
+              borderRadius: 10, padding: "7px 4px",
+              opacity: visible ? 1 : 0,
+              transform: visible ? "scale(1) translateY(0)" : "scale(0.85) translateY(4px)",
+              transition: "all 0.42s cubic-bezier(0.34,1.56,0.64,1)",
+              boxShadow: visible && gold ? "0 0 10px rgba(201,168,76,0.18)" : "none",
+            }}>
+              <span style={{
+                color: "rgba(255,255,255,0.22)", fontSize: 7, fontWeight: 700,
+                letterSpacing: "0.1em", textTransform: "uppercase",
+              }}>{label}</span>
+              <span style={{
+                color: visible ? c : "transparent",
+                fontSize: 14, fontWeight: 700, lineHeight: 1, letterSpacing: "-0.4px",
+                transition: "color 0.25s ease",
+                animation: visible ? "gradeCountBlur 0.4s ease both" : "none",
+              }}>
+                <CountUp target={score} active={visible} />
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* PSA final grade — slams in after subgrades */}
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+        opacity: step >= 5 ? 1 : 0,
+        transition: "opacity 0.25s ease",
+        paddingTop: 2,
+        position: "relative",
+      }}>
+        {/* Flash ring behind grade */}
+        {psaIn && (
+          <div style={{
+            position: "absolute",
+            width: isGold ? 100 : 80, height: isGold ? 100 : 80,
+            borderRadius: "50%",
+            background: isGold
+              ? "radial-gradient(circle, rgba(201,168,76,0.55) 0%, transparent 68%)"
+              : isHigh
+                ? "radial-gradient(circle, rgba(255,255,255,0.28) 0%, transparent 68%)"
+                : "none",
+            animation: `gradeFlash ${isGold ? "0.85s" : "0.65s"} cubic-bezier(0.22,1,0.36,1) forwards`,
+            pointerEvents: "none",
+          }} />
+        )}
+
+        <div style={{
+          color: "rgba(255,255,255,0.2)", fontSize: 9, fontWeight: 800,
+          letterSpacing: "0.22em", textTransform: "uppercase",
+          alignSelf: "flex-end", paddingBottom: 10,
+        }}>PSA</div>
+
+        <div style={{
+          color,
+          fontSize: 76, fontWeight: 800, lineHeight: 1,
+          letterSpacing: isGold ? "-4px" : "-3px",
+          fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif",
+          fontVariantNumeric: "tabular-nums",
+          textShadow: psaIn && isGold
+            ? "0 0 40px rgba(201,168,76,0.9), 0 0 80px rgba(201,168,76,0.35)"
+            : psaIn && isHigh
+              ? "0 0 24px rgba(255,255,255,0.45)"
+              : "none",
+          animation: psaIn ? "revealSlam 0.55s cubic-bezier(0.22,1,0.36,1) forwards" : "none",
+          transition: "text-shadow 0.5s ease",
+          position: "relative",
+        }}>
+          {psaGrade ?? "—"}
+
+          {/* Gold shimmer overlay for PSA 10 */}
+          {isGold && psaIn && (
+            <div style={{
+              position: "absolute", inset: 0,
+              background: "linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.3) 50%, transparent 70%)",
+              backgroundSize: "200% 100%",
+              animation: "goldShimmer 2.2s ease-in-out 0.3s infinite",
+              WebkitBackgroundClip: "text",
+              pointerEvents: "none",
+            }} />
+          )}
+        </div>
+
+        <div style={{
+          color: isGold ? "rgba(201,168,76,0.6)" : "rgba(255,255,255,0.2)",
+          fontSize: 10, fontWeight: 700, letterSpacing: "-0.1px",
+          alignSelf: "flex-end", paddingBottom: 11,
+          opacity: psaIn ? 1 : 0,
+          transition: "opacity 0.4s ease 0.3s",
+        }}>
+          {psaLabel}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── BulkItem row ─────────────────────────────────────────────────────────────
+
+function BulkItem({ item, onConfirm, onRemove, onRevealDone }) {
   const cardName = item.confirmedCard
     ? item.confirmedCard.player
     : item.candidates?.[0]?.player ?? "Identifying…";
@@ -85,23 +319,31 @@ function BulkItem({ item, onConfirm, onRemove }) {
     return null;
   };
 
-  const psaGrade  = item.result?.psa?.grade;
-  const bgsGrade  = item.result?.bgs?.overall;
-  const psaRec    = item.result?.submission?.psaRecommended;
-  const psa10Val  = item.result?.market?.graded?.psa10;
-  const verdict   = item.result?.verdict ?? "";
+  const psaGrade = item.result?.psa?.grade;
+  const bgsGrade = item.result?.bgs?.overall;
+  const psaRec   = item.result?.submission?.psaRecommended;
+  const psa10Val = item.result?.market?.graded?.psa10;
+  const verdict  = item.result?.verdict ?? "";
 
   return (
     <div style={{
       background: "#1c1c1e",
-      border: `1px solid ${isDone ? "rgba(255,255,255,0.1)" : isPending ? "rgba(255,159,10,0.2)" : "rgba(255,255,255,0.07)"}`,
+      border: `1px solid ${isDone ? "rgba(255,255,255,0.1)" : isPending ? "rgba(255,159,10,0.2)" : isGrading ? "rgba(201,168,76,0.18)" : "rgba(255,255,255,0.07)"}`,
       borderRadius: 20,
       overflow: "hidden",
-      boxShadow: "0 2px 20px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.07)",
+      boxShadow: isGrading
+        ? "0 2px 20px rgba(201,168,76,0.08), inset 0 1px 0 rgba(255,255,255,0.07)"
+        : "0 2px 20px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.07)",
+      transition: "border-color 0.3s ease, box-shadow 0.3s ease",
     }}>
+
       {/* Main row */}
       <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "16px 18px" }}>
-        {item.thumb ? (
+
+        {/* Thumbnail — scan animation while grading, normal otherwise */}
+        {isGrading && item.thumb ? (
+          <BulkScanThumb thumb={item.thumb} />
+        ) : item.thumb ? (
           <img src={item.thumb} alt="" style={{
             width: 42, height: 58, objectFit: "cover", borderRadius: 8,
             flexShrink: 0, opacity: isError ? 0.3 : 1,
@@ -116,21 +358,22 @@ function BulkItem({ item, onConfirm, onRemove }) {
             {cardName}
           </div>
           {cardSub && (
-            <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11, marginBottom: isDone ? 0 : 7, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11, marginBottom: (isDone && !item.revealing) ? 0 : 7, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               {cardSub}
             </div>
           )}
           {!isDone && statusBadge()}
         </div>
 
-        {isDone && (
+        {/* Grade chips — only show after reveal animation finishes */}
+        {isDone && !item.revealing && (
           <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
             <GradeChip label="PSA" grade={psaGrade} sub={item.result?.psa?.label} />
             <GradeChip label="BGS" grade={bgsGrade != null ? bgsGrade : null} />
           </div>
         )}
 
-        {!isWorking && (
+        {!isWorking && !item.revealing && (
           <button onClick={() => onRemove(item.id)} style={{
             background: "none", border: "none", color: "rgba(255,255,255,0.15)",
             fontSize: 22, cursor: "pointer", padding: "0 2px", lineHeight: 1, flexShrink: 0,
@@ -159,22 +402,25 @@ function BulkItem({ item, onConfirm, onRemove }) {
         </div>
       )}
 
-      {/* Done — expanded result */}
-      {isDone && item.result && (
-        <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", padding: "14px 18px", display: "flex", flexDirection: "column", gap: 10 }}>
-          {/* BGS subgrades */}
-          {item.result.bgs && (
-            <SubgradeRow bgs={item.result.bgs} />
-          )}
+      {/* Inline grade reveal animation */}
+      {isDone && item.revealing && item.result && (
+        <BulkGradeReveal
+          result={item.result}
+          onDone={onRevealDone}
+        />
+      )}
 
-          {/* Verdict */}
+      {/* Normal done — expanded result (shown only after reveal finishes) */}
+      {isDone && !item.revealing && item.result && (
+        <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", padding: "14px 18px", display: "flex", flexDirection: "column", gap: 10 }}>
+          {item.result.bgs && <SubgradeRow bgs={item.result.bgs} />}
+
           {verdict && (
             <p style={{ color: "rgba(255,255,255,0.32)", fontSize: 11, lineHeight: 1.65, margin: 0 }}>
               {verdict.length > 220 ? verdict.slice(0, 220) + "…" : verdict}
             </p>
           )}
 
-          {/* Market + submission */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
             {psa10Val ? (
               <div>
@@ -196,13 +442,6 @@ function BulkItem({ item, onConfirm, onRemove }) {
               </div>
             )}
           </div>
-        </div>
-      )}
-
-      {/* Grading progress bar */}
-      {isGrading && (
-        <div style={{ height: 2, background: "rgba(255,255,255,0.05)" }}>
-          <div className="bulk-progress-bar" style={{ height: "100%", background: "#c9a84c", borderRadius: 1 }} />
         </div>
       )}
     </div>
@@ -238,14 +477,20 @@ function saveGrading(parsed) {
   } catch {}
 }
 
+// ── Main BulkTab ──────────────────────────────────────────────────────────────
+
 export default function BulkTab({ session, userPlan, onUpgrade, isLoggedIn, onOpenCamera }) {
-  const [items, setItems] = useState([]);
+  const [items,   setItems]   = useState([]);
   const [grading, setGrading] = useState(false);
   const fileInputRef = useRef();
 
   const authHeaders = () => session ? { Authorization: `Bearer ${session.access_token}` } : {};
-  const openCamera = () => onOpenCamera?.((file) => addImages([file]));
-  const tokensLeft = userPlan ? Math.max(0, userPlan.grade_limit - userPlan.grades_used) : 0;
+  const openCamera  = () => onOpenCamera?.((file) => addImages([file]));
+  const tokensLeft  = userPlan ? Math.max(0, userPlan.grade_limit - userPlan.grades_used) : 0;
+
+  const clearRevealing = (id) => {
+    setItems(prev => prev.map(i => i.id === id ? { ...i, revealing: false } : i));
+  };
 
   const addImages = async (files) => {
     const fileArr = Array.from(files).slice(0, 20);
@@ -262,6 +507,7 @@ export default function BulkTab({ session, userPlan, onUpgrade, isLoggedIn, onOp
       candidates: [],
       confirmedCard: null,
       result: null,
+      revealing: false,
       error: null,
     }));
     setItems(prev => [...prev, ...newItems]);
@@ -281,12 +527,12 @@ export default function BulkTab({ session, userPlan, onUpgrade, isLoggedIn, onOp
           status: 'identifying',
         } : i));
 
-        const res = await fetch('/api/identify', {
+        const res  = await fetch('/api/identify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ images: [processed.imageData] }),
         });
-        const data = await res.json();
+        const data       = await res.json();
         const candidates = data.candidates ?? [];
         if (data.confidence >= 98 && candidates.length === 1) {
           setItems(prev => prev.map(i => i.id === id
@@ -354,7 +600,11 @@ export default function BulkTab({ session, userPlan, onUpgrade, isLoggedIn, onOp
           break;
         }
         const result = extractJSON(data.content?.[0]?.text ?? '');
-        setItems(prev => prev.map(i => i.id === item.id ? { ...i, status: 'done', result } : i));
+        // Set done + revealing:true to trigger the inline grade reveal animation
+        setItems(prev => prev.map(i => i.id === item.id
+          ? { ...i, status: 'done', result, revealing: true }
+          : i
+        ));
         if (result) saveGrading(result);
       } catch {
         setItems(prev => prev.map(i => i.id === item.id ? { ...i, status: 'error', error: 'Grade failed' } : i));
@@ -465,7 +715,13 @@ export default function BulkTab({ session, userPlan, onUpgrade, isLoggedIn, onOp
 
       {/* Card list */}
       {items.map(item => (
-        <BulkItem key={item.id} item={item} onConfirm={confirmItem} onRemove={removeItem} />
+        <BulkItem
+          key={item.id}
+          item={item}
+          onConfirm={confirmItem}
+          onRemove={removeItem}
+          onRevealDone={() => clearRevealing(item.id)}
+        />
       ))}
 
       {/* Pending notice */}
@@ -493,7 +749,7 @@ export default function BulkTab({ session, userPlan, onUpgrade, isLoggedIn, onOp
         </button>
       )}
 
-      {/* Grading progress */}
+      {/* Batch progress */}
       {grading && (
         <div style={{
           background: "#1c1c1e", border: "1px solid rgba(255,255,255,0.08)",
