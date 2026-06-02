@@ -1020,6 +1020,7 @@ app.post('/api/grade', async (req, res) => {
   let gradingModel = 'claude-opus-4-7';
   let planRow = null;
   let tokenCost = 1;
+  let isWhitelisted = false;
   const user = await getUser(req);
 
   if (user && supabaseAdmin) {
@@ -1030,7 +1031,7 @@ app.post('/api/grade', async (req, res) => {
     gradingModel = 'claude-opus-4-7';
     tokenCost = TOKEN_COST[gradingModel] ?? 1;
 
-    const isWhitelisted = WHITELIST_EMAILS.has(user.email);
+    isWhitelisted = WHITELIST_EMAILS.has(user.email);
     if (!isWhitelisted && planRow.grades_used + tokenCost > planRow.grade_limit) {
       return res.status(403).json({
         error: 'You\'ve used all your tokens for this period.',
