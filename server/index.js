@@ -53,6 +53,12 @@ const TOKEN_PACKS = {
 // Token cost per grade — all paid grades use Opus (1 token each); Sonnet reserved for anonymous free grades
 const TOKEN_COST = { 'claude-sonnet-4-6': 1, 'claude-opus-4-7': 1 };
 
+// ── Unlimited-access whitelist ────────────────────────────────────────────────
+// Emails listed here bypass token limits entirely (no deduction, no paywall).
+const WHITELIST_EMAILS = new Set([
+  'aidanbjohnston@gmail.com',
+]);
+
 // ── Auth helper ───────────────────────────────────────────────────────────────
 async function getUser(req) {
   if (!supabaseAdmin) return null;
@@ -785,6 +791,10 @@ app.get('/api/user/plan', async (req, res) => {
   if (!supabaseAdmin) return res.status(503).json({ error: 'Auth not configured' });
   try {
     const plan = await getUserPlan(user.id);
+    // Whitelisted accounts always appear to have unlimited tokens
+    if (WHITELIST_EMAILS.has(user.email)) {
+      return res.json({ plan: { ...plan, grade_limit: 999999, grades_used: 0, plan: 'unlimited' } });
+    }
     res.json({ plan });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1020,7 +1030,8 @@ app.post('/api/grade', async (req, res) => {
     gradingModel = 'claude-opus-4-7';
     tokenCost = TOKEN_COST[gradingModel] ?? 1;
 
-    if (planRow.grades_used + tokenCost > planRow.grade_limit) {
+    const isWhitelisted = WHITELIST_EMAILS.has(user.email);
+    if (!isWhitelisted && planRow.grades_used + tokenCost > planRow.grade_limit) {
       return res.status(403).json({
         error: 'You\'ve used all your tokens for this period.',
         code: 'GRADE_LIMIT_REACHED',
@@ -1357,8 +1368,8 @@ app.post('/api/grade', async (req, res) => {
       console.log('===================');
     } catch (e) { console.log('debug parse error:', e.message); }
 
-    // Deduct tokens for authenticated users
-    if (user && planRow && supabaseAdmin) {
+    // Deduct tokens for authenticated users (skip for whitelisted accounts)
+    if (user && planRow && supabaseAdmin && !isWhitelisted) {
       await supabaseAdmin.from('user_plans')
         .update({ grades_used: planRow.grades_used + tokenCost, updated_at: new Date().toISOString() })
         .eq('id', user.id);
