@@ -50,7 +50,7 @@ Measure how accurately the grading pipeline matches real PSA/BGS outcomes. Drop 
 - **No client-side centering pipeline.** The browser app runs a canvas-based centering measurement before sending to `/api/grade`; this harness skips that step and lets the AI estimate centering directly. So `bgs.centering` numbers here reflect the AI's vision-only estimate, which is the *first-pass* number a user sees before any manual override. Production accuracy is typically a bit better because the canvas measurement is more precise.
 - **No zoom-in zone crops.** Same reason — the browser slices 8 corner/edge crops before the API call. Without them, the AI has to do whole-image inspection. Add them later if accuracy plateaus.
 - **eBay market data noise.** Each grading call also pulls eBay comps. That doesn't affect subgrades but does slow each run. Use the `--only` flag to iterate on a single card faster.
-- **Costs API credits.** Each card is one Claude grading call (`claude-opus-4-7`) plus a Haiku call for market bucketing.
+- **Costs API credits.** Each card is one Claude grading call (`claude-opus-4-8`) plus a Haiku call for market bucketing.
 
 ## CLI flags
 

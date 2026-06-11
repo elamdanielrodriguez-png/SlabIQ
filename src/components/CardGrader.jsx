@@ -368,7 +368,7 @@ export default function CardGrader() {
   const [freeGradesUsed, setFreeGradesUsed] = useState(
     () => parseInt(localStorage.getItem(FREE_GRADE_KEY) || '0')
   );
-  const [selectedModel, setSelectedModel] = useState('claude-opus-4-7');
+  const [selectedModel, setSelectedModel] = useState('claude-opus-4-8');
   const [purchaseSuccess, setPurchaseSuccess] = useState(null); // null | 'polling' | 'confirmed'
   const [popLoading, setPopLoading] = useState(false);
 

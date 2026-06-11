@@ -575,7 +575,7 @@ export default function BulkTab({ session, userPlan, onUpgrade, isLoggedIn, onOp
         const res = await fetch('/api/grade', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...authHeaders() },
-          body: JSON.stringify({ images: [item.imageData], confirmedCard: item.confirmedCard, zoneCrops, measuredCentering: item.centering ?? null, gradingModel: 'claude-opus-4-7' }),
+          body: JSON.stringify({ images: [item.imageData], confirmedCard: item.confirmedCard, zoneCrops, measuredCentering: item.centering ?? null, gradingModel: 'claude-opus-4-8' }),
         });
         if (res.status === 403) {
           setItems(prev => prev.map(i => (i.status === 'confirmed' || i.id === item.id) ? { ...i, status: 'error', error: 'Out of tokens' } : i));

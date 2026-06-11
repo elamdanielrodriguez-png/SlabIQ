@@ -51,7 +51,7 @@ const TOKEN_PACKS = {
 };
 
 // Token cost per grade — all paid grades use Opus (1 token each); Sonnet reserved for anonymous free grades
-const TOKEN_COST = { 'claude-sonnet-4-6': 1, 'claude-opus-4-7': 1 };
+const TOKEN_COST = { 'claude-sonnet-4-6': 1, 'claude-opus-4-8': 1 };
 
 // ── Unlimited-access whitelist ────────────────────────────────────────────────
 // Emails listed here bypass token limits entirely (no deduction, no paywall).
@@ -1017,7 +1017,7 @@ app.post('/api/grade', async (req, res) => {
   const { images, imageData, mediaType = 'image/jpeg', confirmedCard, zoneCrops, backZoneCrops, measuredCentering } = req.body;
 
   // ── Auth + plan check ──────────────────────────────────────────────────────
-  let gradingModel = 'claude-opus-4-7';
+  let gradingModel = 'claude-opus-4-8';
   let planRow = null;
   let tokenCost = 1;
   let isWhitelisted = false;
@@ -1028,7 +1028,7 @@ app.post('/api/grade', async (req, res) => {
     if (!planRow) return res.status(500).json({ error: 'Could not load user plan' });
 
     // All paid grades use Opus for best accuracy
-    gradingModel = 'claude-opus-4-7';
+    gradingModel = 'claude-opus-4-8';
     tokenCost = TOKEN_COST[gradingModel] ?? 1;
 
     isWhitelisted = WHITELIST_EMAILS.has(user.email);

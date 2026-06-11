@@ -136,7 +136,7 @@ async function improvePrompts(systemPrompt, gradingPrompt, failureReport, report
   const gradingInstructions = schemaIdx >= 0 ? gradingPrompt.slice(0, schemaIdx).trim() : gradingPrompt;
 
   const response = await anthropic.messages.create({
-    model: 'claude-opus-4-7',
+    model: 'claude-opus-4-8',
     max_tokens: 4000,
     messages: [{
       role: 'user',
