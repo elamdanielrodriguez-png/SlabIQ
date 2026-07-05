@@ -21,18 +21,22 @@ const FREE_LIMIT = 2;
 const FREE_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
 const ipFreeGrades = new Map(); // ip → { count, resetAt }
 
-function checkFreeLimit(ip) {
+// Check and consume are split so a free grade is only burned after a
+// successful grading call — not on validation errors or upstream failures.
+function freeGradesRemaining(ip) {
+  const entry = ipFreeGrades.get(ip);
+  if (!entry || Date.now() > entry.resetAt) return FREE_LIMIT;
+  return Math.max(0, FREE_LIMIT - entry.count);
+}
+
+function consumeFreeGrade(ip) {
   const now = Date.now();
   const entry = ipFreeGrades.get(ip);
   if (!entry || now > entry.resetAt) {
     ipFreeGrades.set(ip, { count: 1, resetAt: now + FREE_WINDOW_MS });
-    return { allowed: true, remaining: FREE_LIMIT - 1 };
+  } else {
+    entry.count++;
   }
-  if (entry.count >= FREE_LIMIT) {
-    return { allowed: false, remaining: 0 };
-  }
-  entry.count++;
-  return { allowed: true, remaining: FREE_LIMIT - entry.count };
 }
 
 // ── Supabase admin (service key — bypasses RLS) ──────────────────────────────
@@ -492,23 +496,6 @@ function edgeCategoryGrade(severities) {
   return 6.0;
 }
 
-function computeSubgradesFromVerifications(verifications) {
-  const corners = [], edges = [], surface = [];
-  for (const v of verifications ?? []) {
-    if (v.cleared) continue;
-    const sev = v.severity ?? inferSeverity(v.reason ?? '');
-    if (CORNER_IDS.has(v.id))  corners.push(sev);
-    else if (SURFACE_IDS.has(v.id)) surface.push(sev);
-    else edges.push(sev);
-  }
-  return {
-    corners:  categoryGrade(corners),
-    edges:    categoryGrade(edges),
-    surface:  categoryGrade(surface),
-    _debug: { corners, edges, surface },
-  };
-}
-
 const PSA_LABELS = { 10: 'GEM MT', 9: 'MINT', 8: 'NM-MT', 7: 'NM', 6: 'EX-MT', 5: 'EX', 4: 'VG-EX', 3: 'VG', 2: 'GOOD', 1: 'PR' };
 
 // Second-pass zone review: re-examine only the flagged zones with fresh eyes.
@@ -580,45 +567,29 @@ Return ONLY a JSON array, no prose:
     const overall = Math.min(rounded, lowest + 0.5);
     const isBlackLabel = subs.length === 4 && subs.every(v => v === 10.0);
 
-    const psaWeakest = Math.min(corners, edges, surface);
-    const psaCap = psaWeakest >= 9.5 ? 10 : psaWeakest >= 9.0 ? 9 : psaWeakest >= 8.0 ? 8 : psaWeakest >= 7.0 ? 7 : psaWeakest >= 6.0 ? 6 : 5;
-    const psaGrade = Math.max(1, Math.min(psaCap, Math.round(avg)));
+    const allSevs = [...cornerSevs, ...edgeSevs, ...surfaceSevs];
+    const psaGrade = computePsaGrade(avg, {
+      corners, edges, surface, centering: c,
+      totalObvious: allSevs.filter(s => s === 'obvious').length,
+      totalVisible: allSevs.filter(s => s === 'visible').length,
+    });
 
     console.log(`2nd pass result: PSA ${parsedResult.psa?.grade} → ${psaGrade}, BGS ${parsedResult.bgs?.overall} → ${overall}`);
-    return {
+    const revised = {
       ...parsedResult,
       zones: updatedZones,
       bgs: { ...parsedResult.bgs, corners, edges, surface, overall, isBlackLabel },
       psa: { grade: psaGrade, label: PSA_LABELS[psaGrade] || '' },
     };
+    // Keep the Submit tab in sync with the revised grades
+    if (revised.submission) {
+      revised.submission = { ...revised.submission, psaExpectedGrade: psaGrade, bgsExpectedGrade: overall };
+    }
+    return revised;
   } catch (err) {
     console.warn('Second pass failed:', err.message);
     return parsedResult;
   }
-}
-
-const VAGUE_CENTERING_RE = [
-  /slight\w*\s+(?:centering|off-?cent\w*)[^.!?]*/gi,
-  /(?:centering\s+)?(?:concern|imbalance|issue|problem|deviation|variance)\s*(?:with\s+centering)?[^.!?]*/gi,
-  /marginal\s+centering[^.!?]*/gi,
-  /(?:a\s+)?(?:bit|little|touch|tad|minor|minor\s+)?(?:off-?cent\w*|miscent\w*)[^.!?]*/gi,
-  /centering\s+appears?\s+(?:slightly|marginally|somewhat|a\s+(?:bit|little))\w*[^.!?]*/gi,
-];
-
-function cleanVagueCentering(str, worstAxisRatio) {
-  let out = str;
-  const replacement = worstAxisRatio
-    ? `centering measures ${worstAxisRatio}`
-    : 'centering within tolerance';
-  for (const re of VAGUE_CENTERING_RE) out = out.replace(re, replacement);
-  return out;
-}
-
-function psaCenteringGradeFromWorst(worst) {
-  if (worst <= 55) return 'PSA 10';
-  if (worst <= 60) return 'PSA 9';
-  if (worst <= 65) return 'PSA 8';
-  return 'PSA 7';
 }
 
 function bgsCenteringFromWorst(worst) {
@@ -628,6 +599,49 @@ function bgsCenteringFromWorst(worst) {
   if (worst <= 65) return 8.5;
   if (worst <= 70) return 8.0;
   return 7.5;
+}
+
+// PSA grade from subgrades: round of average, then capped by the weakest
+// non-centering zone, by centering, and by widespread obvious damage.
+// Single source of truth — used by both the first-pass sanitizer and the
+// second-pass zone review so the caps can't drift apart.
+function computePsaGrade(avg, { corners, edges, surface, centering, totalObvious = 0, totalVisible = 0 }) {
+  let psa = Math.max(1, Math.min(10, Math.round(avg)));
+
+  // PSA graders don't average; they cap on the worst zone.
+  const weakest = Math.min(
+    typeof corners === 'number' ? corners : 10,
+    typeof edges   === 'number' ? edges   : 10,
+    typeof surface === 'number' ? surface : 10,
+  );
+  const weakestCap =
+    weakest >= 9.5 ? 10 :
+    weakest >= 9.0 ?  9 :
+    weakest >= 8.0 ?  8 :
+    weakest >= 7.0 ?  7 :
+    weakest >= 6.0 ?  6 : 5;
+  psa = Math.min(psa, weakestCap);
+
+  // BGS centering maps directly to PSA centering limits:
+  // BGS 9.5+ = ≤55/45 → PSA 10 allowed | BGS 9.0 = ≤60/40 → PSA 9 max | etc.
+  const c = typeof centering === 'number' ? centering : null;
+  const centeringCap =
+    c == null ? 10 :
+    c >= 9.5  ? 10 :
+    c >= 9.0  ?  9 :
+    c >= 8.0  ?  8 :
+    c >= 7.5  ?  7 :
+    c >= 7.0  ?  6 : 5;
+  psa = Math.min(psa, centeringCap);
+
+  // Widespread obvious flaws (e.g. PSA 2 vintage) — averaging alone masks them.
+  if      (totalObvious >= 8) psa = Math.min(psa, 1);
+  else if (totalObvious >= 6) psa = Math.min(psa, 2);
+  else if (totalObvious >= 4) psa = Math.min(psa, 3);
+  else if (totalObvious >= 2 && totalVisible >= 3) psa = Math.min(psa, 4);
+  else if (totalObvious >= 2) psa = Math.min(psa, 5);
+
+  return psa;
 }
 
 function sanitizeGradingResponse(rawText, measuredCentering) {
@@ -703,42 +717,9 @@ function sanitizeGradingResponse(rawText, measuredCentering) {
       parsed.bgs.overall = Math.min(rounded, lowest + 0.5);
       parsed.bgs.isBlackLabel = subs.length === 4 && subs.every(v => v === 10.0);
 
-      // PSA: round of average, then cap by weakest non-centering subgrade.
-      // Averaging alone masks damage — a single bad edge with perfect corners/surface
-      // still averages high. PSA graders don't average; they cap on the worst zone.
-      let psaGrade = Math.max(1, Math.min(10, Math.round(avg)));
-      const psaWeakest = Math.min(
-        typeof corners === 'number' ? corners : 10,
-        typeof edges   === 'number' ? edges   : 10,
-        typeof surface === 'number' ? surface : 10,
-      );
-      const psaCapFromWeakest =
-        psaWeakest >= 9.5 ? 10 :
-        psaWeakest >= 9.0 ?  9 :
-        psaWeakest >= 8.0 ?  8 :
-        psaWeakest >= 7.0 ?  7 :
-        psaWeakest >= 6.0 ?  6 : 5;
-      psaGrade = Math.min(psaGrade, psaCapFromWeakest);
-
-      // Also cap PSA by centering — BGS centering maps directly to PSA centering limits
-      // BGS 9.5+ = ≤55/45 → PSA 10 allowed | BGS 9.0 = ≤60/40 → PSA 9 max | etc.
-      const psaCenteringCap =
-        c == null ? 10 :
-        c >= 9.5  ? 10 :
-        c >= 9.0  ?  9 :
-        c >= 8.0  ?  8 :
-        c >= 7.5  ?  7 :
-        c >= 7.0  ?  6 : 5;
-      psaGrade = Math.min(psaGrade, psaCenteringCap);
-
-      // Secondary cap: widespread obvious flaws (e.g. PSA 2 vintage with damage everywhere)
       const totalObvious = parsed._totalObvious ?? 0;
       const totalVisible = parsed._totalVisible ?? 0;
-      if      (totalObvious >= 8) psaGrade = Math.min(psaGrade, 1);
-      else if (totalObvious >= 6) psaGrade = Math.min(psaGrade, 2);
-      else if (totalObvious >= 4) psaGrade = Math.min(psaGrade, 3);
-      else if (totalObvious >= 2 && totalVisible >= 3) psaGrade = Math.min(psaGrade, 4);
-      else if (totalObvious >= 2) psaGrade = Math.min(psaGrade, 5);
+      const psaGrade = computePsaGrade(avg, { corners, edges, surface, centering: c, totalObvious, totalVisible });
       delete parsed._totalObvious; delete parsed._totalVisible;
 
       if (!parsed.psa) parsed.psa = {};
@@ -838,8 +819,16 @@ app.post('/api/fetch-listing', async (req, res) => {
   let { url } = req.body;
   if (!url?.trim()) return res.status(400).json({ error: 'URL required' });
   url = url.trim();
+  if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
 
-  if (!url.includes('ebay.com') && !url.includes('ebay.us')) {
+  // Verify the hostname is actually eBay — a substring check would pass
+  // attacker URLs like https://evil.com/?x=ebay.com and make us fetch them.
+  let hostname;
+  try { hostname = new URL(url).hostname.toLowerCase(); } catch {
+    return res.status(400).json({ error: 'That doesn\'t look like a valid URL' });
+  }
+  const isEbayHost = ['ebay.com', 'ebay.us'].some(d => hostname === d || hostname.endsWith(`.${d}`));
+  if (!isEbayHost) {
     return res.status(400).json({ error: 'Only eBay listing URLs are supported right now' });
   }
 
@@ -1016,11 +1005,22 @@ RULES:
 app.post('/api/grade', async (req, res) => {
   const { images, imageData, mediaType = 'image/jpeg', confirmedCard, zoneCrops, backZoneCrops, measuredCentering } = req.body;
 
+  // Validate the request before any limit checks so a bad payload never costs a grade
+  const imageList = images || (imageData ? [imageData] : null);
+
+  if (!imageList || imageList.length === 0) {
+    return res.status(400).json({ error: 'At least one image is required' });
+  }
+  if (imageList.length > 10) {
+    return res.status(400).json({ error: 'Maximum 10 images allowed' });
+  }
+
   // ── Auth + plan check ──────────────────────────────────────────────────────
   let gradingModel = 'claude-opus-4-8';
   let planRow = null;
   let tokenCost = 1;
   let isWhitelisted = false;
+  let freeGradeIp = null; // set for anonymous users; consumed only on success
   const user = await getUser(req);
 
   if (user && supabaseAdmin) {
@@ -1043,22 +1043,13 @@ app.post('/api/grade', async (req, res) => {
   } else if (!user) {
     // No account — enforce IP-based free limit so incognito/multi-browser abuse is blocked
     const ip = req.ip || req.socket?.remoteAddress || 'unknown';
-    const { allowed } = checkFreeLimit(ip);
-    if (!allowed) {
+    if (freeGradesRemaining(ip) <= 0) {
       return res.status(403).json({
         error: 'Free limit reached. Sign in to keep grading.',
         code: 'GRADE_LIMIT_REACHED',
       });
     }
-  }
-
-  const imageList = images || (imageData ? [imageData] : null);
-
-  if (!imageList || imageList.length === 0) {
-    return res.status(400).json({ error: 'At least one image is required' });
-  }
-  if (imageList.length > 10) {
-    return res.status(400).json({ error: 'Maximum 10 images allowed' });
+    freeGradeIp = ip;
   }
 
   try {
@@ -1227,7 +1218,6 @@ app.post('/api/grade', async (req, res) => {
     try {
       const preParsed = JSON.parse(text);
       const yearNum = parseInt(confirmedCard?.year, 10) || 0;
-      const variantLowerSkip = (confirmedCard?.variant ?? '').toLowerCase();
       if (yearNum > 0 && yearNum < 1980) { skipEbay = true; skipReason = 'vintage'; }
       // Note: oversized-prone variants (Downtown etc.) are no longer skipped —
       // fetchMarketComps has $200 graded floor + title exclusions that filter 5x7s.
@@ -1376,6 +1366,9 @@ app.post('/api/grade', async (req, res) => {
         .eq('id', user.id);
       console.log(`Tokens: ${user.id} → ${planRow.grades_used + tokenCost}/${planRow.grade_limit} (${planRow.plan}, ${gradingModel}, -${tokenCost})`);
     }
+
+    // Burn the anonymous free grade only now that grading actually succeeded
+    if (freeGradeIp) consumeFreeGrade(freeGradeIp);
 
     res.json({ content: [{ type: 'text', text }] });
   } catch (err) {

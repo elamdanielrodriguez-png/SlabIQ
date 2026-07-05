@@ -1,5 +1,7 @@
 .env
 .claude/
+# one-time setup script — contains hardcoded Supabase service key, never commit
+setup.mjs
 
 # Logs
 logs
