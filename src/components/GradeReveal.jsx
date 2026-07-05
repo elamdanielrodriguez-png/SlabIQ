@@ -1,151 +1,5 @@
 import { useState, useEffect } from "react";
-
-function shareColor(g) {
-  if (g >= 10) return "#c9a84c";
-  if (g >= 9)  return "#e0e0e0";
-  if (g >= 8)  return "#aaaaaa";
-  if (g >= 6)  return "#ffb43c";
-  return "#ff453a";
-}
-
-async function generateShareCanvas(result) {
-  const grade     = result?.psa?.grade != null ? Number(result.psa.grade) : null;
-  const is10      = grade >= 10;
-  const gradeName = PSA_FULL_NAME[grade] ?? result?.psa?.label ?? "";
-  const color     = grade != null ? shareColor(grade) : "#888";
-  const S         = 1080;
-
-  const canvas = document.createElement("canvas");
-  canvas.width = S; canvas.height = S;
-  const ctx = canvas.getContext("2d");
-
-  // Background
-  ctx.fillStyle = "#080808";
-  ctx.fillRect(0, 0, S, S);
-
-  // Gold radial glow for 10
-  if (is10) {
-    const grd = ctx.createRadialGradient(S/2, S*0.42, 0, S/2, S*0.42, S*0.52);
-    grd.addColorStop(0, "rgba(201,168,76,0.20)");
-    grd.addColorStop(0.55, "rgba(201,168,76,0.06)");
-    grd.addColorStop(1, "transparent");
-    ctx.fillStyle = grd;
-    ctx.fillRect(0, 0, S, S);
-  }
-
-  // Horizontal accent lines (top + bottom)
-  const drawLine = (y) => {
-    const lg = ctx.createLinearGradient(0, y, S, y);
-    lg.addColorStop(0,    "transparent");
-    lg.addColorStop(0.25, color + (is10 ? "55" : "28"));
-    lg.addColorStop(0.5,  color + (is10 ? "99" : "44"));
-    lg.addColorStop(0.75, color + (is10 ? "55" : "28"));
-    lg.addColorStop(1,    "transparent");
-    ctx.strokeStyle = lg;
-    ctx.lineWidth = is10 ? 1.5 : 1;
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(S, y); ctx.stroke();
-  };
-  drawLine(88);
-  drawLine(S - 88);
-
-  // PSA label
-  ctx.fillStyle = "rgba(255,255,255,0.18)";
-  ctx.font = "600 28px -apple-system, system-ui, sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "alphabetic";
-  ctx.fillText("P  S  A", S/2, 172);
-
-  // Big grade number
-  const numSize = is10 ? 380 : 340;
-  ctx.font = `800 ${numSize}px -apple-system, system-ui, sans-serif`;
-  ctx.textBaseline = "middle";
-  if (is10) { ctx.shadowColor = color; ctx.shadowBlur = 80; }
-  ctx.fillStyle = color;
-  ctx.fillText(grade != null ? String(grade) : "—", S/2, S * 0.42);
-  ctx.shadowBlur = 0;
-
-  // Grade name
-  if (gradeName) {
-    ctx.textBaseline = "alphabetic";
-    ctx.fillStyle = is10 ? color : color + "99";
-    ctx.font = `700 40px -apple-system, system-ui, sans-serif`;
-    ctx.fillText(gradeName.toUpperCase(), S/2, S * 0.67);
-  }
-
-  // Divider
-  ctx.strokeStyle = "rgba(255,255,255,0.07)";
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(80, S*0.73); ctx.lineTo(S-80, S*0.73); ctx.stroke();
-
-  // Player name — scale down if too wide
-  const player = result?.player ?? "";
-  let pSize = 58;
-  ctx.font = `700 ${pSize}px -apple-system, system-ui, sans-serif`;
-  while (ctx.measureText(player).width > S - 160 && pSize > 26) {
-    pSize -= 2;
-    ctx.font = `700 ${pSize}px -apple-system, system-ui, sans-serif`;
-  }
-  ctx.fillStyle = "rgba(255,255,255,0.88)";
-  ctx.fillText(player, S/2, S * 0.81);
-
-  // Year · Set · Variant
-  const sub = [result?.year, result?.set, result?.variant].filter(Boolean).join("  ·  ");
-  if (sub) {
-    let sSize = 28;
-    ctx.font = `400 ${sSize}px -apple-system, system-ui, sans-serif`;
-    while (ctx.measureText(sub).width > S - 160 && sSize > 16) {
-      sSize -= 1;
-      ctx.font = `400 ${sSize}px -apple-system, system-ui, sans-serif`;
-    }
-    ctx.fillStyle = "rgba(255,255,255,0.28)";
-    ctx.fillText(sub, S/2, S * 0.88);
-  }
-
-  // Branding
-  ctx.fillStyle = "rgba(255,255,255,0.14)";
-  ctx.font = "500 22px -apple-system, system-ui, sans-serif";
-  ctx.fillText("CardGradeOrNot.com", S/2, S - 34);
-
-  return canvas;
-}
-
-async function shareGrade(result) {
-  const canvas = await generateShareCanvas(result);
-  return new Promise((resolve) => {
-    canvas.toBlob(async (blob) => {
-      const grade    = result?.psa?.grade != null ? `PSA${result.psa.grade}` : "grade";
-      const player   = (result?.player ?? "card").replace(/\s+/g, "_").slice(0, 40);
-      const filename = `${player}_${grade}.png`;
-      const file     = new File([blob], filename, { type: "image/png" });
-
-      if (navigator.canShare?.({ files: [file] })) {
-        try {
-          await navigator.share({ files: [file], title: `${result?.player ?? "Card"} — PSA ${result?.psa?.grade}` });
-          resolve(); return;
-        } catch {}
-      }
-      // Fallback: trigger download
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url; a.download = filename; a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-      resolve();
-    }, "image/png");
-  });
-}
-
-const PSA_FULL_NAME = {
-  10: "Gem Mint",
-  9:  "Mint",
-  8:  "NM-MT",
-  7:  "Near Mint",
-  6:  "EX-MT",
-  5:  "Excellent",
-  4:  "VG-EX",
-  3:  "Very Good",
-  2:  "Good",
-  1:  "Poor",
-};
+import { shareGrade, PSA_FULL_NAME } from "../lib/shareCard";
 
 function gradeColor(g) {
   if (!g && g !== 0) return "rgba(255,255,255,0.55)";
@@ -384,7 +238,6 @@ function JudgeCard({ judge, score, visible, idx }) {
       {/* Score */}
       <div style={{
         opacity: visible ? 1 : 0,
-        transition: "opacity 0.3s ease 0.15s",
         color, fontSize: 46, fontWeight: 800,
         letterSpacing: "-2.5px", lineHeight: 1,
         fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif",
@@ -403,7 +256,7 @@ function JudgeCard({ judge, score, visible, idx }) {
   );
 }
 
-export default function GradeReveal({ result, onDone }) {
+export default function GradeReveal({ result, frontImage, onDone }) {
   const psaRaw = result?.psa?.grade;
   const bgsRaw = result?.bgs?.overall;
   const grade  = psaRaw != null ? Number(psaRaw) : null;
@@ -715,7 +568,7 @@ export default function GradeReveal({ result, onDone }) {
           e.stopPropagation();
           if (sharing || phase < 5) return;
           setSharing(true);
-          try { await shareGrade(result); } finally { setSharing(false); }
+          try { await shareGrade(result, frontImage); } finally { setSharing(false); }
         }}
         style={{
           position: "absolute", bottom: 96,

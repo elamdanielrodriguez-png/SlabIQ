@@ -925,6 +925,7 @@ export default function CardGrader() {
       {showReveal && result && (
         <GradeReveal
           result={result}
+          frontImage={(images.find(i => i.role === "front") ?? images[0])?.objectURL ?? null}
           onDone={() => setShowReveal(false)}
         />
       )}

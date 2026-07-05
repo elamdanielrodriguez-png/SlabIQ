@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect, useMemo } from "react";
+import { shareGrade } from "../lib/shareCard";
 
 // Camera capture with a fixed 5:7 rectangle overlay. User aligns the card inside
 // the rectangle and taps capture. Captured frame is cropped to exactly the
@@ -848,48 +849,6 @@ function cleanCenteringText(text, cm) {
     }
   }
   return out;
-}
-
-function computeCentering(cm) {
-  if (!cm) return null;
-  // support both old flat format and new {front, back} format
-  const f = cm.front ?? cm;
-  const b = cm.back ?? null;
-  const lr = Math.max(f.leftPct ?? 50, f.rightPct ?? 50);
-  const tb = Math.max(f.topPct ?? 50, f.bottomPct ?? 50);
-  const worst = Math.max(lr, tb);
-  const narrow = 100 - worst;
-  const ratio = `${worst}/${narrow}`;
-  let psaGrade, bgsSubgrade, color;
-  if (worst <= 52) { psaGrade = "PSA 10"; bgsSubgrade = 10.0; color = "#30d158"; }
-  else if (worst <= 55) { psaGrade = "PSA 10"; bgsSubgrade = 9.5; color = "#30d158"; }
-  else if (worst <= 60) { psaGrade = "PSA 9"; bgsSubgrade = 9.0; color = "#ffd60a"; }
-  else if (worst <= 65) { psaGrade = "PSA 8"; bgsSubgrade = 8.5; color = "#ffd60a"; }
-  else if (worst <= 70) { psaGrade = "PSA 7"; bgsSubgrade = 8.0; color = "#ff453a"; }
-  else { psaGrade = "PSA 6 or lower"; bgsSubgrade = 7.5; color = "#ff453a"; }
-
-  // back centering — PSA is more lenient (75/25 = PSA 10)
-  let backResult = null;
-  if (b) {
-    const blr = Math.max(b.leftPct ?? 50, b.rightPct ?? 50);
-    const btb = Math.max(b.topPct ?? 50, b.bottomPct ?? 50);
-    const bworst = Math.max(blr, btb);
-    const bnarrow = 100 - bworst;
-    const bcolor = bworst <= 75 ? "#30d158" : bworst <= 80 ? "#ffd60a" : "#ff453a";
-    const bgrade = bworst <= 75 ? "PSA 10" : bworst <= 80 ? "PSA 9" : "PSA 8–";
-    backResult = {
-      lrRatio: `${blr}/${100 - blr}`,
-      tbRatio: `${btb}/${100 - btb}`,
-      worstRatio: `${bworst}/${bnarrow}`,
-      psaGrade: bgrade,
-      color: bcolor,
-    };
-  }
-
-  return { lr, tb, worst, ratio, psaGrade, bgsSubgrade, color, back: backResult,
-    lrRatio: `${lr}/${100 - lr}`,
-    tbRatio: `${tb}/${100 - tb}`,
-  };
 }
 
 const ROLE_LABEL = { front: 'Front', back: 'Back', detail: 'Detail' };
@@ -1950,22 +1909,7 @@ export default function GradeTab({ images, result, candidates, loading, error, o
           <button
             onClick={async () => {
               try {
-                const blob = await generateShareImage(displayResult);
-                const file = new File([blob], 'cgon-grade.png', { type: 'image/png' });
-                if (navigator.share && navigator.canShare?.({ files: [file] })) {
-                  await navigator.share({
-                    files: [file],
-                    title: `${result.player} — PSA ${displayResult.psa?.grade}`,
-                    text: `Just graded my ${[result.year, result.player, result.variant].filter(Boolean).join(' ')} on CardGradeOrNot — PSA ${displayResult.psa?.grade} / BGS ${displayResult.bgs?.overall}`,
-                  });
-                } else {
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = `cgon-${(result.player || 'grade').replace(/\s+/g, '-')}.png`;
-                  a.click();
-                  URL.revokeObjectURL(url);
-                }
+                await shareGrade(displayResult, frontImg?.objectURL ?? null);
               } catch (e) {
                 if (e.name !== 'AbortError') console.warn('Share failed:', e);
               }
@@ -2004,84 +1948,6 @@ export default function GradeTab({ images, result, candidates, loading, error, o
       )}
     </div>
   );
-}
-
-async function generateShareImage(result) {
-  const S = 600;
-  const canvas = document.createElement('canvas');
-  canvas.width = S; canvas.height = S;
-  const ctx = canvas.getContext('2d');
-
-  ctx.fillStyle = '#000';
-  ctx.fillRect(0, 0, S, S);
-
-  const grd = ctx.createRadialGradient(S/2, 0, 0, S/2, 0, S * 0.7);
-  grd.addColorStop(0, 'rgba(201,168,76,0.2)');
-  grd.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = grd;
-  ctx.fillRect(0, 0, S, S);
-
-  ctx.strokeStyle = 'rgba(201,168,76,0.25)';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(0.5, 0.5, S-1, S-1);
-
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#fff';
-  ctx.font = '700 20px system-ui, Arial, sans-serif';
-  ctx.fillText('CardGradeOrNot', S/2, 52);
-  ctx.fillStyle = '#c9a84c';
-  ctx.font = '500 10px system-ui, Arial, sans-serif';
-  ctx.fillText('PSA  ·  BGS  ·  AI GRADER', S/2, 70);
-
-  ctx.fillStyle = '#fff';
-  ctx.font = '700 26px system-ui, Arial, sans-serif';
-  ctx.fillText(result.player || 'Unknown', S/2, 148);
-  ctx.fillStyle = 'rgba(255,255,255,0.38)';
-  ctx.font = '400 14px system-ui, Arial, sans-serif';
-  ctx.fillText([result.year, result.set, result.variant].filter(Boolean).join('  ·  '), S/2, 172);
-
-  const rule = (y) => { ctx.strokeStyle = 'rgba(255,255,255,0.07)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(60, y); ctx.lineTo(S-60, y); ctx.stroke(); };
-  rule(200);
-
-  const psaGrade = result.psa?.grade;
-  ctx.fillStyle = 'rgba(255,255,255,0.22)';
-  ctx.font = '600 11px system-ui, Arial, sans-serif';
-  ctx.fillText('PSA', S/4, 238);
-  ctx.fillStyle = psaGrade >= 10 ? '#c9a84c' : psaGrade >= 9 ? '#f0f0f0' : 'rgba(255,255,255,0.65)';
-  ctx.font = '800 100px system-ui, Arial, sans-serif';
-  ctx.fillText(psaGrade ?? '—', S/4, 356);
-  ctx.fillStyle = 'rgba(255,255,255,0.28)';
-  ctx.font = '600 11px system-ui, Arial, sans-serif';
-  ctx.fillText(result.psa?.label ?? '', S/4, 376);
-
-  ctx.strokeStyle = 'rgba(255,255,255,0.07)';
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(S/2, 216); ctx.lineTo(S/2, 392); ctx.stroke();
-
-  const bgsGrade = result.bgs?.overall;
-  ctx.fillStyle = 'rgba(255,255,255,0.22)';
-  ctx.font = '600 11px system-ui, Arial, sans-serif';
-  ctx.fillText('BGS', S*3/4, 238);
-  ctx.fillStyle = bgsGrade >= 10 ? '#c9a84c' : bgsGrade >= 9 ? '#f0f0f0' : 'rgba(255,255,255,0.65)';
-  ctx.font = '800 100px system-ui, Arial, sans-serif';
-  ctx.fillText(bgsGrade != null ? Number(bgsGrade).toFixed(1) : '—', S*3/4, 356);
-  ctx.fillStyle = 'rgba(255,255,255,0.28)';
-  ctx.font = '600 11px system-ui, Arial, sans-serif';
-  ctx.fillText(result.bgs?.isBlackLabel ? 'BLACK LABEL' : bgsGrade >= 9.5 ? 'GEM MINT' : bgsGrade >= 9 ? 'MINT' : bgsGrade >= 8 ? 'NM-MT' : '', S*3/4, 376);
-
-  rule(406);
-
-  if (result.market?.raw) {
-    ctx.fillStyle = 'rgba(255,255,255,0.18)';
-    ctx.font = '400 12px system-ui, Arial, sans-serif';
-    ctx.fillText(`Raw value  $${result.market.raw}`, S/2, 432);
-  }
-
-  ctx.fillStyle = 'rgba(255,255,255,0.13)';
-  ctx.font = '400 11px system-ui, Arial, sans-serif';
-  ctx.fillText('CardGradeOrNot.com', S/2, S - 22);
-
-  return new Promise(res => canvas.toBlob(res, 'image/png'));
 }
 
 function gradeColor(g, blackLabel) {
